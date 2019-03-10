@@ -101,11 +101,20 @@ int idt_test_extensive(){
 	return result;
 }
 
+/*
+ * Paging Test
+ * Attempts to write to all valid paged memory, which should not cause an error
+ * Then, it attempts to write to address 0x0, which should cause a page fault
+ *
+ * INPUTS: None
+ * OUTPUTS: None
+ * SIDE EFFECTS: causes a page fault if paging is correctly setup
+ */
 void paging_test() {
 	volatile unsigned char* ptr;
 	volatile unsigned char value;
 
-	printf("Starting paging test...");
+	printf("Starting paging test...\n");
 
 	// Attempt to access read and write every byte of memory that should be paged
 	// First, access all bytes of video memory
@@ -138,7 +147,6 @@ void paging_test() {
 
 /* Test suite entry point */
 void launch_tests(){
-	clear();
 	TEST_OUTPUT("idt_test", idt_test());
 	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
 	paging_test();
