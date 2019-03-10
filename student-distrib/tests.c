@@ -1,6 +1,7 @@
 #include "tests.h"
 #include "x86_desc.h"
 #include "lib.h"
+#include "init_idt.h"
 
 #define PASS 1
 #define FAIL 0
@@ -45,6 +46,16 @@ int idt_test(){
 	return result;
 }
 
+// int idt_test_extensive(){
+// 	TEST_HEADER;
+// 	int result = PASS;
+// 	if (idt[0].offset_31_16 != (DIVIDE_ZERO_E & 0xFFFF) >> 16 && idt[0].offset_15_00 != DIVIDE_ZERO_E & 0x0000FFFF){
+// 			assertion_failure();
+// 			result = FAIL;
+// 	}
+// 	return result;
+// }
+
 // add more tests here
 
 /* Checkpoint 2 tests */
@@ -55,7 +66,8 @@ int idt_test(){
 
 /* Test suite entry point */
 void launch_tests(){
-	// TEST_OUTPUT("idt_test", idt_test());
-	
+	TEST_OUTPUT("idt_test", idt_test());
+	// TEST_OUTPUT("", idt_test_extensive());
+	// assertion_failure();
 	// launch your tests here
 }
