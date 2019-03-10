@@ -32,7 +32,7 @@ typedef struct x86_desc {
     uint32_t addr;
 } x86_desc_t;
 
-/* This is a segment descriptor.  It goes in the GDT. */
+/* This is a segment descriptor. It goes in the GDT. */
 typedef struct seg_desc {
     union {
         uint32_t val[2];
@@ -166,6 +166,9 @@ typedef union idt_desc_t {
 extern idt_desc_t idt[NUM_VEC];
 /* The descriptor used to load the IDTR */
 extern x86_desc_t idt_desc_ptr;
+
+/* The decriptor used to load the GDTR (DONE BY US)*/
+extern x86_desc_t gdt_desc_ptr;
 
 /* Sets runtime parameters for an IDT entry */
 #define SET_IDT_ENTRY(str, handler)                              \

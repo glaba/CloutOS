@@ -9,7 +9,7 @@
 .globl ldt_size, tss_size
 .globl gdt_desc, ldt_desc, tss_desc
 .globl tss, tss_desc_ptr, ldt, ldt_desc_ptr
-.globl gdt_ptr
+.globl gdt_ptr, gdt_desc_ptr
 .globl idt_desc_ptr, idt
 
 .align 4
@@ -97,6 +97,10 @@ idt_desc_ptr:
     .word idt_bottom - idt - 1
     .long idt
 
+# Done by us
+gdt_desc_ptr:
+    .word gdt_bottom - gdt - 1  # size - 1
+    .long gdt                   # offset (linear address of table)
 
     .align  16
 idt:

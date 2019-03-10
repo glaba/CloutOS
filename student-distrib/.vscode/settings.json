@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "i8259.h": "c",
+        "x86_desc.h": "c"
+    }
+}
