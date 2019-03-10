@@ -7,6 +7,9 @@
 
 #include "types.h"
 
+#define VIDEO      0xB8000
+#define VIDEO_SIZE 0x04000
+
 int32_t printf(int8_t *format, ...);
 void putc(uint8_t c);
 int32_t puts(int8_t *s);

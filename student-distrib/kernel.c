@@ -8,6 +8,7 @@
 #include "i8259.h"
 #include "debug.h"
 #include "tests.h"
+#include "paging.h"
 
 #define RUN_TESTS
 
@@ -148,6 +149,9 @@ void entry(unsigned long magic, unsigned long addr) {
      * without showing you any output */
     /*printf("Enabling Interrupts\n");
     sti();*/
+
+    /* Enable paging */
+    init_paging();
 
 #ifdef RUN_TESTS
     /* Run tests */

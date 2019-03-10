@@ -101,6 +101,35 @@ int idt_test_extensive(){
 	return result;
 }
 
+void paging_test() {
+	volatile unsigned char* ptr;
+	volatile unsigned char value;
+
+	printf("Starting paging test...");
+
+	// Attempt to access read and write every byte of memory that should be paged
+	// First, access all bytes of video memory
+	for (ptr = (unsigned char*)VIDEO; ptr < (unsigned char*)(VIDEO + VIDEO_SIZE); ptr++) {
+		value = *ptr;
+		*ptr = value;
+	}
+
+	printf("Successfully performed read/write to all bytes of video memory.\n");
+
+	// Then, access all bytes of kernel memory
+	for (ptr = (unsigned char*)0x400000; ptr < (unsigned char*)0x800000; ptr++) {
+		value = *ptr;
+		*ptr = value;
+	}
+
+	printf("Successfully performed read/write to all bytes of kernel memory.\n");
+	printf("Attempting to dereference unpaged pointer...\n");
+	printf("Should result in page fault...\n");
+
+	ptr = NULL;
+	value = *ptr;
+}
+
 /* Checkpoint 2 tests */
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */
@@ -109,8 +138,8 @@ int idt_test_extensive(){
 
 /* Test suite entry point */
 void launch_tests(){
+	clear();
 	TEST_OUTPUT("idt_test", idt_test());
 	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
-	// assertion_failure();
-	// launch your tests here
+	paging_test();
 }
