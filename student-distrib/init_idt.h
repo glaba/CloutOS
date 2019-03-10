@@ -3,6 +3,7 @@
 #define _INIT_IDT_H
 
 void initialize_idt();
+
 void DIVIDE_ZERO_E();
 void DEBUG_E();
 void NMINTERRUPT_E();

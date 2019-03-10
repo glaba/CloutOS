@@ -60,79 +60,79 @@ void initialize_idt(){
 }
 
 void DIVIDE_ZERO_E(){
-    printf("DIVIDE BY ZERO EXCEPTION");
+    printf("DIVIDE BY ZERO EXCEPTION\n");
     while(1){}
 }
 void DEBUG_E(){
-    printf("DEBUG EXCEPTION");
+    printf("DEBUG EXCEPTION\n");
     while(1){}
 }
 void NMINTERRUPT_E(){
-    printf("NON MASKABLE INTERRUPT EXCEPTION");
+    printf("NON MASKABLE INTERRUPT EXCEPTION\n");
     while(1){}
 }
 void BREAKPOINT_E(){
-    printf("BREAKPOINT EXCEPTION");
+    printf("BREAKPOINT EXCEPTION\n");
     while(1){}
 }
 void OVERFLOW_E(){
-    printf("OVERFLOW EXCEPTION");
+    printf("OVERFLOW EXCEPTION\n");
     while(1){}
 }
 void BOUND_RANGE_EXCEEDED_E(){
-    printf("BOUND RANGE EXCEEDED EXCEPTION");
+    printf("BOUND RANGE EXCEEDED EXCEPTION\n");
     while(1){}
 }
 void INVALID_OPCODE_E(){
-    printf("INVALID OPCODE EXCEPTION");
+    printf("INVALID OPCODE EXCEPTION\n");
     while(1){}
 }
 void DEVICE_NA_E(){
-    printf("DEVICE NOT AVAILABLE EXCEPTION");
+    printf("DEVICE NOT AVAILABLE EXCEPTION\n");
     while(1){}
 }
 void DOUBLE_FAULT(){
-    printf("DOUBLE FAULT EXCEPTION");
+    printf("DOUBLE FAULT EXCEPTION\n");
     while(1){}
 }
 void COPROCESSOR_SEGMENT_OVERRUN_E(){
-    printf("COPROCESSOR SEGMENT EXCEPTION");
+    printf("COPROCESSOR SEGMENT EXCEPTION\n");
     while(1){}
 }
 void INVALID_TSS_E(){
-    printf("INVALID TSS EXCEPTION");
+    printf("INVALID TSS EXCEPTION\n");
     while(1){}
 }
 void SEGMENT_NP_E(){
-    printf("SEGMENT NOT PRESENT EXCEPTION");
+    printf("SEGMENT NOT PRESENT EXCEPTION\n");
     while(1){}
 }
 void STACK_SEGMENT_FAULT_E(){
-    printf("STACK SEGMENT FAULT EXCEPTION");
+    printf("STACK SEGMENT FAULT EXCEPTION\n");
     while(1){}
 }
 void GENERAL_PROTECTION_E(){
-    printf("GENERAL PROTECTION EXCEPTION");
+    printf("GENERAL PROTECTION EXCEPTION\n");
     while(1){}
 }
 void PAGE_FAULT_E(){
-    printf("PAGE FAULT EXCEPTION");
+    printf("PAGE FAULT EXCEPTION\n");
     while(1){}
 }
 void FLOATING_POINT_ERROR_E(){
-    printf("FLOATING POINT ERROR EXCEPTION");
+    printf("FLOATING POINT ERROR EXCEPTION\n");
     while(1){}
 }
 void ALIGNMENT_CHECK_E(){
-    printf("ALIGNMENT CHE EXCEPTION");
+    printf("ALIGNMENT CHE EXCEPTION\n");
     while(1){}
 }
 void MACHINE_CHECK_E(){
-    printf("MACHINE CHECK EXCEPTION");
+    printf("MACHINE CHECK EXCEPTION\n");
     while(1){}
 }
 void FLOATING_POINT_EXCEPTION_E(){
-    printf("SIMD FLOATING POINT EXCEPTION");
+    printf("SIMD FLOATING POINT EXCEPTION\n");
     while(1){}
 }
 

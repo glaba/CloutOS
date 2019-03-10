@@ -6,6 +6,7 @@
 #define PASS 1
 #define FAIL 0
 
+
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
 	printf("[TEST %s] Running %s at %s:%d\n", __FUNCTION__, __FUNCTION__, __FILE__, __LINE__)
@@ -46,17 +47,59 @@ int idt_test(){
 	return result;
 }
 
-// int idt_test_extensive(){
-// 	TEST_HEADER;
-// 	int result = PASS;
-// 	if (idt[0].offset_31_16 != (DIVIDE_ZERO_E & 0xFFFF) >> 16 && idt[0].offset_15_00 != DIVIDE_ZERO_E & 0x0000FFFF){
-// 			assertion_failure();
-// 			result = FAIL;
-// 	}
-// 	return result;
-// }
+int idt_test_extensive(){
+	TEST_HEADER;
 
-// add more tests here
+	int result = PASS;
+	unsigned long ptr;
+	unsigned long ptr1;
+	unsigned long ptr2;
+	unsigned long ptr3;
+	unsigned long ptr4;
+
+	/* Holds the addresses for various exception handlers */
+	ptr = (unsigned long) DIVIDE_ZERO_E;
+	ptr1 = (unsigned long) NMINTERRUPT_E;
+	ptr2 = (unsigned long) BREAKPOINT_E;
+	ptr3 = (unsigned long) OVERFLOW_E;
+	ptr4 = (unsigned long) INVALID_OPCODE_E;
+
+	/* Makes sure the IDT holds correct address to exception handler for DIVIDE ZERO EXCEPTION*/
+	if (idt[0].offset_31_16 != ((ptr & 0xFFFF0000) >> 16) && idt[0].offset_15_00 != (ptr & 0x0000FFFF)){
+			printf("%#x %#x:%#x", ptr, ptr & 0xFFFF0000, ptr & 0x0000FFFF);
+			assertion_failure();
+			result = FAIL;
+	}
+
+	/* Makes sure the IDT holds correct address to exception handler for NON MASKABLE INTERRUPT*/
+	if (idt[2].offset_31_16 != ((ptr1 & 0xFFFF0000) >> 16) && idt[2].offset_15_00 != (ptr1 & 0x0000FFFF)){
+			printf("%#x %#x:%#x", ptr1 & 0xFFFF0000, ptr1 & 0x0000FFFF);
+			assertion_failure();
+			result = FAIL;
+	}
+
+	/* Makes sure the IDT holds correct address to exception handler for BREAKPOINT EXCEPTION*/
+	if (idt[3].offset_31_16 != ((ptr2 & 0xFFFF0000) >> 16) && idt[3].offset_15_00 != (ptr2 & 0x0000FFFF)){
+			printf("%#x %#x:%#x", ptr2 & 0xFFFF0000, ptr2 & 0x0000FFFF);
+			assertion_failure();
+			result = FAIL;
+	}
+
+	/* Makes sure the IDT holds correct address to exception handler for OVERFLOW EXCEPTION*/
+	if (idt[4].offset_31_16 != ((ptr3 & 0xFFFF0000) >> 16) && idt[4].offset_15_00 != (ptr3 & 0x0000FFFF)){
+			printf("%#x %#x:%#x", ptr3 & 0xFFFF0000, ptr3 & 0x0000FFFF);
+			assertion_failure();
+			result = FAIL;
+	}
+
+	/* Makes sure the IDT holds correct address to exception handler for INVALID OPCODE EXCEPTION*/
+	if (idt[6].offset_31_16 != ((ptr4 & 0xFFFF0000) >> 16) && idt[6].offset_15_00 != (ptr4 & 0x0000FFFF)){
+			printf("%#x %#x:%#x", ptr4 & 0xFFFF0000, ptr4 & 0x0000FFFF);
+			assertion_failure();
+			result = FAIL;
+	}
+	return result;
+}
 
 /* Checkpoint 2 tests */
 /* Checkpoint 3 tests */
@@ -67,7 +110,7 @@ int idt_test(){
 /* Test suite entry point */
 void launch_tests(){
 	TEST_OUTPUT("idt_test", idt_test());
-	// TEST_OUTPUT("", idt_test_extensive());
+	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
 	// assertion_failure();
 	// launch your tests here
 }
