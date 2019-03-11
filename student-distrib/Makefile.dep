@@ -1,8 +1,16 @@
 boot.o: boot.S multiboot.h x86_desc.h types.h
+interrupt_service_routines.o: interrupt_service_routines.S \
+  interrupt_service_routines.h
 x86_desc.o: x86_desc.S x86_desc.h types.h
+exception_handlers.o: exception_handlers.c x86_desc.h types.h lib.h \
+  i8259.h exception_handlers.h
 i8259.o: i8259.c i8259.h types.h lib.h
-init_idt.o: init_idt.c x86_desc.h types.h lib.h i8259.h init_idt.h
+init_idt.o: init_idt.c x86_desc.h types.h lib.h i8259.h init_idt.h \
+  exception_handlers.h interrupt_service_routines.h keyboard.h rtc.h
 kernel.o: kernel.c multiboot.h types.h x86_desc.h lib.h i8259.h debug.h \
-  tests.h
+  tests.h keyboard.h
+keyboard.o: keyboard.c lib.h types.h i8259.h keyboard.h
 lib.o: lib.c lib.h types.h
-tests.o: tests.c tests.h x86_desc.h types.h lib.h init_idt.h
+rtc.o: rtc.c rtc.h
+tests.o: tests.c tests.h x86_desc.h types.h lib.h init_idt.h \
+  exception_handlers.h

@@ -2,6 +2,8 @@
 #include "x86_desc.h"
 #include "lib.h"
 #include "init_idt.h"
+#include "exception_handlers.h"
+
 
 #define PASS 1
 #define FAIL 0
@@ -47,6 +49,12 @@ int idt_test(){
 	return result;
 }
 
+/*   idt_test_extensive();
+ *   DESCRIPTION: Tests whether entries in IDT have the 
+ * 				  correct function addresses encoded in them			  
+ *   INPUTS: NONE
+ *   RETURN VALUE: NONE
+ *   SIDE EFFECTS: NONE */ 
 int idt_test_extensive(){
 	TEST_HEADER;
 
@@ -109,6 +117,7 @@ int idt_test_extensive(){
 
 /* Test suite entry point */
 void launch_tests(){
+	// clear();
 	TEST_OUTPUT("idt_test", idt_test());
 	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
 	// assertion_failure();

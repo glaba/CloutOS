@@ -4,24 +4,4 @@
 
 void initialize_idt();
 
-void DIVIDE_ZERO_E();
-void DEBUG_E();
-void NMINTERRUPT_E();
-void BREAKPOINT_E();
-void OVERFLOW_E();
-void BOUND_RANGE_EXCEEDED_E();
-void INVALID_OPCODE_E();
-void DEVICE_NA_E();
-void DOUBLE_FAULT();
-void COPROCESSOR_SEGMENT_OVERRUN_E();
-void INVALID_TSS_E();
-void SEGMENT_NP_E();
-void STACK_SEGMENT_FAULT_E();
-void GENERAL_PROTECTION_E();
-void PAGE_FAULT_E();
-void FLOATING_POINT_ERROR_E();
-void ALIGNMENT_CHECK_E();
-void MACHINE_CHECK_E();
-void FLOATING_POINT_EXCEPTION_E();
-
 #endif
