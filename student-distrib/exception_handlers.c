@@ -165,6 +165,9 @@ void GENERAL_PROTECTION_E(){
 void PAGE_FAULT_E(){
     cli();
     printf("PAGE FAULT EXCEPTION\n");
+    uint32_t address;
+    asm("movl %%cr2, %0": "=r" (address));
+    printf("Memory access at 0x%#x caused page fault\n", address);
     sti();
     while(1){}
 }

@@ -147,6 +147,23 @@ void paging_test() {
 	value = *ptr;
 }
 
+/*
+ * divide_by_zero_test
+ * Attempts to divide by zero and should cause an exception
+ *
+ * INPUTS: None
+ * OUTPUTS: None
+ * SIDE EFFECTS: causes a divide by zero exception
+ */
+void divide_by_zero_test() {
+	int num;
+	int zero;
+	int result;
+	num = 10;
+	zero = 0;
+	result = num / zero;
+}
+
 /* Checkpoint 2 tests */
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */
@@ -158,4 +175,5 @@ void launch_tests(){
 	TEST_OUTPUT("idt_test", idt_test());
 	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
 	paging_test();
+	// divide_by_zero_test();
 }

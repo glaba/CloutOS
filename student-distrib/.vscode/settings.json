@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "interrupt_service_routines.h": "c",
-        "keyboard.h": "c",
-        "lib.h": "c"
-    }
-}

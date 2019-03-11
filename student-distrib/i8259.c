@@ -14,7 +14,6 @@ uint8_t slave_mask;  /* IRQs 8-15 */
 /* Initialize the 8259 PIC */
 void i8259_init(void) {
 
-    printf("Start PIC init\n");
     /* Start with masking all interrupts */
     master_mask = 0xFF;
     slave_mask = 0xFF;
@@ -43,13 +42,10 @@ void i8259_init(void) {
 
     /* Enable slave pin on master */
     enable_irq(SLAVE_PIN_IRQ);
-
-    printf("End PIC init\n");
 }
 
 /* Enable (unmask) the specified IRQ */
 void enable_irq(uint32_t irq_num) {
-    printf("Enable %d IRQ\n", irq_num);
     if (irq_num < 8){
         /* Unmasks irq pin on master PIC */
         master_mask &= ~(1 << irq_num);

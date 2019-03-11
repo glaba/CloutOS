@@ -511,3 +511,4 @@ void test_interrupts(void) {
         video_mem[i << 1]++;
     }
 }
+
