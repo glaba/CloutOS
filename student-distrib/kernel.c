@@ -148,7 +148,7 @@ void entry(unsigned long magic, unsigned long addr) {
     
     /* Initialize keyboard */
     init_keyboard();
-    /* Initialize RTC (will run test_interrupts() only for Checkpoint 1)
+    /* Initialize RTC (will run test_interrupts() only for Checkpoint 1) */
     // init_rtc();
 
     /* Enable interrupts */
@@ -157,8 +157,6 @@ void entry(unsigned long magic, unsigned long addr) {
      * without showing you any output */
     printf("Enabling Interrupts\n");
     sti();
-
-
 
     /* Enable paging */
     init_paging();

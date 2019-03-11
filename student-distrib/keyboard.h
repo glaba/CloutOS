@@ -1,5 +1,5 @@
-#ifndef KEYBOARD_H
-#define KEYBOARD_H
+#ifndef _KEYBOARD_H
+#define _KEYBOARD_H
 
 #define KEYBOARD_IRQ 1
 

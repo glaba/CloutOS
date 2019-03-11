@@ -5,10 +5,15 @@
 
 #define NUM_COLS    80
 #define NUM_ROWS    25
-#define ATTRIB      0x7
 
+// Position of cursor
 static int screen_x;
 static int screen_y;
+
+// Color of text that is drawn in the future
+static uint8_t attrib = 0x3;
+
+// Pointer to video memory 
 static char* video_mem = (char *)VIDEO;
 
 /* void clear(void);
@@ -16,15 +21,35 @@ static char* video_mem = (char *)VIDEO;
  * Return Value: none
  * Function: Clears video memory */
 void clear(void) {
-    screen_x = 0;
-    screen_y = 0;
     int32_t i;
     for (i = 0; i < NUM_ROWS * NUM_COLS; i++) {
         *(uint8_t *)(video_mem + (i << 1)) = ' ';
-        *(uint8_t *)(video_mem + (i << 1) + 1) = ATTRIB;
+        *(uint8_t *)(video_mem + (i << 1) + 1) = attrib;
     }
+    // Reset the cursor to point to the top left of the screen
     screen_x = 0;
     screen_y = 0;
+}
+
+/*
+ * Sets the color with which subsequent text will be drawn
+ *
+ * INPUTS: back_color, fore_color: the background and foreground color 
+ * SIDE EFFECTS: all future text drawn until another invocation of this function will 
+ *               be drawn with the given color
+ */
+void set_color(uint8_t back_color, uint8_t fore_color) {
+    attrib = fore_color | (back_color << 4);
+}
+
+/*
+ * Sets the location of the cursor
+ *
+ * INPUTS: (x, y): the updated location of the cursor where text will start being drawn
+ */
+void set_cursor_location(int x, int y) {
+    screen_x = x;
+    screen_y = y;
 }
 
 /* Standard printf().
@@ -166,6 +191,36 @@ int32_t puts(int8_t* s) {
 }
 
 /*
+ * Prints an ASCII image with top right corner at (x, y)
+ *
+ * INPUTS: s: the ASCII image to print
+ *         x, y: the top left coordinates of the image
+ * OUTPUTS: none
+ * SIDE EFFECTS: prints an image onto the screen, overwriting what may already be there
+ */
+void print_image(const char* s, unsigned int x, unsigned int y) {
+    unsigned int start_x = x;
+
+    for (; *s != '\0'; s++) {
+        // Go to next iteration if we are out of bounds 
+        if (y >= NUM_ROWS || x >= NUM_COLS)
+            continue;
+
+        // If there is a newline character, jump to the next line in the image
+        if (*s == '\n' || *s == '\r') {
+            y++;
+            x = start_x;
+        // Otherwise, draw the image
+        } else {
+            *(uint8_t *)(video_mem + ((NUM_COLS * y + x) << 1))     = *s;
+            *(uint8_t *)(video_mem + ((NUM_COLS * y + x) << 1) + 1) = attrib;
+
+            x++;
+        }
+    }
+}
+
+/*
  * Scrolls all the text on the screen up by one line and sets the cursor position on the bottom
  * 
  * INPUTS: none
@@ -190,7 +245,7 @@ static void scroll_screen() {
     // Finally, clear the last line
     for (x = 0; x < NUM_COLS; x++) {
         *(uint8_t *)(video_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1)) = ' ';
-        *(uint8_t *)(video_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1) + 1) = ATTRIB;
+        *(uint8_t *)(video_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1) + 1) = attrib;
     }
 }
 
@@ -199,19 +254,23 @@ static void scroll_screen() {
  * Return Value: void
  *  Function: Output a character to the console */
 void putc(uint8_t c) {
+    // If it is a newline character, move the cursor down one and reset x
     if(c == '\n' || c == '\r') {
         screen_y++;
         screen_x = 0;
     } else {
+        // Otherwise, set the desired text at the cursor position
         *(uint8_t *)(video_mem + ((NUM_COLS * screen_y + screen_x) << 1)) = c;
-        *(uint8_t *)(video_mem + ((NUM_COLS * screen_y + screen_x) << 1) + 1) = ATTRIB;
+        *(uint8_t *)(video_mem + ((NUM_COLS * screen_y + screen_x) << 1) + 1) = attrib;
 
+        // Update the screen coordinates
         screen_x = (screen_x + 1) % NUM_COLS;
 
         if (screen_x == 0)
             screen_y++;
     }
     
+    // Scroll the screen if we have reached the bottom of the page
     if (screen_y == NUM_ROWS) {
         scroll_screen();
     }

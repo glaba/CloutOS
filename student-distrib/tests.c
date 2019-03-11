@@ -4,10 +4,8 @@
 #include "init_idt.h"
 #include "exception_handlers.h"
 
-
 #define PASS 1
 #define FAIL 0
-
 
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
@@ -66,63 +64,63 @@ int idt_test_extensive(){
 	unsigned long ptr4;
 
 	/* Holds the addresses for various exception handlers */
-	ptr = (unsigned long) DIVIDE_ZERO_E;
-	ptr1 = (unsigned long) NMINTERRUPT_E;
-	ptr2 = (unsigned long) BREAKPOINT_E;
-	ptr3 = (unsigned long) OVERFLOW_E;
-	ptr4 = (unsigned long) INVALID_OPCODE_E;
+	ptr =  (unsigned long) exception_handlers[DIVIDE_ZERO_E];
+	ptr1 = (unsigned long) exception_handlers[NMINTERRUPT_E];
+	ptr2 = (unsigned long) exception_handlers[BREAKPOINT_E];
+	ptr3 = (unsigned long) exception_handlers[OVERFLOW_E];
+	ptr4 = (unsigned long) exception_handlers[INVALID_OPCODE_E];
 
 	/* Makes sure the IDT holds correct address to exception handler for DIVIDE ZERO EXCEPTION*/
 	if (idt[0].offset_31_16 != ((ptr & 0xFFFF0000) >> 16) && idt[0].offset_15_00 != (ptr & 0x0000FFFF)){
-			printf("%#x %#x:%#x", ptr, ptr & 0xFFFF0000, ptr & 0x0000FFFF);
-			assertion_failure();
-			result = FAIL;
+		printf("%#x %#x:%#x", ptr, ptr & 0xFFFF0000, ptr & 0x0000FFFF);
+		assertion_failure();
+		result = FAIL;
 	}
 
 	/* Makes sure the IDT holds correct address to exception handler for NON MASKABLE INTERRUPT*/
 	if (idt[2].offset_31_16 != ((ptr1 & 0xFFFF0000) >> 16) && idt[2].offset_15_00 != (ptr1 & 0x0000FFFF)){
-			printf("%#x %#x:%#x", ptr1 & 0xFFFF0000, ptr1 & 0x0000FFFF);
-			assertion_failure();
-			result = FAIL;
+		printf("%#x %#x:%#x", ptr1 & 0xFFFF0000, ptr1 & 0x0000FFFF);
+		assertion_failure();
+		result = FAIL;
 	}
 
 	/* Makes sure the IDT holds correct address to exception handler for BREAKPOINT EXCEPTION*/
 	if (idt[3].offset_31_16 != ((ptr2 & 0xFFFF0000) >> 16) && idt[3].offset_15_00 != (ptr2 & 0x0000FFFF)){
-			printf("%#x %#x:%#x", ptr2 & 0xFFFF0000, ptr2 & 0x0000FFFF);
-			assertion_failure();
-			result = FAIL;
+		printf("%#x %#x:%#x", ptr2 & 0xFFFF0000, ptr2 & 0x0000FFFF);
+		assertion_failure();
+		result = FAIL;
 	}
 
 	/* Makes sure the IDT holds correct address to exception handler for OVERFLOW EXCEPTION*/
 	if (idt[4].offset_31_16 != ((ptr3 & 0xFFFF0000) >> 16) && idt[4].offset_15_00 != (ptr3 & 0x0000FFFF)){
-			printf("%#x %#x:%#x", ptr3 & 0xFFFF0000, ptr3 & 0x0000FFFF);
-			assertion_failure();
-			result = FAIL;
+		printf("%#x %#x:%#x", ptr3 & 0xFFFF0000, ptr3 & 0x0000FFFF);
+		assertion_failure();
+		result = FAIL;
 	}
 
 	/* Makes sure the IDT holds correct address to exception handler for INVALID OPCODE EXCEPTION*/
 	if (idt[6].offset_31_16 != ((ptr4 & 0xFFFF0000) >> 16) && idt[6].offset_15_00 != (ptr4 & 0x0000FFFF)){
-			printf("%#x %#x:%#x", ptr4 & 0xFFFF0000, ptr4 & 0x0000FFFF);
-			assertion_failure();
-			result = FAIL;
+		printf("%#x %#x:%#x", ptr4 & 0xFFFF0000, ptr4 & 0x0000FFFF);
+		assertion_failure();
+		result = FAIL;
 	}
 	return result;
 }
 
 /*
- * Paging Test
  * Attempts to write to all valid paged memory, which should not cause an error
- * Then, it attempts to write to address 0x0, which should cause a page fault
  *
  * INPUTS: None
- * OUTPUTS: None
- * SIDE EFFECTS: causes a page fault if paging is correctly setup
+ * RETURN VALUE: returns 1 if all regions that should be paged are paged and accessible for reading / writing
+ * SIDE EFFECTS: none, if paging is correctly setup
  */
-void paging_test() {
+int paging_test_valid_regions() {
+	TEST_HEADER;
+
 	volatile unsigned char* ptr;
 	volatile unsigned char value;
 
-	printf("Starting paging test...\n");
+	printf("   Starting paging test...\n");
 
 	// Attempt to access read and write every byte of memory that should be paged
 	// First, access all bytes of video memory
@@ -131,7 +129,7 @@ void paging_test() {
 		*ptr = value;
 	}
 
-	printf("Successfully performed read/write to all bytes of video memory.\n");
+	printf("   Successfully performed read/write to all bytes of video memory.\n");
 
 	// Then, access all bytes of kernel memory
 	for (ptr = (unsigned char*)0x400000; ptr < (unsigned char*)0x800000; ptr++) {
@@ -139,9 +137,24 @@ void paging_test() {
 		*ptr = value;
 	}
 
-	printf("Successfully performed read/write to all bytes of kernel memory.\n");
-	printf("Attempting to dereference unpaged pointer...\n");
-	printf("Should result in page fault...\n");
+	printf("   Successfully performed read/write to all bytes of kernel memory.\n");
+	
+	return 1;
+}
+
+/*
+ * Attempts to write to a region of memory that should not be paged, which should cause a page fault
+ *
+ * INPUTS: none
+ * OUTPUTS: none
+ * SIDE EFFECTS: if paging is correctly set up, it should cause a page fault
+ */
+void paging_test_invalid_region() {
+	volatile unsigned char* ptr;
+	volatile unsigned char value;
+
+	printf("   Attempting to dereference unpaged pointer...\n");
+	printf("   Should result in page fault...\n");
 
 	ptr = NULL;
 	value = *ptr;
@@ -174,6 +187,8 @@ void divide_by_zero_test() {
 void launch_tests(){
 	TEST_OUTPUT("idt_test", idt_test());
 	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
-	paging_test();
+	TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
+
 	// divide_by_zero_test();
+	// paging_test_invalid_region();
 }

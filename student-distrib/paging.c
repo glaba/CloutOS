@@ -5,13 +5,16 @@ static unsigned int video_page_table[PAGE_TABLE_SIZE] __attribute__((aligned (PA
 
 /*
  * Writes a page directory address to the cr3 register
+ *
+ * INPUT: pd_addr: the address of the page directory, which is 
+ *                 a 1024 item array of 4-byte entries
  */
 #define write_cr3(pd_addr)            \
 do {                                  \
 	asm volatile ("movl %k0, %%cr3"   \
 		:                             \
 		: "r"((pd_addr))              \
-		: "cc"                 \
+		: "cc"                        \
 	);                                \
 } while (0)
 
@@ -44,8 +47,9 @@ static inline void enable_page_size_extension() {
 }
 
 /*
- * Initializes paging by setting the Page Directory Base Register (PDBR / CR3)
- *  to point to the kernel page directory 
+ * Initializes the kernel page directory
+ * Sets CR0 and CR4 to correctly support paging
+ * Sets Page Directory Base Register (PDBR / CR3) to point to the kernel page directory
  *
  * INPUTS: none
  * OUTPUTS: none

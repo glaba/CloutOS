@@ -3,215 +3,134 @@
 #include "i8259.h"
 #include "exception_handlers.h"
 
-
-/* void DIVIDE_ZERO_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void DIVIDE_ZERO_E(){
-    cli();
-    printf("DIVIDE BY ZERO EXCEPTION\n");
-    sti();
-    while(1){}
+/*
+ * This macro generates an exception handler
+ *
+ * INPUTS: handler_name: the name of the exception handler
+ *         err: the string containing the name of the exception which will be printed
+ *         line1_gen, line2_gen: function bodies which print out custom error messages (if desired)
+ *              they return non-zero if something was printed, and optionally return 0 if nothing was printed
+ */
+#define GENERATE_EXCEPTION_HANDLER(handler_name, err, line1_gen, line2_gen) \
+int line1_##handler_name(void) {line1_gen return 0;}                        \
+int line2_##handler_name(void) {line2_gen return 0;}                        \
+void handler_name() {                                                       \
+	cli();                                                                  \
+	print_error(err, line1_##handler_name, line2_##handler_name);           \
+	while (1);                                                              \
+	sti();                                                                  \
 }
 
-/* void DEBUG_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void DEBUG_E(){
-    cli();
-    printf("DEBUG EXCEPTION\n");
-    sti();
-    while(1){}
+/* An ASCII art skeleton that is 25 lines tall */
+const char* skeleton = "\n\n\n\n\n\n\
+    .-.    \n\
+   (o.o)   \n\
+    |=|    \n\
+   __|__   \n\
+ //.=|=.\\\\ \n\
+// .=|=. \\\\\n\
+\\\\ .=|=. //\n\
+ \\\\(_=_)// \n\
+  (:| |:)  \n\
+   || ||   \n\
+   () ()   \n\
+   || ||   \n\
+   || ||   \n\
+  ==' '==\n\n\n\n\n";
+
+/*
+ * Prints the error message for the provided exception name and two function pointers
+ *  that generate 2 custom error lines
+ *
+ * INPUTS: err: the name of the exception
+ *         line1, line2: functions which print custom error lines, and return non-zero if something was printed
+ * SIDE EFFECTS: fills the screen with a "red screen of clout" (our error screen)
+ */
+void print_error(const char* err, int (*line1)(void), int (*line2)(void)) {
+	unsigned int y = 7;
+
+	set_color(V_RED, V_CYAN);
+	clear();
+	print_image(skeleton, 3, 0);
+
+	set_cursor_location(17, y);
+	printf("Greetings citizens of clout town. It is I, Flex Master Susan.");
+
+	y += 2;
+	set_cursor_location(17, y);
+	printf("It is with great regret that I must inform you that");
+
+	y += 1;
+	set_cursor_location(19, y);
+	printf("you have encountered a %s", err);
+	
+	y += 2;
+	set_cursor_location(17, y);
+	
+	if (line1())
+		y++;
+
+	set_cursor_location(17, y);
+
+	if (line2())
+		y += 2;
+
+	set_cursor_location(17, y);
+	printf("That is all.");
+
+	set_cursor_location(17, y + 2);
+	printf("Regards,");
+	
+	set_cursor_location(17, y + 3);
+	printf("Flex Master Susan");
 }
 
-/* void NMINTERRUPT_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void NMINTERRUPT_E(){
-    cli();
-    printf("NON MASKABLE INTERRUPT EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void BREAKPOINT_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void BREAKPOINT_E(){
-    cli();
-    printf("BREAKPOINT EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void OVERFLOW_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void OVERFLOW_E(){
-    cli();
-    printf("OVERFLOW EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void BOUND_RANGE_EXCEEDED_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void BOUND_RANGE_EXCEEDED_E(){
-    cli();
-    printf("BOUND RANGE EXCEEDED EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void INVALID_OPCODE_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void INVALID_OPCODE_E(){
-    cli();
-    printf("INVALID OPCODE EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void DEVICE_NA_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void DEVICE_NA_E(){
-    cli();
-    printf("DEVICE NOT AVAILABLE EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void DOUBLE_FAULT();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void DOUBLE_FAULT(){
-    cli();
-    printf("DOUBLE FAULT EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void COPROCESSOR_SEGMENT_OVERRUN_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void COPROCESSOR_SEGMENT_OVERRUN_E(){
-    cli();
-    printf("COPROCESSOR SEGMENT EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void INVALID_TSS_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void INVALID_TSS_E(){
-    cli();
-    printf("INVALID TSS EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void SEGMENT_NP_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void SEGMENT_NP_E(){
-    cli();
-    printf("SEGMENT NOT PRESENT EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void STACK_SEGMENT_FAULT_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void STACK_SEGMENT_FAULT_E(){
-    cli();
-    printf("STACK SEGMENT FAULT EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void GENERAL_PROTECTION_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void GENERAL_PROTECTION_E(){
-    cli();
-    printf("GENERAL PROTECTION EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void PAGE_FAULT_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void PAGE_FAULT_E(){
-    cli();
-    printf("PAGE FAULT EXCEPTION\n");
-    uint32_t address;
+GENERATE_EXCEPTION_HANDLER(divide_zero_e, "DIVIDE BY ZERO EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(debug_e, "DEBUG EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(nminterrupt_e, "NON MASKABLE INTERRUPT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(breakpoint_e, "BREAKPOINT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(overflow_e, "OVERFLOW EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(bound_range_exceeded_e, "BOUND RANGE EXCEEDED EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(invalid_opcode_e, "INVALID OPCODE EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(device_na_e, "DEVICE NOT AVAILABLE EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(double_fault, "DOUBLE FAULT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(coprocessor_segment_overrun_e, "COPROCESSOR SEGMENT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(invalid_tss_e, "INVALID TSS EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(segment_np_e, "SEGMENT NOT PRESENT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(stack_segment_fault_e, "STACK SEGMENT FAULT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(general_protection_e, "GENERAL PROTECTION EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(page_fault_e, "PAGE FAULT EXCEPTION", {
+	uint32_t address;
     asm("movl %%cr2, %0": "=r" (address));
-    printf("Memory access at 0x%#x caused page fault\n", address);
-    sti();
-    while(1){}
-}
+    return printf("Invalid memory access attempt at 0x%#x", address);
+}, {
+	return printf("caused page fault.");
+})
+GENERATE_EXCEPTION_HANDLER(floating_point_error_e, "FLOATING POINT ERROR EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(alignment_check_e, "ALIGNMENT CHE EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(machine_check_e, "MACHINE CHECK EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(floating_point_exception_e, "SIMD FLOATING POINT EXCEPTION", {}, {})
 
-/* void FLOATING_POINT_ERROR_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void FLOATING_POINT_ERROR_E(){
-    cli();
-    printf("FLOATING POINT ERROR EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void ALIGNMENT_CHECK_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void ALIGNMENT_CHECK_E(){
-    cli();
-    printf("ALIGNMENT CHE EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void MACHINE_CHECK_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void MACHINE_CHECK_E(){
-    cli();
-    printf("MACHINE CHECK EXCEPTION\n");
-    sti();
-    while(1){}
-}
-
-/* void FLOATING_POINT_EXCEPTION_E();
- * Inputs: NONE
- * Return Value: none
- * Function: squash user level program and cause exception */
-void FLOATING_POINT_EXCEPTION_E(){
-    cli();
-    printf("SIMD FLOATING POINT EXCEPTION\n");
-    sti();
-    while(1){}
-}
+/* Fill in exception handlers array with all exception handlers generated by the macro */
+void (*exception_handlers[NUM_EXCEPTION_HANDLERS])(void) = {
+	divide_zero_e,
+	debug_e,
+	nminterrupt_e,
+	breakpoint_e,
+	overflow_e,
+	bound_range_exceeded_e,
+	invalid_opcode_e,
+	device_na_e,
+	double_fault,
+	coprocessor_segment_overrun_e,
+	invalid_tss_e,
+	segment_np_e,
+	stack_segment_fault_e,
+	general_protection_e,
+	page_fault_e,
+	NULL,
+	floating_point_error_e,
+	alignment_check_e,
+	machine_check_e,
+	floating_point_exception_e
+};

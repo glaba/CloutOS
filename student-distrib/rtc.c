@@ -3,10 +3,9 @@
 #include "i8259.h"
 #include "rtc.h"
 
-
-
 /*
  * NMI_enable()
+ * Enables non-maskable interrupts
  *
  * INPUTS: none
  * OUTPUTS: none
@@ -17,6 +16,7 @@ void NMI_enable() {
 }
 /*
  * NMI_disable()
+ * Disable non-maskable interrupts
  *
  * INPUTS: none
  * OUTPUTS: none
@@ -28,6 +28,7 @@ void NMI_disable() {
 
 /*
  * init_rtc()
+ * Initialies the RTC registers and enables the interrupt
  *
  * INPUTS: none
  * OUTPUTS: none
@@ -61,17 +62,17 @@ void init_rtc() {
 
 /*
  * rtc_handler()
+ * Handler which gets called every time RTC sends an interrupt
  *
  * INPUTS: none
  * OUTPUTS: none
  * SIDE EFFECTS: Handler for the RTC
  */
 void rtc_handler() {
-
 	cli();
 	/* Select register C */
 	outb(REGISTER_C, RTC_ADDRESS_PORT);
-	/* Throw away contents they don't matter :(*/
+	/* Throw away contents they don't matter :( */
 	inb(RTC_DATA_PORT);
 	/* Send EOI */
 	send_eoi(RTC_IRQ);

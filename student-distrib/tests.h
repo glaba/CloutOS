@@ -1,7 +1,7 @@
-#ifndef TESTS_H
-#define TESTS_H
+#ifndef _TESTS_H
+#define _TESTS_H
 
-// test launcher
+/* Starts all the unit tests */
 void launch_tests();
 
-#endif /* TESTS_H */
+#endif /* _TESTS_H */
