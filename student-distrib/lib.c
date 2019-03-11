@@ -3,7 +3,6 @@
 
 #include "lib.h"
 
-#define VIDEO       0xB8000
 #define NUM_COLS    80
 #define NUM_ROWS    25
 #define ATTRIB      0x7
@@ -24,6 +23,8 @@ void clear(void) {
         *(uint8_t *)(video_mem + (i << 1)) = ' ';
         *(uint8_t *)(video_mem + (i << 1) + 1) = ATTRIB;
     }
+    screen_x = 0;
+    screen_y = 0;
 }
 
 /* Standard printf().
@@ -44,7 +45,6 @@ void clear(void) {
  *       Also note: %x is the only conversion specifier that can use
  *       the "#" modifier to alter output. */
 int32_t printf(int8_t *format, ...) {
-
     /* Pointer to the format string */
     int8_t* buf = format;
 
@@ -165,6 +165,35 @@ int32_t puts(int8_t* s) {
     return index;
 }
 
+/*
+ * Scrolls all the text on the screen up by one line and sets the cursor position on the bottom
+ * 
+ * INPUTS: none
+ * OUTPUTS: none
+ * SIDE EFFECTS: scrolls the text in the video memory upwards like a console 
+ */
+static void scroll_screen() {
+    screen_y = NUM_ROWS - 1;
+    screen_x = 0;
+    int x, y;
+
+    // Copy all the lines up one 
+    for (x = 0; x < NUM_COLS; x++) {
+        for (y = 1; y < NUM_ROWS; y++) {
+            *(uint8_t *)(video_mem + ((NUM_COLS * (y - 1) + x) << 1)) = 
+                *(uint8_t *)(video_mem + ((NUM_COLS * y + x) << 1));
+            *(uint8_t *)(video_mem + ((NUM_COLS * (y - 1) + x) << 1) + 1) = 
+                *(uint8_t *)(video_mem + ((NUM_COLS * y + x) << 1) + 1);
+        }
+    }
+
+    // Finally, clear the last line
+    for (x = 0; x < NUM_COLS; x++) {
+        *(uint8_t *)(video_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1)) = ' ';
+        *(uint8_t *)(video_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1) + 1) = ATTRIB;
+    }
+}
+
 /* void putc(uint8_t c);
  * Inputs: uint_8* c = character to print
  * Return Value: void
@@ -176,9 +205,15 @@ void putc(uint8_t c) {
     } else {
         *(uint8_t *)(video_mem + ((NUM_COLS * screen_y + screen_x) << 1)) = c;
         *(uint8_t *)(video_mem + ((NUM_COLS * screen_y + screen_x) << 1) + 1) = ATTRIB;
-        screen_x++;
-        screen_x %= NUM_COLS;
-        screen_y = (screen_y + (screen_x / NUM_COLS)) % NUM_ROWS;
+
+        screen_x = (screen_x + 1) % NUM_COLS;
+
+        if (screen_x == 0)
+            screen_y++;
+    }
+    
+    if (screen_y == NUM_ROWS) {
+        scroll_screen();
     }
 }
 

@@ -9,6 +9,7 @@
 #include "debug.h"
 #include "tests.h"
 #include "keyboard.h"
+#include "paging.h"
 
 #define RUN_TESTS
 
@@ -153,6 +154,9 @@ void entry(unsigned long magic, unsigned long addr) {
     sti();
 
 
+
+    /* Enable paging */
+    init_paging();
 
 #ifdef RUN_TESTS
     /* Run tests */
