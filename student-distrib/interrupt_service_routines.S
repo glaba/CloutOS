@@ -35,5 +35,3 @@ rtc_linkage:
 	popal                       # Pop general purpose registers
 	sti                         # Enable interrupts due to interrupt gate
 	iret
-
-    
