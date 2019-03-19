@@ -18,6 +18,7 @@
 #define BYTES_DENTRY 64
 #define DENTRY_PAD 24
 #define BOOTBLOCK_PAD 52
+#define ONE 1
 
 typedef struct dentry {
 	int8_t fname[FILE_NAME_LEN];
