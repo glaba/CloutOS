@@ -6,7 +6,6 @@
 #define KERNEL_STACK_SIZE   0x2000
 #define KERNEL_MEM_END 	 	0x800000
 
-
 //define the ten system calls
 //most of these functions are not going to be written right now
 int32_t halt(uint8_t status);

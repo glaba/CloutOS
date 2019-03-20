@@ -1,299 +1,505 @@
 #include "file_system.h"
-#include "proc.h"
+#include "system_calls.h"
+#include "x86_desc.h"
+#include "lib.h"
 
-/* pointer to the bootblock of our filesystem */
-static bootblock_t* bootblock;
+/* Variable to ensure only one 'open' of the file system. */
+uint32_t fs_is_open;
 
-/* Open, close, read, write system calls for the filesystem */
-static int32_t dir_read (int32_t fd, void* buf, int32_t nbytes);
-static int32_t fs_read (int32_t fd, void* buf, int32_t nbytes);
-static int32_t fs_write (int32_t fd, const void* buf, int32_t nbytes);
-static int32_t fs_open (const uint8_t* filename);
-static int32_t fs_close (int32_t fd);
+/* The statistics for the file system provided by the boot block. */
+fs_stats_t fs_stats;
 
-/* we use a read only filesystem so fs_write just returns -1 */
-int32_t fs_write (int32_t fd, const void* buf, int32_t nbytes){
- return -1;
-}
+/* The array of directory entries for the file system. */
+dentry_t * fs_dentries;
 
-/* opening a file is handeled by the open system call */
-int32_t fs_open (const uint8_t* filename){
- return 0;
-}
+/* The array of inodes. */
+inode_t * inodes;
 
-/* closing a file is handeled by the close system call */
-int32_t fs_close (int32_t fd){
- return 0;
-}
+/* The number of filenames read from the filesystem. */
+uint32_t dir_reads;
 
-/* file operations for a file */
-static fops_t fs_fops = {
-	.read = fs_read,
-	.write = fs_write,
-	.open = fs_open,
-	.close = fs_close
-};
+/* The address of the boot block. */
+uint32_t bb_start;
 
-/* file operations for a directory */
-static fops_t dir_fops = {
-	.read = dir_read,
-	.write = fs_write,
-	.open = fs_open,
-	.close = fs_close
-};
+/* The address of the first data block. */
+uint32_t data_start;
 
 /*
- *	  DESCRIPTION: initialize the filesystem
- *    INPUTS: mem_mod - pointer to a module that specifies the
- *			  memory address of the start of the filesystem.
- *    OUTPUTS: none
- *    RETURN VALUE: none
+ * Description: Opens the file system by calling fs_init.
+ *
+ * Inputs: fs_start- location of the boot block
+ *         fs_end- end
+ * Returns: -1- failure (file sytem already open)
+ *           0- success
  */
-void fs_init(module_t *mem_mod){
-	bootblock = (bootblock_t*)mem_mod->mod_start;
+int32_t fs_open(uint32_t fs_start, uint32_t fs_end){
+	/* Return error if the file system is already open. */
+	if(fs_is_open == 1)
+		return -1;
 
-  add_device(DIR_FTYPE, &dir_fops);
-	add_device(FILE_FTYPE, &fs_fops);
+	/* Initialize the file system. */
+	fs_init(fs_start, fs_end);
+	fs_is_open = 1;
+
+	return 0;
 }
 
 /*
- *	  DESCRIPTION: reads the dentry by filename
- *    INPUTS: fname - filename specifying the file to read from
- *			  dentry - pointer to dentry block to fill
- *    OUTPUTS: none
- *    RETURN VALUE: 0 on success, -1 on failure (nonexistant file)
- *    SIDE EFFECTS: fills the second arg (dentry) with file name,
- * 					file type, and inode number
+ * Description: Close the file system.
+ * Inputs: none
+ * Returns: -1- failure (file system already closed)
+ *           0- success
  */
- int32_t read_dentry_by_name(const uint8_t* fname, dentry_t* dentry){
- 	dentry_t* curr_dentry; //iterate through dentries
-  int i;
-  curr_dentry = &(bootblock->dentry[0]);
+int32_t fs_close(void){
+	/* Return error if the file system isn't open. */
+	if(fs_is_open == 0)
+		return -1;
 
- 	for(i = 0; i < bootblock->dir_entries_cnt; i++){
- 		if((strlen((int8_t*)fname) == strlen((int8_t *) curr_dentry->fname))){
-			//we !strcmp because strcmp returns 0 on a match
- 			if(!strncmp((int8_t *) fname, (int8_t *) curr_dentry->fname, strlen((int8_t*)curr_dentry->fname))){
- 				memcpy(dentry, curr_dentry, BYTES_DENTRY);
- 				return 0;
- 			}
- 		}
- 		curr_dentry++;
- 	}
- 	return -1;
- }
+	/* Clear the flag indicating an open file system. */
+	fs_is_open = 0;
 
-/*
- *	  DESCRIPTION: reads the dentry by index number
- *    INPUTS: index - index specifying file to read from
- *			  dentry - pointer to dentry block to fill
- *    OUTPUTS: none
- *    RETURN VALUE: 0 on success, -1 on failure (invalid index)
- *    SIDE EFFECTS: fills the second arg (dentry) with file name,
- * 					file type, and inode number
- */
- int32_t read_dentry_by_index(uint32_t index, dentry_t* dentry){
- 	dentry_t* curr_dentry; //iterate through dentries
-
- 	if(index >= 0 && index < bootblock->dir_entries_cnt){
- 		curr_dentry = &(bootblock->dentry[index]);
- 		memcpy(dentry, curr_dentry, BYTES_DENTRY);
- 		return 0;
- 	}
- 	return -1;
- }
-
- /*
- *	  DESCRIPTION: reads 'length' bytes starting from position 'offset'
- * 				   in the file with inode number 'inode'.
- *    INPUTS: inode - inode number specifying file to read from
- 			  offset - position to start reading from in the file
- 			  buf - buffer to be filled by the bytes read from the file
- 			  length - number of bytes to read
- *    OUTPUTS: none
- *    RETURN VALUE: number of bytes read and placed in the buffer
- *    SIDE EFFECTS: fills the third arg (buf) with the bytes read from
- *					the file
- */
- int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length){
- 	uint32_t i;
- 	int32_t bytes_read = 0;
- 	data_block_t* curr_data_block; // data to copy to buf
- 	int32_t off_data_block; // data block number in inode
- 	int32_t new_offset; // offset once inside correct data block
- 	inode_t *curr_inode;
- 	bytes_read = 0;
-
-	// bytes_read = read_directory_entry(offset, buf, length);
-
- 	if(inode < 0 || inode >= bootblock->inode_cnt){
- 		return bytes_read;
- 	}
-
- 	// calculate correct data block and offset to start copying from
- 	new_offset = offset % CHARS_PER_BLOCK;
- 	off_data_block = offset / CHARS_PER_BLOCK;
- 	curr_inode = (inode_t*)((uint8_t*) bootblock + ((inode+ONE) * BLOCK_SIZE));
- 	curr_data_block = (data_block_t*) ((uint8_t*) bootblock + (ONE + bootblock->inode_cnt + curr_inode->data_block[off_data_block])*BLOCK_SIZE);
-
- 		// copy data to buf
- 	for(i = 0; i < length; i++){
- 			//check for EOF
- 		if(bytes_read + offset < curr_inode->length){
- 			buf[i] = curr_data_block->data[new_offset];
- 			bytes_read++;
- 			new_offset++;
-				// move to next data block
- 			if(new_offset >= CHARS_PER_BLOCK){
- 				off_data_block++;
- 				curr_data_block = (data_block_t*) ((uint8_t*) bootblock + (ONE + bootblock->inode_cnt + curr_inode->data_block[off_data_block])*BLOCK_SIZE);
- 				new_offset = 0;
- 			}
- 		}
- 	}
- return bytes_read;
+	return 0;
 }
 
- /*
- *	  DESCRIPTION: copies over 'length' bytes of directory entries into 'buf'
- *    INPUTS: buf - buffer to be filled by the bytes read from the file
- 			  length - number of bytes to read
- *    OUTPUTS: none
- *    RETURN VALUE: number of bytes read and placed in the buffer
- *    SIDE EFFECTS: fills the first arg (buf) with the bytes read from
- *					the file
+/*
+ * Description: Performs a read on the file with name 'fname' by calling read_data
+ * for the specified number of bytes and starting at the specified offset
+ * in the file.
+ * Inputs: fname- name of file
+ *         offset- offset to start read
+ *         buf- buffer to send to read_data
+ *         length- number of bytes
+ * Returns: -1- failure (invalid parameters, nonexistent file)
+ *           0- success
  */
- uint32_t read_directory(uint32_t offset, uint8_t* buf, uint32_t length){
- 	uint32_t i,k;
- 	uint32_t buf_idx = 0;
- 	uint32_t buf_off = 0;
- 	uint32_t ret_val = 0;
- 	dentry_t dentry;
+int32_t fs_read(const int8_t * fname, uint32_t offset, uint8_t * buf,
+                uint32_t length){
+	/* Local variables. */
+	dentry_t dentry;
 
- 	for(k = 0; k < bootblock->dir_entries_cnt; k++){
- 		read_dentry_by_index(k, &dentry);
- 		for(i = 0; i < strlen((int8_t*)dentry.fname); i++){
- 			if(buf_off>= offset && ret_val < length){
- 				buf[buf_idx++] = dentry.fname[i];
- 				ret_val++;
- 			}
- 			else{
- 				buf_off++;
- 			}
- 		}
- 		if(buf_off>= offset && ret_val<length){
- 			buf[buf_idx++]= '\n';
- 		}
- 	}
+	/* Check for invalid file name or buffer. */
+	if(buf == NULL || fname == NULL)
+		return -1;
 
- 	buf[buf_idx] = '\0';
- 	return ret_val;
- }
+	/* Extract dentry information using the filename passed in. */
+	if(read_dentry_by_name((uint8_t *)fname, &dentry) == -1)
+		return -1;
 
-
- /*
- *	  DESCRIPTION: copies over 'length' bytes of directory entries into 'buf'
- *    INPUTS: entry - directory entry to copy over
- *			  buf - buffer to be filled by the bytes read from the file
- *			  length - number of bytes to read
- *    OUTPUTS: none
- *    RETURN VALUE: number of bytes read and placed in the buffer
- *    SIDE EFFECTS: fills the first arg (buf) with the bytes read from
- *					the file
- */
- uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length){
- 	uint32_t i;
- 	uint32_t buf_idx = 0;
- 	uint32_t ret_val = 0;
- 	dentry_t dentry;
-
- 	if(dir_entry >= bootblock -> dir_entries_cnt || dir_entry < 0) return 0;
-
- 	read_dentry_by_index(dir_entry, &dentry);
-
- 	for(i = 0; i < strlen((int8_t*)dentry.fname); i++){
- 		if(ret_val < length){
- 			buf[buf_idx++] = dentry.fname[i];
- 			ret_val++;
- 		}
- 	}
- 	buf[buf_idx++]= '\n';
- 	buf[buf_idx] = '\0';
-
- 	return ret_val;
- }
-
- /*
- *	  DESCRIPTION: loads contents of the file 'fname' into memory at address 'addr'
- *    INPUTS: fname - filename specifying the file to read from
- 			  addr - address to copy contents of file to
- *    OUTPUTS: none
- *    RETURN VALUE: 0 on success, -1 on failure
- *    SIDE EFFECTS: copies contents of the specified file into the memoy
- *					address.
- */
- int32_t load(dentry_t * d, uint8_t * mem) {
- 	uint32_t len;
- 	inode_t * curr_inode;
-
- 	if(d == NULL || mem == NULL) return -1;
-
- 	curr_inode = (inode_t*)((uint8_t*) bootblock + ((d -> inode+ONE) * BLOCK_SIZE));
- 	len = curr_inode -> length;
- 	read_data(d -> inode, 0, mem, len);
- 	return 0;
- }
-
-/* get_inode_ptr
- *	  DESCRIPTION: get inode pointer given an inode number.
- *    INPUTS: inode - inode number to get the corresponding inode pointer to.
- *    OUTPUTS: none
- *    RETURN VALUE: inode pointer corresponding to the inode number
- */
- inode_t * get_inode_ptr(uint32_t inode) {
- 	return (inode_t*) ((uint8_t*) bootblock + (inode + ONE) * BLOCK_SIZE);
- }
+	/* Use read_data to read the file into the buffer passed in. */
+	return read_data(dentry.inode, offset, buf, length);
+}
 
 /*
- *	  DESCRIPTION: reads directory entries in the filesystem.
- *    INPUTS: fd - file descriptor describing the file to read.
- *			  buf - buffer to will with the bytes read
- *			  nbytes - number of bytes to read
- *    OUTPUTS: fills the 'buf' buffer with the bytes read
- *    RETURN VALUE: number of bytes read
+ * Description: Does nothing as our file system is read only.
+ * Inputs: none
+ * Returns: 0- default
  */
-int32_t dir_read (int32_t fd, void* buf, int32_t nbytes){
- 	int32_t bytes_read;
- 	pcb_t * pcb;
- 	fd_t * fs_fd;
-
- 	pcb(pcb);
- 	fs_fd = &(pcb -> files[fd]);
-
- 	bytes_read = read_directory_entry(fs_fd -> pos, buf, nbytes);
- 	fs_fd -> pos++;
-
- 	return bytes_read;
- }
+int32_t fs_write(void){
+	return 0;
+}
 
 /*
- *	  DESCRIPTION: reads files in the filesystem.
- *    INPUTS: fd - file descriptor describing the file to read.
- *			  buf - buffer to will with the bytes read
- *			  nbytes - number of bytes to read
- *    OUTPUTS: fills the 'buf' buffer with the bytes read
- *    RETURN VALUE: number of bytes read
+ * Description: Loads an executable file into memory and prepares to begin the
+ *              new process.
+ * Inputs: fname- name of file
+ *         address- address of read - offset
+ * Returns: -1- failure
+ *           0- success
  */
- int32_t fs_read (int32_t fd, void* buf, int32_t nbytes){
- 	int32_t bytes_read;
- 	pcb_t * pcb;
- 	fd_t * fs_fd;
+int32_t fs_load(const int8_t * fname, uint32_t address){
+	/* Local variables. */
+	dentry_t dentry;
 
- 	pcb(pcb);
- 	fs_fd = &(pcb -> files[fd]);
+	/* Check for invalid file name or buffer. */
+	if(fname == NULL)
+		return -1;
 
- 	bytes_read = read_data(fs_fd -> inode_num, fs_fd -> pos, buf, nbytes);
- 	fs_fd -> pos += bytes_read;
+	/* Extract dentry information using the filename passed in. */
+	if(read_dentry_by_name((uint8_t *)fname, &dentry) == -1)
+		return -1;
 
- 	return bytes_read;
- }
+	/* Load the entire file at the address passed in. */
+	if(read_data(dentry.inode, 0, (uint8_t *)address, inodes[dentry.inode].size)){
+		return -1;
+	}
+
+	return 0;
+}
+
+/*
+ * Description: Initializes global variables associated with the file system.
+ * Inputs: fs_start- start
+ *         fs_end- end
+ * Returns: none
+ */
+void fs_init(uint32_t fs_start, uint32_t fs_end){
+	/* Set the location of the boot block. */
+	bb_start = fs_start;
+
+	/* Populate the fs_stats variable with the filesystem statistics. */
+	memcpy(&fs_stats, (void *)bb_start, FS_STATS_SIZE);
+
+	/* Set the location of the directory entries array. */
+	fs_dentries = (dentry_t *)(bb_start + FS_STATS_SIZE);
+
+	/* Set the location of the array of inodes. */
+	inodes = (inode_t *)(bb_start + FS_PAGE_SIZE);
+
+	/* Set the location of the first data block. */
+	data_start = bb_start + (fs_stats.num_inodes+1)*FS_PAGE_SIZE;
+
+	/* Initialize the number of directory reads to zero. */
+	dir_reads = 0;
+}
+
+/*
+ * Description: Returns directory entry information (file name, file type,
+ *              inode number) for the file with the given name via the dentry_t
+ *              block passed in.
+ * Inputs: fname- name of file
+ *         dentry- directory entry
+ * Returns: -1- failure (non-existent file)
+ *           0- success
+ */
+int32_t read_dentry_by_name(const uint8_t * fname, dentry_t * dentry){
+	/* Local variables. */
+	int i;
+
+	/* Find the entry in the array. */
+	for( i = 0; i < MAX_NUM_FS_DENTRIES; i++ ){
+		if(strlen( fs_dentries[i].filename ) == strlen( (int8_t *)fname)){
+			if(strncmp(fs_dentries[i].filename, (int8_t *)fname, strlen( (int8_t *)fname)) == 0){
+				/* Found it! Copy the data into 'dentry'. */
+				strcpy(dentry->filename, fs_dentries[i].filename);
+				dentry->filetype = fs_dentries[i].filetype;
+				dentry->inode = fs_dentries[i].inode;
+				return 0;
+			}
+		}
+	}
+
+	/* If we did not find the file, return failure. */
+	return -1;
+}
+
+/*
+ * Description: Returns directory entry information (file name, file type, inode
+ *              number) for the file with the given index via the dentry_t block
+ *              passed in.
+ * Inputs: fname- name of file
+ *         dentry- directory entry
+ * Returns: -1- failure (invalid index)
+ *           0- success
+ */
+int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
+	/* Check for an invalid index. */
+	if( index >= MAX_NUM_FS_DENTRIES )
+		return -1;
+
+	/* Copy the data into 'dentry'. */
+	strcpy( dentry->filename, fs_dentries[index].filename );
+	dentry->filetype = fs_dentries[index].filetype;
+	dentry->inode = fs_dentries[index].inode;
+
+	return 0;
+}
+
+/*
+ * Description:
+ * Reads (up to) 'length' bytes starting from position 'offset' in the file
+ * with inode number 'inode'. Returns the number of bytes read and placed
+ * in the buffer 'buf'.
+ *
+ * Inputs:
+ * inode- index node
+ * offset- offset
+ * buf- buffer
+ * length- number of bytes
+ *
+ * Returns:
+ * -1- failure (bad data block number within inode)
+ * 0- end of file has been reached
+ * n- number of bytes read and placed in the buffer
+ */
+int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
+                  uint32_t length){
+	/* Local variables. */
+	uint32_t  total_successful_reads;
+	uint32_t  location_in_block;
+	uint32_t  cur_data_block;
+	uint8_t * read_addr;
+
+	/* Initializations. */
+	total_successful_reads = 0;
+
+	/* Check for an invalid inode number. */
+	if( inode >= fs_stats.num_inodes )
+		return -1;
+
+	/* Check for invalid offset. */
+	if( offset >= inodes[inode].size )
+		return 0;
+
+	/* Calculate the starting data block for this read. */
+	cur_data_block = offset/FS_PAGE_SIZE;
+
+	/* Check for an invalid data block. */
+	if( inodes[inode].data_blocks[cur_data_block] >= fs_stats.num_datablocks )
+		return -1;
+
+	/* Calculate the location within the starting data block. */
+	location_in_block = offset % FS_PAGE_SIZE;
+
+	/* Calculate the address to start reading from. */
+	read_addr = (uint8_t *)(data_start +
+				(inodes[inode].data_blocks[cur_data_block])*FS_PAGE_SIZE +
+				offset % FS_PAGE_SIZE);
+
+	/* Read all the data. */
+	while( total_successful_reads < length ){
+		if( location_in_block >= FS_PAGE_SIZE ){
+			location_in_block = 0;
+
+			/* Move to the next data block. */
+			cur_data_block++;
+
+			/* Check for an invalid data block. */
+			if( inodes[inode].data_blocks[cur_data_block] >= fs_stats.num_datablocks ){
+				return -1;
+			}
+
+			/* Find the start of the next data block. */
+			read_addr = (uint8_t *)(data_start + (inodes[inode].data_blocks[cur_data_block])*FS_PAGE_SIZE);
+		}
+
+		/* See if we've reached the end of the file. */
+		if( total_successful_reads + offset >= inodes[inode].size ){
+			return total_successful_reads;
+		}
+
+		/* Read a byte. */
+		buf[total_successful_reads] = *read_addr;
+		location_in_block++;
+		total_successful_reads++;
+		read_addr++;
+	}
+
+	return total_successful_reads;
+}
+
+/**** Regular file operations. ****/
+
+/*
+ * Inputs: none
+ *
+ * Returns: 0- always
+ */
+int32_t file_open(void){
+	return 0;
+}
+
+/*
+ * Returns: 0- always
+ */
+int32_t file_close(void){
+	return 0;
+}
+
+/*
+ * Description: Performs a fs_read.
+ * Inputs: none
+ * Returns:
+ * -1- failure (invalid parameters, nonexistent file)
+ *  0- success
+ */
+int32_t file_read( uint8_t * buf, uint32_t length, const int8_t * fname, uint32_t offset ){
+	return fs_read(fname, offset, buf, length);
+}
+
+/*
+ * Inputs: none
+ *
+ * Returns: -1- always
+ */
+int32_t file_write(void){
+	return -1;
+}
+
+/**** Directory operations. ****/
+
+/*
+ * Inputs: none
+ *
+ * Returns: 0- always
+ */
+int32_t dir_open(void){
+	return 0;
+}
+
+/*
+ * Inputs: none
+ *
+ * Returns: 0- always
+ */
+int32_t dir_close(void){
+	return 0;
+}
+
+/*
+ * Description:
+ * Implements ls.
+ *
+ * Inputs: none
+ *
+ * Returns: n- number of bytes in buf
+ */
+int32_t dir_read(uint8_t * buf){
+	/*
+	 * Reset dir_reads and return if we've already read
+	 * the whole file system.
+	 */
+	if(dir_reads >= fs_stats.num_dentries){
+		dir_reads = 0;
+		return 0;
+	}
+
+	/* Copy the next filename into buf. */
+	strcpy((int8_t *)buf, (const int8_t *)fs_dentries[dir_reads].filename);
+
+	/* Increment the number of directory reads. */
+	dir_reads++;
+
+	/* Return the length of the filename. */
+	return strlen((int8_t *)buf);
+}
+
+/*
+ * Inputs: none
+ *
+ * Returns: -1- always
+ */
+int32_t dir_write(void){
+	return -1;
+}
+
+/***************test cases**********************/
+
+// read_test_text:
+// Print out a text file and/or an executable.
+// Print out the size in bytes of a text file and/or an executable.
+// input: none
+// output: none
+// effect: print out the content in the specific file, depending on the file flag
+void read_test_text(uint8_t* filename){
+	printf("test reading file...\n");
+	clear();
+	printf("test reading file...\n");
+
+  printf("Filename: %s\n", filename);
+
+	dentry_t test_file;
+	uint32_t i;
+	int32_t bytes_read;
+
+	uint32_t buffer_size = SMALL_BUF;
+	uint8_t buffer[buffer_size];
+	if(-1 == read_dentry_by_name((uint8_t*)filename, &test_file)){
+		printf("failed reading file");
+		return;
+	}
+	read_dentry_by_name((uint8_t*)filename, &test_file);   // read the text file
+
+	printf("The file type the file:%d\n", test_file.filetype);
+	printf("The inode index of the file:%d\n", test_file.inode);
+	bytes_read = read_data(test_file.inode, 0, buffer, buffer_size);  // size of file
+	printf("size of file is : %d btyes\n", (int32_t)bytes_read);
+
+	if (bytes_read <= 0){
+		printf("read data failed\n");
+		return;
+	}
+
+	// print the content of file depending on how large it is
+	if (bytes_read>=SIZE_THREAD){
+		printf("Since the file is too large,\nwe print the first and last 200 bytes in the file.\n");
+		printf("\n");
+		printf("First 400 bytes:\n");
+		//for (i=0; i<bytes_read; i++)
+		for (i=0; i<SIZE_THREAD/2; i++){
+			printf("%c", buffer[i]);
+		}
+		printf("\n\n");
+		printf("Last 400 bytes:\n");
+		for (i=bytes_read-SIZE_THREAD/2; i<bytes_read; i++){
+			printf("%c", buffer[i]);
+		}
+		return;
+	}
+
+	for (i=0; i<bytes_read; i++){
+		printf("%c", buffer[i]);
+	}
+	return;
+}
+
+
+// read_test_exe:
+// Print out a text file and/or an executable.
+// Print out the size in bytes of a text file and/or an executable.
+// input: none
+// output: none
+// effect: print out the content in the specific file, depending on the file flag
+void read_test_exe(uint8_t* filename){
+	printf("test reading file...\n");
+	clear();
+	printf("test reading file...\n");
+
+  printf("Filename: %s\n", filename);
+
+	dentry_t test_file;
+	uint32_t i;
+	int32_t bytes_read;
+
+
+	uint32_t buffer_size = LARGE_BUF;
+	uint8_t buffer[buffer_size];
+	if(-1 == read_dentry_by_name((uint8_t*)filename, &test_file)){
+		printf("failed reading file");
+		return;
+	}
+	read_dentry_by_name((uint8_t*)filename, &test_file);   // read the execute file
+
+	printf("The file type the file:%d\n", test_file.filetype);
+	printf("The inode index of the file:%d\n", test_file.inode);
+	bytes_read = read_data(test_file.inode, 0, buffer, buffer_size);  // size of file
+	printf("size of file is : %d btyes\n", (int32_t)bytes_read);
+
+	if (bytes_read <= 0){
+		printf("read data failed\n");
+		return;
+	}
+
+	// print the content of file depending on how large it is
+	if (bytes_read>=SIZE_THREAD){
+		printf("Since the file is too large,\nwe print the first and last 200 bytes in the file.\n");
+		printf("\n");
+		printf("First 400 bytes:\n");
+		//for (i=0; i<bytes_read; i++)
+		for (i=0; i<SIZE_THREAD/2; i++){
+			printf("%c", buffer[i]);
+		}
+		printf("\n\n");
+		printf("Last 400 bytes:\n");
+		for (i=bytes_read-SIZE_THREAD/2; i<bytes_read; i++){
+			printf("%c", buffer[i]);
+		}
+		return;
+	}
+
+	for (i=0; i<bytes_read; i++){
+		printf("%c", buffer[i]);
+	}
+	return;
+}
+
+/***************test cases************************/

@@ -11,6 +11,7 @@
 #include "keyboard.h"
 #include "paging.h"
 #include "rtc.h"
+#include "file_system.h"
 
 #define RUN_TESTS
 
@@ -145,7 +146,10 @@ void entry(unsigned long magic, unsigned long addr) {
 
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
-    
+     /** Initialize the filesystem **/
+  	module_t* module = (module_t*)mbi->mods_addr;
+  	fs_open(module->mod_start, module->mod_end );
+
     /* Initialize keyboard */
     init_keyboard();
     /* Initialize RTC (will run test_interrupts() only for Checkpoint 1) */

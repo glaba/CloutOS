@@ -14,6 +14,7 @@ int32_t read(int32_t fd, void* buf, int32_t nbytes){
 int32_t write(int32_t fd, const void* buf, int32_t nbytes){
   return -1;
 }
+
 /*
 DESCRIPTION: sets flags and prepares an unused file descriptor for the named file
 INPUTS:
@@ -23,53 +24,10 @@ OUTPUTS:
 RETURN VALUE:
 	-fd the corresponding index in the fd table of the pcb
 	- -1 on failure (named file does not exist, or no open file descriptors)
-SIDE EFFECTS:
+SIDE EFFECTS: none
 */
 int32_t open (const uint8_t* filename){
-    int i, fd = -1;
-    pcb_t* pcb;
-    dentry_t dentry;
-    fd_t* fd_ptr = NULL;
-    fops_t * fops;
-
-    pcb(pcb);
-
-    // sti();
-
-    /* find available file descriptor entry */
-    /* start after stdin (0) and stdout (1) */
-    for(i = 2; i < FILE_ARRAY_LEN ; i++){
-        if(!(pcb->files[i].flags && FD_LIVE)){
-            fd = i;
-            break;
-        }
-    }
-
-    /* if no available fd directory or valid filename*/
-    if(fd == -1 || read_dentry_by_name(filename, &dentry) == -1)
-        return -1;
-
-    fd_ptr = &(pcb -> files[i]);
-    fops = get_device_fops(dentry.ftype);
-
-    /* RTC or Directory */
-    if(dentry.ftype == RTC_FTYPE || dentry.ftype == DIR_FTYPE){
-        fd_ptr -> inode = NULL;
-        fd_ptr -> inode_num = dentry.inode;
-    }
-
-    /* Regular File */
-    else if(dentry.ftype == FILE_FTYPE){
-        fd_ptr -> inode = get_inode_ptr(dentry.inode);
-        fd_ptr -> inode_num = dentry.inode;
-    }
-
-    /*setting flags to make the file descriptor live*/
-    fd_ptr -> fops = fops;
-    fd_ptr -> flags = FD_LIVE;
-    fd_ptr -> fops -> open(filename);
-
-    return fd;
+    return -1;
 }
 
 /*
@@ -84,27 +42,6 @@ RETURN VALUE:
 SIDE EFFECTS: none
 */
 int32_t close (int32_t fd){
-    pcb_t* pcb;
-    fd_t * file_desc;
-
-    /* prevent closing stdin or stdout */
-    if(fd < 2 || fd >= FILE_ARRAY_LEN) return -1;
-
-    pcb(pcb);
-    file_desc = &(pcb -> files[fd]);
-
-	//clearing flags so the FD is set to unused state
-    if(file_desc -> flags && FD_LIVE){
-
-        file_desc -> fops -> close(fd);
-
-        file_desc -> fops = NULL;
-        file_desc -> inode = NULL;
-        file_desc -> pos = 0;
-        file_desc -> flags = 0;
-        return 0;
-    }
-
     return -1;
 }
 int32_t getargs(uint8_t* buf, int32_t nbytes){

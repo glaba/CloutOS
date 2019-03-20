@@ -3,6 +3,7 @@
 #include "lib.h"
 #include "init_idt.h"
 #include "exception_handlers.h"
+#include "file_system.h"
 
 #define PASS 1
 #define FAIL 0
@@ -23,7 +24,7 @@ static inline void assertion_failure(){
 /* Checkpoint 1 tests */
 
 /* IDT Test - Example
- * 
+ *
  * Asserts that first 10 IDT entries are not NULL
  * Inputs: None
  * Outputs: PASS/FAIL
@@ -37,7 +38,7 @@ int idt_test(){
 	int i;
 	int result = PASS;
 	for (i = 0; i < 10; ++i){
-		if ((idt[i].offset_15_00 == NULL) && 
+		if ((idt[i].offset_15_00 == NULL) &&
 			(idt[i].offset_31_16 == NULL)){
 			assertion_failure();
 			result = FAIL;
@@ -48,11 +49,11 @@ int idt_test(){
 }
 
 /*   idt_test_extensive();
- *   DESCRIPTION: Tests whether entries in IDT have the 
- * 				  correct function addresses encoded in them			  
+ *   DESCRIPTION: Tests whether entries in IDT have the
+ * 				  correct function addresses encoded in them
  *   INPUTS: NONE
  *   RETURN VALUE: NONE
- *   SIDE EFFECTS: NONE */ 
+ *   SIDE EFFECTS: NONE */
 int idt_test_extensive(){
 	TEST_HEADER;
 
@@ -138,7 +139,7 @@ int paging_test_valid_regions() {
 	}
 
 	printf("   Successfully performed read/write to all bytes of kernel memory.\n");
-	
+
 	return 1;
 }
 
@@ -178,6 +179,130 @@ void divide_by_zero_test() {
 }
 
 /* Checkpoint 2 tests */
+int test_fs() {
+	TEST_HEADER;
+	 dentry_t dentry;
+	 dentry_t dentry2;
+	 uint8_t buf_text[250];
+	 //uint8_t buf_non_text[500];
+	 uint8_t buf_large_text[6000];
+	 // uint8_t buf_dir[120];
+	 uint32_t i;
+	 uint32_t buf_len;
+	 /* test read directory */
+
+	 printf("TESTING READ DIRECTORY\n");
+	 buf_len = 1;
+	 while(buf_len != 0){
+		 buf_len = dir_read(buf_text);
+		 if(buf_len == 0) break;
+		 printf("file name: ");
+		 for(i=0; i< buf_len; i++){
+			 if(i == 32) break;
+		   putc(buf_text[i]);
+		 }
+		 printf(" bytes read: %d", buf_len);
+		 printf("\n");
+	 }
+
+	 i = 0;
+	 while(i < 429496729) i++;
+
+	 /* test read by name */
+	 printf("TESTING READ BY NAME\n");
+	 buf_len = 1;
+	 while(buf_len != 0){
+		 buf_len = dir_read(buf_text);
+		 if(buf_len == 0) break;
+		 printf("read by name ret val: %d\n", read_dentry_by_name(buf_text ,&dentry));
+		 printf("fname: %s\n", dentry.filename);
+		 printf("ftype: %d\n", dentry.filetype);
+		 printf("inode: %d\n", dentry.inode);
+
+		 i = 0;
+		 while(i < 429496729) i++;
+	 }
+
+	 printf("TESTING READ BY INDEX\n");
+	 	int j = 0;
+ 		for(j = 0; j < 17; j++){
+ 			read_dentry_by_index(j, &dentry2);
+ 			printf("index: %d\n", j);
+ 			printf("fname: %s\n", dentry2.filename);
+ 			printf("ftype: %d\n", dentry2.filetype);
+ 	 		printf("inode: %d\n", dentry2.inode);
+
+ 			i = 0;
+ 			while(i < 429496729) i++;
+ 		}
+
+	 /* test reading large file*/
+	printf("TESTING READ LARGE FILE\n");
+	buf_len = read_data(44,0,buf_large_text,6000);
+	printf("Number bytes read: %d\n", buf_len);
+	printf("Since the file is too large,\nwe print the first and last 400 bytes in the file.\n");
+	printf("\n");
+	printf("First 400 bytes:\n");
+	//for (i=0; i<bytes_read; i++)
+	for (i=0; i<SIZE_THREAD/2; i++){
+		printf("%c", buf_large_text[i]);
+	}
+	printf("\nLast 400 bytes:\n");
+	for (i=buf_len-SIZE_THREAD/2; i<buf_len; i++){
+		printf("%c", buf_large_text[i]);
+	}
+	printf("verylargetextwithverylongname.txt\n");
+
+	i = 0;
+	while(i < 429496729) i++;
+
+	 read_test_text((uint8_t*)"frame0.txt");
+	 	i = 0;
+ 		while(i < 429496729) i++;
+		clear();
+		read_test_text((uint8_t*)"frame1.txt");
+		 i = 0;
+		 while(i < 429496729) i++;
+		 clear();
+	 	read_test_exe((uint8_t*)"cat");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"counter");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"grep");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"hello");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"ls");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"pingpong");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"shell");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"sigtest");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"syserr");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"testprint");
+	return 1;
+}
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */
 /* Checkpoint 5 tests */
@@ -188,6 +313,7 @@ void launch_tests(){
 	TEST_OUTPUT("idt_test", idt_test());
 	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
 	TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
+	TEST_OUTPUT("file_system_test", test_fs());
 
 	// divide_by_zero_test();
 	// paging_test_invalid_region();

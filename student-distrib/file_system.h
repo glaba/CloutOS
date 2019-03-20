@@ -1,71 +1,112 @@
-#ifndef _FILE_SYSTEM_H
-#define _FILE_SYSTEM_H
+#ifndef FILES_H
+#define FILES_H
+
+
 
 #include "types.h"
-#include "multiboot.h"
 #include "lib.h"
 
-//all of these come from reading appendix A and also lecture slides
-#define BLOCK_SIZE 4096 /* kilobytes */
-#define NUM_INODES 63
-#define CHARS_PER_BLOCK 4096 /* 4kB block */
-#define BLOCKS_PER_INODE 1023
-#define RTC_FTYPE	0
-#define DIR_FTYPE	1
-#define FILE_FTYPE	2
-#define TERM_FTYPE	3
-#define FILE_NAME_LEN 32
-#define BYTES_DENTRY 64
-#define DENTRY_PAD 24
-#define BOOTBLOCK_PAD 52
-#define ONE 1
 
-typedef struct dentry {
-	int8_t fname[FILE_NAME_LEN];
-	int32_t ftype; //0-RTC, 1-Directory, 2-Regular File
-	int32_t inode;
-	int32_t pad[DENTRY_PAD];
+
+/* Constants. */
+#define MAX_NUM_FS_DENTRIES  63
+#define MAX_FILENAME_LENGTH  32
+#define FS_PAGE_SIZE         0x1000 // 4kB
+#define FS_STATS_SIZE        64
+#define FS_STATS_RESERVED    52
+#define DENTRY_RESERVED      24
+#define INODE_BLOCKS         1023
+#define BLOCK_SIZE 4096
+#define SMALL_BUF 500
+#define LARGE_BUF 6000
+#define SIZE_THREAD 800
+#define TEST_FD 2
+
+#define EIGHT_MB 0x0800000
+#define EIGHT_KB 0x2000
+
+/*
+ * File system statistics format provided at the beginning of
+ * the boot block.
+ */
+typedef struct {
+	uint32_t num_dentries;
+	uint32_t num_inodes;
+	uint32_t num_datablocks;
+	uint8_t  reserved[FS_STATS_RESERVED];
+} fs_stats_t;
+
+/*
+ * File system directory entry format.
+ */
+typedef struct {
+	int8_t   filename[MAX_FILENAME_LENGTH];
+	uint32_t filetype;
+	uint32_t inode;
+	uint8_t  reserved[DENTRY_RESERVED];
 } dentry_t;
 
-typedef struct bootblock {
-	int32_t dir_entries_cnt;
-	int32_t inode_cnt;
-	int32_t data_block_cnt;
-	int32_t pad[BOOTBLOCK_PAD];
-	dentry_t dentry[NUM_INODES];
-} bootblock_t;
-
-typedef struct inode {
-	int32_t length;
-	int32_t data_block[BLOCKS_PER_INODE]; /* number based on lecture slides */
+/*
+ * Inode block format.
+ */
+typedef struct{
+	uint32_t size;
+	uint32_t data_blocks[INODE_BLOCKS];
 } inode_t;
 
-typedef struct data_block {
-	uint8_t data[CHARS_PER_BLOCK];
-} data_block_t;
+/* Opens the file system by calling fs_init. */
+int32_t fs_open(uint32_t fs_start, uint32_t fs_end);
 
-typedef struct {
-	int32_t (*read) (int32_t fd, void* buf, int32_t nbytes);
-	int32_t (*write) (int32_t fd, const void* buf, int32_t nbytes);
-	int32_t (*open) (const uint8_t* filename);
-	int32_t (*close) (int32_t fd);
-} fops_t;
+/* Close the file system. */
+int32_t fs_close(void);
 
-//Initialize filesystem
-void fs_init(module_t *mem_mod);
-//Read a dentry by the filename and returns pointer to the dentry block
-int32_t read_dentry_by_name(const uint8 t* fname, dentry_t* dentry);
-//Read a dentry by the index number and returns a pointer to the dentry block
-int32_t read_dentry_by_index(uint32_t index, dentry_t* dentry);
-//Read the data in dentry from the offset
-int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length);
-//Lists all of the directory entries
-uint32_t read_directory(uint32_t offset, uint8_t* buf, uint32_t length);
-//Reads one diectory entry
-uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length);
-//Gets a pointer to an inode
-inode_t * get_inode_ptr(uint32_t inode);
-//Loads the file into the correct location in memory
-int32_t load(dentry_t * d, uint8_t * mem);
+/* Performs a read on the file with name 'fname'. */
+int32_t fs_read(const int8_t * fname, uint32_t offset, uint8_t * buf, uint32_t length);
 
-#endif
+/* Does nothing as our file system is read only. */
+int32_t fs_write(void);
+
+/* Loads an executable file into memory and prepares to begin the new process */
+int32_t fs_load(const int8_t * fname, uint32_t address);
+
+/* Initializes global variables associated with the file system. */
+void fs_init(uint32_t fs_start, uint32_t fs_end);
+
+void read_test_text(uint8_t * filename);
+
+void read_test_exe(uint8_t * filename);
+
+/* Returns directory entry information from the given name */
+int32_t read_dentry_by_name(const uint8_t * fname, dentry_t * dentry);
+
+/* Returns directory entry information from the given index */
+int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry);
+
+/* Reads bytes starting from 'offset' in the file with the inode 'inode'. */
+int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf, uint32_t length);
+
+/* Returns 0 */
+int32_t file_open(void);
+
+/* Returns 0 */
+int32_t file_close(void);
+
+/* Performs a fs_read. */
+int32_t file_read( uint8_t * buf, uint32_t length, const int8_t * fname, uint32_t offset );
+
+/* Returns -1 */
+int32_t file_write(void);
+
+/* Returns 0 */
+int32_t dir_open(void);
+
+/* Returns 0 */
+int32_t dir_close(void);
+
+/* Implements ls. */
+int32_t dir_read(uint8_t * buf);
+
+/* Return -1 */
+int32_t dir_write(void);
+
+#endif /* FILES_H */
