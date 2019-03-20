@@ -9,13 +9,13 @@
 
 
 /* Constants. */
-#define MAX_NUM_FS_DENTRIES  63
-#define MAX_FILENAME_LENGTH  32
 #define FS_PAGE_SIZE         0x1000 // 4kB
-#define FS_STATS_SIZE        64
 #define FS_STATS_RESERVED    52
-#define DENTRY_RESERVED      24
+#define MAX_NUM_FS_DENTRIES  63
 #define INODE_BLOCKS         1023
+#define MAX_FILENAME_LENGTH  32
+#define DENTRY_RESERVED      24
+#define FS_STATS_SIZE        64
 #define BLOCK_SIZE 4096
 #define SMALL_BUF 500
 #define LARGE_BUF 6000

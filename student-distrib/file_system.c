@@ -9,6 +9,12 @@ uint32_t fs_is_open;
 /* The statistics for the file system provided by the boot block. */
 fs_stats_t fs_stats;
 
+/* The address of the boot block. */
+uint32_t bb_start;
+
+/* The address of the first data block. */
+uint32_t data_start;
+
 /* The array of directory entries for the file system. */
 dentry_t * fs_dentries;
 
@@ -17,12 +23,6 @@ inode_t * inodes;
 
 /* The number of filenames read from the filesystem. */
 uint32_t dir_reads;
-
-/* The address of the boot block. */
-uint32_t bb_start;
-
-/* The address of the first data block. */
-uint32_t data_start;
 
 /*
  * Description: Opens the file system by calling fs_init.
@@ -244,7 +244,7 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
 	cur_data_block = offset/FS_PAGE_SIZE;
 
 	/* Check for an invalid data block. */
-	if( inodes[inode].data_blocks[cur_data_block] >= fs_stats.num_datablocks )
+	if(inodes[inode].data_blocks[cur_data_block] >= fs_stats.num_datablocks)
 		return -1;
 
 	/* Calculate the location within the starting data block. */
@@ -403,7 +403,7 @@ void read_test_text(uint8_t* filename){
 
 	uint32_t buffer_size = SMALL_BUF;
 	uint8_t buffer[buffer_size];
-	if(-1 == read_dentry_by_name((uint8_t*)filename, &test_file)){
+	if(read_dentry_by_name((uint8_t*)filename, &test_file)==-1){
 		printf("failed reading file");
 		return;
 	}
@@ -463,7 +463,7 @@ void read_test_exe(uint8_t* filename){
 
 	uint32_t buffer_size = LARGE_BUF;
 	uint8_t buffer[buffer_size];
-	if(-1 == read_dentry_by_name((uint8_t*)filename, &test_file)){
+	if(read_dentry_by_name((uint8_t*)filename, &test_file)==-1){
 		printf("failed reading file");
 		return;
 	}
