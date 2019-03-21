@@ -47,6 +47,20 @@ static inline void enable_page_size_extension() {
 }
 
 /*
+ * Flushes the TLB for the page at the specified location 
+ * This only works if the kernel is not multithreaded, since it only flushes the page
+ *  for the current processor
+ */
+static inline void flush_page_from_tlb(unsigned long addr) {
+	asm volatile("\
+		invlpg (%0)" 
+		:
+		: "r"(addr)
+		: "memory"
+	);
+}
+
+/*
  * Initializes the kernel page directory
  * Sets CR0 and CR4 to correctly support paging
  * Sets Page Directory Base Register (PDBR / CR3) to point to the kernel page directory

@@ -3,6 +3,7 @@
 #include "lib.h"
 #include "init_idt.h"
 #include "exception_handlers.h"
+#include "pci.h"
 
 #define PASS 1
 #define FAIL 0
@@ -182,12 +183,34 @@ void divide_by_zero_test() {
 /* Checkpoint 4 tests */
 /* Checkpoint 5 tests */
 
+void init_device(pci_function *func) {
+	uint32_t *eth_reg_base = (uint32_t*)func->reg_base[0];
+
+	printf("Device driver begin\n");
+
+	// Read the device status register
+	printf("Device status register: %x\n", eth_reg_base[0x8]);
+}
+
+void pci_test() {
+	pci_driver driver;
+	driver.vendor = 0x8086;
+	driver.device = 0x100E;
+	driver.function = 0;
+
+	driver.init_device = &init_device;
+
+	if (register_pci_driver(driver) == 0)
+		enumerate_pci_devices();
+}
 
 /* Test suite entry point */
-void launch_tests(){
-	TEST_OUTPUT("idt_test", idt_test());
-	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
-	TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
+void launch_tests() {
+	pci_test();
+
+	// TEST_OUTPUT("idt_test", idt_test());
+	// TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
+	// TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
 
 	// divide_by_zero_test();
 	// paging_test_invalid_region();

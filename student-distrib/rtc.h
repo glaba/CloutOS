@@ -1,8 +1,8 @@
 #ifndef RTC_H
 #define RTC
 
-/* Pin RTC is connected to on IRQ */
-#define RTC_IRQ 8
+#include "irq_defs.h"
+
 /* Address port allows you to specify index/register number */
 #define RTC_ADDRESS_PORT 0x70
 /* Data port allows you to read/write to byte in CMOS RAM */
