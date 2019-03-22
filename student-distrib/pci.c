@@ -1,4 +1,5 @@
 #include "pci.h"
+#include "paging.h"
 
 // Uncomment to enable debugging
 #define PCI_DEBUG 1
@@ -105,7 +106,7 @@ int register_pci_driver(pci_driver driver) {
  */
 int initialize_pci_function(pci_driver *driver, pci_function *func, uint8_t bus, uint8_t slot, uint8_t function) {
 #ifdef PCI_DEBUG
-	printf("Begin init of PCI device - VendorID: 0x%x, DeviceID: 0x%x\n", driver->vendor, driver->device);
+	printf("Begin initialization of PCI device - VendorID: 0x%x, DeviceID: 0x%x\n", driver->vendor, driver->device);
 #endif
 
 	func->bus = bus;
@@ -145,7 +146,7 @@ int initialize_pci_function(pci_driver *driver, pci_function *func, uint8_t bus,
 			func->reg_base[bar] = original_value & PCI_BAR_IO_SPACE_BASE_ADDR_MASK;
 
 #ifdef PCI_DEBUG
-			printf("   For I/O BAR %d: base_addr=%x\n", bar, func->reg_base[bar]);
+			printf("   For I/O  BAR 0x%d: base_addr=0x%x\n", bar, func->reg_base[bar]);
 #endif
 		} else {
 			// The BAR uses memory space addressing
@@ -175,7 +176,7 @@ int initialize_pci_function(pci_driver *driver, pci_function *func, uint8_t bus,
 			func->reg_size[bar] = size;
 
 #ifdef PCI_DEBUG
-			printf("   For MMIO BAR %d: base_addr=%x, size=%x\n", bar, base_addr, size);
+			printf("   For MMIO BAR %d: base_addr=0x%x, size=0x%x\n", bar, base_addr, size);
 #endif
 
 			// If for some reason the base pointer is null but the size is non-zero
@@ -199,20 +200,38 @@ int initialize_pci_function(pci_driver *driver, pci_function *func, uint8_t bus,
 	// Device has been inited	
 	func->inited = 1;
 #ifdef PCI_DEBUG
-	printf("    Successfully inited device\n");
+	printf("   Successfully inited device\n");
 #endif
 	return 0;
 
 	// Exception handling is a standard use for goto labels in C
 pci_init_failed:
 #ifdef PCI_DEBUG
-	printf("    Initialization failed\n");
+	printf("   Initialization failed\n");
 #endif
 	// Undo written configuration and disable interrupts
 	pci_config_write(func, PCI_COMMAND_REGISTER, 2, PCI_DISABLE_INTERRUPTS);
 
 	// Return failure
 	return -1;
+}
+
+/*
+ * Pages in the memory mapped I/O used by the given PCI function into the kernel page directory
+ *
+ * INPUTS: func: a pointer to the PCI function whose memory mapped I/O will be paged in
+ * SIDE EFFECTS: modifies the kernel page directory
+ */
+void page_mapped_io(pci_function *func) {
+	int i;
+	// Loop through all BARs 
+	for (i = 0; i < NUM_BASE_ADDRESS_REGS; i++) {
+		// Page it in if the size is non-zero and if it is a memory mapped I/O
+		if (func->reg_size[i] != 0 && func->is_memory_space_reg[i]) {
+			// Additionally, pass the PAGE_DISABLE_CACHE flag since it is MMIO and not regular memory
+			map_region_into_kernel((void*)func->reg_base[i], func->reg_size[i], PAGE_DISABLE_CACHE);
+		}
+	}
 }
 
 /*
@@ -247,6 +266,9 @@ void enumerate_pci_devices() {
 
 							// Initialize the function's memory mapped I/O and interrupts
 							initialize_pci_function(&pci_drivers[i], &pci_functions[i], bus, slot, function);
+
+							// Page in the MMIO that this PCI function uses
+							page_mapped_io(&pci_functions[i]);
 
 							// Use the driver to initialize the device
 							pci_drivers[i].init_device(&pci_functions[i]);

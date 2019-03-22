@@ -13,7 +13,7 @@ kernel.o: kernel.c multiboot.h types.h x86_desc.h lib.h i8259.h debug.h \
 keyboard.o: keyboard.c lib.h types.h i8259.h keyboard.h irq_defs.h
 lib.o: lib.c lib.h types.h
 paging.o: paging.c paging.h lib.h types.h
-pci.o: pci.c pci.h lib.h types.h spinlock.h irq_defs.h
+pci.o: pci.c pci.h lib.h types.h spinlock.h irq_defs.h paging.h
 rtc.o: rtc.c rtc.h irq_defs.h lib.h types.h i8259.h
 spinlock.o: spinlock.c spinlock.h types.h
 tests.o: tests.c tests.h x86_desc.h types.h lib.h init_idt.h \

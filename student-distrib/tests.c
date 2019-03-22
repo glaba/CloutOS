@@ -184,12 +184,15 @@ void divide_by_zero_test() {
 /* Checkpoint 5 tests */
 
 void init_device(pci_function *func) {
-	uint32_t *eth_reg_base = (uint32_t*)func->reg_base[0];
+	volatile uint32_t *eth_reg_base = (volatile uint32_t*)func->reg_base[0];
 
 	printf("Device driver begin\n");
 
 	// Read the device status register
-	printf("Device status register: %x\n", eth_reg_base[0x8]);
+	int i;
+	for (i = 0; i < 60; i++) {
+		printf("Value at %d: %x   ", i, eth_reg_base[i]);
+	}
 }
 
 void pci_test() {
