@@ -17,4 +17,13 @@ pci.o: pci.c pci.h lib.h types.h spinlock.h irq_defs.h paging.h
 rtc.o: rtc.c rtc.h irq_defs.h lib.h types.h i8259.h
 spinlock.o: spinlock.c spinlock.h types.h
 tests.o: tests.c tests.h x86_desc.h types.h lib.h init_idt.h \
-  exception_handlers.h pci.h spinlock.h irq_defs.h
+  exception_handlers.h pci.h spinlock.h irq_defs.h pci_drivers/e1000.h \
+  pci_drivers/../pci.h
+e1000.o: pci_drivers/e1000.c pci_drivers/e1000.h pci_drivers/../pci.h \
+  pci_drivers/../lib.h pci_drivers/../types.h pci_drivers/../spinlock.h \
+  pci_drivers/../irq_defs.h pci_drivers/e1000_tx.h pci_drivers/../types.h \
+  pci_drivers/e1000_misc.h
+e1000_tx.o: pci_drivers/e1000_tx.c pci_drivers/e1000_tx.h \
+  pci_drivers/../types.h pci_drivers/e1000_misc.h pci_drivers/../pci.h \
+  pci_drivers/../lib.h pci_drivers/../types.h pci_drivers/../spinlock.h \
+  pci_drivers/../irq_defs.h

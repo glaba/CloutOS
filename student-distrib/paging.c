@@ -61,6 +61,34 @@ static inline void flush_page_from_tlb(unsigned long addr) {
 }
 
 /*
+ * Unconditionally unmaps the 4MB aligned region containing the specified region 
+ *  from the kernel page directory
+ *
+ * INPUTS: start_addr: the start address of the region to unmap
+ *         size: the size of the region in bytes
+ * SIDE EFFECTS: modifies the kernel page directory
+ */
+void unmap_region_from_kernel(void* start_addr, int size) {
+	// The start address rounded down to the nearest 4MB (1 << 22 bytes)
+	void* start_addr_aligned = (void*)((unsigned int)start_addr / (1 << 22) * (1 << 22));
+	// The number of page directory entries to mark as present
+	// We take the original # bytes and add on the extra bytes occupied by aligning to 4MB boundary
+	//  and then divide by 4MB to get the number of page directory entries
+	unsigned int num_pdes = (size + (unsigned int)(start_addr - start_addr_aligned)) / (1 << 22);
+
+	// Mark all the desired pages as 4M, present pages
+	unsigned int i, cur_pde_index;
+	for (i = 0; i < num_pdes; i++) {
+		cur_pde_index = (unsigned int)(start_addr_aligned) / (1 << 22) + i;
+
+		kernel_page_directory[cur_pde_index] = 0;
+	}
+
+	// Reload the page directory
+	write_cr3(&kernel_page_directory);
+}
+
+/*
  * Finds a 4MB aligned region containing the specified region, adds it to the kernel page
  *  directory and flushes the TLB
  *

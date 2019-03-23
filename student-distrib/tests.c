@@ -4,6 +4,7 @@
 #include "init_idt.h"
 #include "exception_handlers.h"
 #include "pci.h"
+#include "pci_drivers/e1000.h"
 
 #define PASS 1
 #define FAIL 0
@@ -183,33 +184,19 @@ void divide_by_zero_test() {
 /* Checkpoint 4 tests */
 /* Checkpoint 5 tests */
 
-void init_device(pci_function *func) {
-	volatile uint32_t *eth_reg_base = (volatile uint32_t*)func->reg_base[0];
-
-	printf("Device driver begin\n");
-
-	// Read the device status register
-	int i;
-	for (i = 0; i < 60; i++) {
-		printf("Value at %d: %x   ", i, eth_reg_base[i]);
-	}
-}
-
-void pci_test() {
-	pci_driver driver;
-	driver.vendor = 0x8086;
-	driver.device = 0x100E;
-	driver.function = 0;
-
-	driver.init_device = &init_device;
-
-	if (register_pci_driver(driver) == 0)
+void eth_test() {
+	if (register_pci_driver(e1000_driver) == 0)
 		enumerate_pci_devices();
+
+	unsigned char buffer[50] = "Hello World!";
+	e1000_transmit(buffer, 13);
+
+	while (1);
 }
 
 /* Test suite entry point */
 void launch_tests() {
-	pci_test();
+	eth_test();
 
 	// TEST_OUTPUT("idt_test", idt_test());
 	// TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
