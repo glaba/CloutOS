@@ -10,8 +10,15 @@
 // The alignment of page tables and pages in memory (they must be 4 KiB aligned)
 #define PAGE_ALIGNMENT      4096
 
+// The size of a regular 4 KiB page
+#define PAGE_SIZE           0x001000
+// The size of a 4 MiB page
+#define LARGE_PAGE_SIZE     0x400000
+
 // The kernel starts at 4MB in physical memory
-#define KERNEL_START_ADDR   0x400000
+#define KERNEL_START_ADDR      0x400000
+// The kernel heap starts at 8MB in physical memory
+#define KERNEL_HEAP_START_ADDR 0x800000
 
 /////////////////////////////////////////////////
 // Page table / page directory entry constants //

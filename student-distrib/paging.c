@@ -76,7 +76,7 @@ void unmap_region_from_kernel(void* start_addr, int size) {
 	//  and then divide by 4MB to get the number of page directory entries
 	unsigned int num_pdes = (size + (unsigned int)(start_addr - start_addr_aligned)) / (1 << 22);
 
-	// Mark all the desired pages as 4M, present pages
+	// Mark all the desired pages as not present
 	unsigned int i, cur_pde_index;
 	for (i = 0; i < num_pdes; i++) {
 		cur_pde_index = (unsigned int)(start_addr_aligned) / (1 << 22) + i;
@@ -162,8 +162,11 @@ void init_paging() {
 	// Map kernel memory starting at 4MB to a 4MB page
 	kernel_page_directory[1] = KERNEL_START_ADDR | PAGE_GLOBAL | PAGE_SIZE_IS_4M | PAGE_READ_WRITE | PAGE_PRESENT;
 
+	// Map kernel heap memory starting at 8MB to a 4MB page
+	kernel_page_directory[2] = KERNEL_HEAP_START_ADDR | PAGE_GLOBAL | PAGE_SIZE_IS_4M | PAGE_READ_WRITE | PAGE_PRESENT;	
+
 	// Set all other page directory entries to not present
-	for (i = 2; i < PAGE_DIRECTORY_SIZE; i++) {
+	for (i = 3; i < PAGE_DIRECTORY_SIZE; i++) {
 		// Set bit 0 to zero, which means that the page table is not present
 		kernel_page_directory[i] &= ~PAGE_PRESENT;
 	}

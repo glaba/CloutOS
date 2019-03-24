@@ -28,6 +28,7 @@ void e1000_init_tx(volatile uint8_t *eth_mmio_base) {
 	GET_32(eth_mmio_base, ETH_TRANSMIT_DESCRIPTOR_HEAD) = 0;
 	GET_32(eth_mmio_base, ETH_TRANSMIT_DESCRIPTOR_TAIL) = 0;	
 
+	// Set the TIPG register to the magic number given in the documentation (corresponds somehow to speed of link)
 	GET_32(eth_mmio_base, ETH_TRANSMIT_IPG) = 10;
 
 	// Set the control fields to the values recommended in the Intel documentation

@@ -5,6 +5,7 @@
 #include "exception_handlers.h"
 #include "pci.h"
 #include "pci_drivers/e1000.h"
+#include "kheap.h"
 
 #define PASS 1
 #define FAIL 0
@@ -184,6 +185,12 @@ void divide_by_zero_test() {
 /* Checkpoint 4 tests */
 /* Checkpoint 5 tests */
 
+/* Extra feature tests */
+
+/*
+ * eth_test
+ * A work in progress
+ */
 void eth_test() {
 	if (register_pci_driver(e1000_driver) == 0)
 		enumerate_pci_devices();
@@ -194,14 +201,126 @@ void eth_test() {
 	while (1);
 }
 
+/*
+ * Tests kmalloc and kfree in a variety of scenarios, assuming the heap is initially empty
+ *
+ * INPUTS: none
+ * RETURN VALUE: PASS if the two work as expected and FAIL if they do not
+ * SIDE EFFECTS: completely clears the heap
+ */
+int kheap_test() {
+	kclear_heap();
+
+	/***********/
+	/* TEST #1 */
+	/***********/
+	if (1) {
+		// Each memory descriptor is 8 bytes, so if we allocate 1016 byte regions,
+		//  we should be able to allocate 4MiB / 1024 = 4096 times and fill up the heap
+		int i;
+		for (i = 0; i < 4096; i++) {
+			if (kmalloc(1016) == NULL)
+				goto kheap_test_fail;
+		}
+	}
+
+	kclear_heap();
+
+	/***********/
+	/* TEST #2 */
+	/***********/
+	if (1) {
+		// Now, we will test that freeing at the beginning, middle, and end all work
+		int i;
+		void *ptr, *beginning, *middle, *end;
+		for (i = 0; i < 4096; i++) {
+			ptr = kmalloc(1016);
+			if (i == 0) beginning = ptr;
+			if (i == 69) middle = ptr;
+			if (i == 4095) end = ptr; 
+		}
+
+		kfree(beginning);
+		kfree(middle);
+		kfree(end);
+
+		// We should now be able to malloc regions of size 1016 three times without error
+		ptr = (void*)(kmalloc(1016) && kmalloc(1016) && kmalloc(1016));
+		if (ptr == NULL)
+			goto kheap_test_fail;
+		// One more malloc should not fit and fail
+		ptr = kmalloc(1);
+		if (ptr != NULL)
+			goto kheap_test_fail;
+
+	}
+
+	kclear_heap();
+	
+	/***********/
+	/* TEST #3 */
+	/***********/
+	if (1) {
+		// Now, we will test coalescing of freed regions 
+		int i;
+		void *ptr, *first, *second;
+		for (i = 0; i < 4096; i++) {
+			ptr = kmalloc(1016);
+			if (i == 690) first = ptr;
+			if (i == 691) second = ptr;
+		}
+
+		kfree(first);
+		// Mallocing 1200 bytes should fail now
+		if (kmalloc(1200) != NULL)
+			goto kheap_test_fail;
+		kfree(second);
+		// Mallocing 1200 bytes should succeed now
+		if (kmalloc(1200) == NULL)
+			goto kheap_test_fail;
+	}
+
+	kclear_heap();
+
+	/***********/
+	/* TEST #4 */
+	/***********/
+	if (1) {
+		// Now, we will test filling a freed region with 2 pieces of smaller size
+		int i;
+		void *ptr, *middle;
+		for (i = 0; i < 4096; i++) {
+			ptr = kmalloc(1016);
+			if (i == 50) middle = ptr;
+		}
+
+		kfree(middle);
+
+		// Now, we should be able to allocate 2 regions of size 504 (plus 2 descriptors of size 8 bytes makes 1024)
+		if (kmalloc(504) && kmalloc(504) == NULL)
+			goto kheap_test_fail;
+		// We should not be able to allocate any more
+		if (kmalloc(1) != NULL)
+			goto kheap_test_fail;
+	}
+
+	kclear_heap();
+	return PASS;
+
+kheap_test_fail:
+	kclear_heap();
+	return FAIL;
+}
+
 /* Test suite entry point */
 void launch_tests() {
-	eth_test();
 
-	// TEST_OUTPUT("idt_test", idt_test());
-	// TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
-	// TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
+	TEST_OUTPUT("idt_test", idt_test());
+	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
+	TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
+	TEST_OUTPUT("kheap_test", kheap_test());
 
 	// divide_by_zero_test();
 	// paging_test_invalid_region();
+	// eth_test();
 }
