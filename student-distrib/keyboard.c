@@ -331,8 +331,8 @@ int32_t terminal_close(void) {
  * initializes vairables if needed and if keyboard
  * has not been initialized, initialize it
  * INPUTS: int32_t fd = file descriptor
-            char* buf = buffer to copy into
-           int32_t bytes = number of bytes to copy into buf
+ *         char* buf = buffer to copy into
+ *         int32_t bytes = number of bytes to copy into buf
  * OUTPUTS: 0, to indicate it went well
  * SIDE EFFECTS: modifies linwbuffer
  */
@@ -367,6 +367,7 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
             buf[i] = linebuffer[i];
         }
         else {
+            //end with null terminate
             buf[i] = '\0';
             bytes = i;
             break;
@@ -378,28 +379,32 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
     /* clear remaining characters written into userspace*/
     for(i = 0, index = bytes+1; index < TERMINAL_SIZE;index++)
         linebuffer[i++] = linebuffer[index];
+    //clear rest of linebuffer that has already been copied
     while(i < TERMINAL_SIZE) {
         linebuffer[i] = '\0';
         i++;
     }
+    //SPECIAL CASE: when linepos & bytes are max, only subtract by bytes
     if(linepos == 127 && bytes == 127) {
         linepos-=bytes;
     }
+    //else, decrement by bytes+1, where 1 represents the \n
     else {
         linepos-=(bytes+1);
     }
 
-
+    //enable interrupts and return # of bytes
     sti();
     return bytes;
 }
 
 /*
- * initializes vairables if needed and if keyboard
- * has not been initialized, initialize it
- * INPUTS: none
+ * outputs buf into terminal
+ * INPUTS: int32_t fd = file descriptor
+ *         char* buf = buffer to copy into
+ *         int32_t bytes = number of bytes to copy into buf
  * OUTPUTS: 0, to indicate it went well
- * SIDE EFFECTS: modifies linwbuffer
+ * SIDE EFFECTS: outputs to terminal
  */
 int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes) {
     int i;
@@ -412,8 +417,7 @@ int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes) {
     //start new line before writing
     //putc('\n');
     for(i = 0; i < bytes;i++) {
-        /*should end at \n, but if it is end of string,
-          print it out*/
+        /*should end at \n or at \0*/
         if(buf[i] != '\n' && buf[i] != '\0') {
             putc(buf[i]);
         }
@@ -422,7 +426,6 @@ int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes) {
 
     }
     //end with new line
-    //putc('\n');
     return TERMINAL_PASS;
 
 }

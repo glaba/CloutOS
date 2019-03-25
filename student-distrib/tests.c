@@ -231,7 +231,7 @@ int negative_null_rtc_read_write() {
 	printf("calling rtc_write with negative number of bytes\n");
 	rtc_open();
 	terminal_open();
-	//1 byte buffer passed in
+	//check if negative bytes does something
 	int32_t FOUR_BYTES = 64;
 	rtc_write(0,(const void*)&FOUR_BYTES,4);
 	response = rtc_read(0,(void *)&FOUR_BYTES,4);
@@ -242,72 +242,101 @@ int negative_null_rtc_read_write() {
 	if(response != -1)
 		return FAIL;
 	printf("negative bytes not written\n");
+
+	//check if it writes to NULL buffer
 	printf("calling rtc_write with NULL buffer\n");
 	ch = NULL;
 	response = terminal_write(0,ch,1);
 	if(response != -1)
 		return FAIL;
+	//it didnt write to NULL buffer
 	printf("NULL buffer not written\n");
 
 
-
+	//close rtc and terminal
 	rtc_close();
 	terminal_close();
 
 	return PASS;
 }
 
-
+/*
+ * tests terminal_read and terminal_write
+ * with simple 10 character limit
+ * INPUTS: none
+ * OUTPUTS: PASS for doing correctly
+ *          FAIL if it doesn't
+ * SIDE EFFECTS: calls upon keyboard
+ */
 int terminal_read_write() {
+	//keeps track of pass or fail
 	int passorfail;
 	char buf[10];
-
+	//open terminal
 	terminal_open();
 	printf("Type in 10 characters\n");
 
+	//read in 10 characters using terminal_read
 	passorfail = terminal_read(0,buf,10);
 	if(passorfail == -1)
 		return FAIL;
+	//newline before writing
 	putc('\n');
 	passorfail = terminal_write(0,buf,10);
 	if(passorfail == -1)
 		return FAIL;
+	//everything passed, so 10 characters should be outputted
 	printf("\n10 characters typed\n");
 	return PASS;
 
 }
 
+/*
+ * tests terminal_read and terminal_write
+ * with garbage input
+ * INPUTS: none
+ * OUTPUTS: PASS for doing correctly
+ *          FAIL if it doesn't
+ * SIDE EFFECTS: calls upon keyboard
+ */
 int extensive_terminal_read_write() {
+	//keeps track of pass or fail
 	int passorfail;
 	char* buf = NULL;
 
+	//open the terminal
 	terminal_open();
+
+	//TEST CASE: buf = NULL
 	printf("buffer is initalized to null\n");
 	printf("Type in 10 characters\n");
-
+	//ask for 10 characters
 	passorfail = terminal_read(0,buf,10);
 	if(passorfail != -1)
 		return FAIL;
+	//should fail, if not, pass
 	printf("buffer null test: PASSED\n");
 
-
+	//TEST CASE: negative bytes in read
 	char buff[10];
 	printf("pass in negatives bytes in read\n");
-	//printf("Type in 10 characters\n");
-
 	passorfail = terminal_read(0,buff,-1);
 	if(passorfail != -1)
 		return FAIL;
+	//supposed to fail, if not, PASSED
 	printf("negative bytes test: PASSED\n");
 
+	//TEST CASE:pass in 0 bytes
 	printf("pass in 0 bytes in read\n");
 	//printf("Type in 10 characters\n");
-
 	passorfail = terminal_read(0,buff,0);
 	if(passorfail == -1)
 		return FAIL;
+	//if it failed, then its a fail. otherwise,
+	//suppose to do nothing. so PASS
 	printf("negative bytes test: PASSED\n");
 
+	//TEST CASE: bytes != size of buffer
 	char bigbuff[128];
 	printf("pass in too many bytes in read and to write\n");
 	printf("Type in 127 characters\n");
@@ -317,19 +346,26 @@ int extensive_terminal_read_write() {
 		return FAIL;
 	putc('\n');
 	passorfail = terminal_write(0,bigbuff,200);
+	if(passorfail == -1)
+		return FAIL;
+	//otherwise, we passed
 	printf("\ntoo many bytes test: PASSED\n");
 
+	//TEST CASE: # of characters typed < buffer size
 	char fivebuff[10];
 	printf("pass in more bytes than entered\n");
 	printf("Type in 5 characters\n");
-
 	passorfail = terminal_read(0,fivebuff,10);
 	if(passorfail == -1)
 		return FAIL;
 	putc('\n');
 	passorfail = terminal_write(0,fivebuff,10);
+	if(passorfail == -1)
+		return FAIL;
+	//works, so PASS
 	printf("\npass in more bytes than entered test: PASSED\n");
 
+	//everything works, so return PASS
 	return PASS;
 }
 
