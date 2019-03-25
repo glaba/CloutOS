@@ -167,15 +167,13 @@ int32_t read_dentry_by_name(const uint8_t * fname, dentry_t * dentry){
 
 	/* Find the entry in the array. */
 	for( i = 0; i < MAX_NUM_FS_DENTRIES; i++ ){
-		if(strlen( fs_dentries[i].filename ) == strlen( (int8_t *)fname)){
-			if(strncmp(fs_dentries[i].filename, (int8_t *)fname, strlen( (int8_t *)fname)) == 0){
-				/* Found it! Copy the data into 'dentry'. */
-				strcpy(dentry->filename, fs_dentries[i].filename);
+		if(0 == strncmp(fs_dentries[i].filename, (int8_t *)fname, strlen((int8_t *)fname))){
+				strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[i].filename, MAX_FILENAME_LENGTH);
+				dentry->filename[MAX_FILENAME_LENGTH] = '\0';
 				dentry->filetype = fs_dentries[i].filetype;
 				dentry->inode = fs_dentries[i].inode;
 				return 0;
 			}
-		}
 	}
 
 	/* If we did not find the file, return failure. */
@@ -196,8 +194,8 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
 	if( index >= MAX_NUM_FS_DENTRIES )
 		return -1;
 
-	/* Copy the data into 'dentry'. */
-	strcpy( dentry->filename, fs_dentries[index].filename );
+	strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[index].filename, MAX_FILENAME_LENGTH);
+	dentry->filename[MAX_FILENAME_LENGTH] = '\0';
 	dentry->filetype = fs_dentries[index].filetype;
 	dentry->inode = fs_dentries[index].inode;
 
@@ -364,7 +362,7 @@ int32_t dir_read(uint8_t * buf){
 	}
 
 	/* Copy the next filename into buf. */
-	strcpy((int8_t *)buf, (const int8_t *)fs_dentries[dir_reads].filename);
+	strncpy((int8_t *)buf, (const int8_t *)fs_dentries[dir_reads].filename, MAX_FILENAME_LENGTH);
 
 	/* Increment the number of directory reads. */
 	dir_reads++;

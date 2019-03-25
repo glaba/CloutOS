@@ -191,36 +191,23 @@ int test_fs() {
 	 uint32_t buf_len;
 	 /* test read directory */
 
-	 printf("TESTING READ DIRECTORY\n");
+	 printf("TESTING READ DIRECTORY read by name\n");
 	 buf_len = 1;
 	 while(buf_len != 0){
 		 buf_len = dir_read(buf_text);
 		 if(buf_len == 0) break;
 		 printf("file name: ");
 		 for(i=0; i< buf_len; i++){
-			 if(i == 32) break;
 		   putc(buf_text[i]);
 		 }
 		 printf(" bytes read: %d", buf_len);
 		 printf("\n");
-	 }
 
-	 i = 0;
-	 while(i < 429496729) i++;
-
-	 /* test read by name */
-	 printf("TESTING READ BY NAME\n");
-	 buf_len = 1;
-	 while(buf_len != 0){
-		 buf_len = dir_read(buf_text);
-		 if(buf_len == 0) break;
-		 printf("read by name ret val: %d\n", read_dentry_by_name(buf_text ,&dentry));
-		 printf("fname: %s\n", dentry.filename);
-		 printf("ftype: %d\n", dentry.filetype);
-		 printf("inode: %d\n", dentry.inode);
-
+		 read_dentry_by_name(buf_text ,&dentry);
+ 		 printf("ftype: %d\n", dentry.filetype);
+ 		 printf("inode: %d\n", dentry.inode);
 		 i = 0;
-		 while(i < 429496729) i++;
+ 		 while(i < 429496729) i++;
 	 }
 
 	 printf("TESTING READ BY INDEX\n");
@@ -235,6 +222,7 @@ int test_fs() {
  			i = 0;
  			while(i < 429496729) i++;
  		}
+
 
 	 /* test reading large file*/
 	printf("TESTING READ LARGE FILE\n");
