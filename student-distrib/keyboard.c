@@ -25,6 +25,9 @@ static unsigned int linepos = 0;
 /*store whether keyboard has been initialized or not*/
 static unsigned int keyboard_init = 0;
 
+/*if last character is edited then no more*/
+static int32_t last_ch = 0;
+
 //line buffer to store everything typed into terminal
 unsigned char linebuffer[(TERMINAL_SIZE)];
 
@@ -244,7 +247,7 @@ void keyboard_handler() {
 
     /*BACKSPACE
       Clear 1 byte back in memory*/
-    if(is_backspace && key_down && linepos >= 0 && linepos < 127 && linebuffer[linepos] != '\n') {
+    if(is_backspace && key_down && linepos > 0 && linepos < 127 && last_ch != -1 && linebuffer[linepos] != '\n') {
         /*if buffer is full, remove \n and previous char*/
         /*set color*/
         set_color(V_BLACK,V_CYAN);
@@ -255,6 +258,9 @@ void keyboard_handler() {
         /*decrement linepos*/
         if(linepos > 0) {
             linepos--;
+        }
+        else if(linepos == 0) {
+            last_ch = 1;
         }
     }
 
@@ -283,6 +289,7 @@ void keyboard_handler() {
             //store character into line
             linebuffer[linepos] = character;
             linepos++;
+            last_ch = 0;
             update_cursor();
         }
         /*if buffer is full, then put \n as last character*/
@@ -384,14 +391,8 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
         linebuffer[i] = '\0';
         i++;
     }
-    //SPECIAL CASE: when linepos & bytes are max, only subtract by bytes
-    if(linepos == 127 && bytes == 127) {
-        linepos-=bytes;
-    }
-    //else, decrement by bytes+1, where 1 represents the \n
-    else {
-        linepos-=(bytes+1);
-    }
+    //reset linepos bc of copying done
+    linepos = 0;
 
     //enable interrupts and return # of bytes
     sti();
