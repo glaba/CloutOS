@@ -389,8 +389,8 @@ void launch_tests(){
 	// paging_test_invalid_region();
 
 	/*CHECKPOINT 2 TESTS*/
-	//TEST_OUTPUT("testing rtc read/write", rtc_read_write());
-	//TEST_OUTPUT("externsive rtc read/write",negative_null_rtc_read_write());
+	TEST_OUTPUT("testing rtc read/write", rtc_read_write());
+	TEST_OUTPUT("externsive rtc read/write",negative_null_rtc_read_write());
 	TEST_OUTPUT("testing terminal read/write",terminal_read_write());
 	TEST_OUTPUT("extensive testing terminal read/write",extensive_terminal_read_write());
 }
