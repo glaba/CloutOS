@@ -13,7 +13,7 @@ static int screen_y;
 // Color of text that is drawn in the future
 static uint8_t attrib = 0x3;
 
-// Pointer to video memory 
+// Pointer to video memory
 static char* video_mem = (char *)VIDEO;
 
 /* void clear(void);
@@ -29,13 +29,15 @@ void clear(void) {
     // Reset the cursor to point to the top left of the screen
     screen_x = 0;
     screen_y = 0;
+    update_cursor();
 }
 
 /*
  * Sets the color with which subsequent text will be drawn
  *
- * INPUTS: back_color, fore_color: the background and foreground color 
- * SIDE EFFECTS: all future text drawn until another invocation of this function will 
+ * INPUTS: back_color, fore_color: the background and foreground color
+ * OUTPUTS: none
+ * SIDE EFFECTS: all future text drawn until another invocation of this function will
  *               be drawn with the given color
  */
 void set_color(uint8_t back_color, uint8_t fore_color) {
@@ -46,10 +48,58 @@ void set_color(uint8_t back_color, uint8_t fore_color) {
  * Sets the location of the cursor
  *
  * INPUTS: (x, y): the updated location of the cursor where text will start being drawn
+ * OUTPUTS: NONE
+ * SIDE EFFECTS: screen_x and screen_y are updated
  */
 void set_cursor_location(int x, int y) {
     screen_x = x;
     screen_y = y;
+}
+
+/*
+ * Decrements the cursor location by 1
+ *
+ * INPUTS: none
+ * OUTPUTS: none
+ * SIDE EFFECTS: screen_x and screen_y are updated
+ *
+ */
+void decrement_location() {
+    if(screen_x <= 0 && screen_y <= 0)
+        return;
+    screen_x--;
+
+    if (screen_x < 0 && screen_y > 0) {
+        screen_y--;
+        screen_x = NUM_COLS-1;
+    }
+    /*update blinking cursor*/
+    update_cursor();
+}
+
+
+/*
+ * Clears the screen by the specified amount of spaces
+ *
+ * INPUTS: none
+ * OUTPUTS: none
+ * SIDE EFFECTS: clears 1 char back in memory,
+ *               updates cursor
+ */
+void clear_char() {
+    /* clear video mem and move cursor*/
+    int i;
+    if(screen_x <= 0 && screen_y <= 0)
+        return;
+    /*linear location is calculated*/
+    i = NUM_COLS * screen_y + screen_x;
+    /*need to clear byte before*/
+    i--;
+    *(uint8_t *)(video_mem + ((i) << 1)) = ' ';
+    *(uint8_t *)(video_mem + ((i) << 1) + 1) = attrib;
+
+    // Update the screen coordinates
+    decrement_location();
 }
 
 /* Standard printf().
@@ -202,7 +252,7 @@ void print_image(const char* s, unsigned int x, unsigned int y) {
     unsigned int start_x = x;
 
     for (; *s != '\0'; s++) {
-        // Go to next iteration if we are out of bounds 
+        // Go to next iteration if we are out of bounds
         if (y >= NUM_ROWS || x >= NUM_COLS)
             continue;
 
@@ -222,22 +272,22 @@ void print_image(const char* s, unsigned int x, unsigned int y) {
 
 /*
  * Scrolls all the text on the screen up by one line and sets the cursor position on the bottom
- * 
+ *
  * INPUTS: none
  * OUTPUTS: none
- * SIDE EFFECTS: scrolls the text in the video memory upwards like a console 
+ * SIDE EFFECTS: scrolls the text in the video memory upwards like a console
  */
 static void scroll_screen() {
     screen_y = NUM_ROWS - 1;
     screen_x = 0;
     int x, y;
 
-    // Copy all the lines up one 
+    // Copy all the lines up one
     for (x = 0; x < NUM_COLS; x++) {
         for (y = 1; y < NUM_ROWS; y++) {
-            *(uint8_t *)(video_mem + ((NUM_COLS * (y - 1) + x) << 1)) = 
+            *(uint8_t *)(video_mem + ((NUM_COLS * (y - 1) + x) << 1)) =
                 *(uint8_t *)(video_mem + ((NUM_COLS * y + x) << 1));
-            *(uint8_t *)(video_mem + ((NUM_COLS * (y - 1) + x) << 1) + 1) = 
+            *(uint8_t *)(video_mem + ((NUM_COLS * (y - 1) + x) << 1) + 1) =
                 *(uint8_t *)(video_mem + ((NUM_COLS * y + x) << 1) + 1);
         }
     }
@@ -247,6 +297,25 @@ static void scroll_screen() {
         *(uint8_t *)(video_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1)) = ' ';
         *(uint8_t *)(video_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1) + 1) = attrib;
     }
+}
+
+/*
+ * Increments the cursor location by 1
+ *
+ * INPUTS: none
+ * OUTPUTS: none
+ * SIDE EFFECTS: screen_x and screen_y are updated
+ */
+void increment_location() {
+    screen_x = (screen_x + 1) % NUM_COLS;
+
+    if (screen_x == 0)
+      screen_y++;
+    // Scroll the screen if we have reached the bottom of the page
+    if(screen_y == NUM_ROWS) {
+      scroll_screen();
+    }
+    update_cursor();
 }
 
 /* void putc(uint8_t c);
@@ -269,12 +338,31 @@ void putc(uint8_t c) {
         if (screen_x == 0)
             screen_y++;
     }
-    
+
     // Scroll the screen if we have reached the bottom of the page
     if (screen_y == NUM_ROWS) {
         scroll_screen();
     }
+    update_cursor();
 }
+
+
+/* void update_cursor(void);
+ * Inputs: N/A
+ * Return Value: n/a
+ * Function: Updates where blinking cursor is
+ * Source: https://wiki.osdev.org/Text_Mode_Cursor
+ */
+void update_cursor()
+{
+	uint16_t post = screen_y * NUM_COLS + screen_x;
+
+	outb(0x0F, 0x3D4);
+	outb(post, 0x3D5);
+	outb(0x0E, 0x3D4);
+	outb((post >> 8),0x3D5);
+}
+
 
 /* int8_t* itoa(uint32_t value, int8_t* buf, int32_t radix);
  * Inputs: uint32_t value = number to convert
@@ -570,4 +658,3 @@ void test_interrupts(void) {
         video_mem[i << 1]++;
     }
 }
-

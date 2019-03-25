@@ -11,7 +11,7 @@
 #define VIDEO      0xB8000
 #define VIDEO_SIZE 0x08000
 
-// Colors in video memory 
+// Colors in video memory
 #define V_BLACK        0x0
 #define V_BLUE         0x1
 #define V_GREEN        0x2
@@ -45,6 +45,16 @@ int8_t *itoa(uint32_t value, int8_t* buf, int32_t radix);
 int8_t *strrev(int8_t* s);
 uint32_t strlen(const int8_t* s);
 void clear(void);
+
+//USER defined functions
+void clear_char();
+
+//Updates cursor
+void update_cursor();
+
+//decrement/increment the location by 1
+void decrement_location();
+void increment_location();
 
 void* memset(void* s, int32_t c, uint32_t n);
 void* memset_word(void* s, int32_t c, uint32_t n);
@@ -188,4 +198,3 @@ do {                                    \
 } while (0)
 
 #endif /* _LIB_H */
-

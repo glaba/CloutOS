@@ -4,6 +4,8 @@
 #include "init_idt.h"
 #include "exception_handlers.h"
 #include "file_system.h"
+#include "keyboard.h"
+#include "rtc.h"
 
 #define PASS 1
 #define FAIL 0
@@ -108,7 +110,7 @@ int idt_test_extensive(){
 	return result;
 }
 
-/*
+/* paging_test_valid_regions()
  * Attempts to write to all valid paged memory, which should not cause an error
  *
  * INPUTS: None
@@ -143,7 +145,7 @@ int paging_test_valid_regions() {
 	return 1;
 }
 
-/*
+/* paging_test_invalid_region()
  * Attempts to write to a region of memory that should not be paged, which should cause a page fault
  *
  * INPUTS: none
@@ -291,6 +293,199 @@ int test_fs() {
 		read_test_exe((uint8_t*)"testprint");
 	return 1;
 }
+
+/* int rtc_read_write();
+ * Inputs: void
+ * Return Value: none
+ * Function: Cycles through rtc hertz  */
+int rtc_read_write() {
+	int32_t freq,i,response;
+	response = 0;
+	terminal_open();
+	rtc_open();
+	for(freq = 2; freq <= 1024; freq*=2) {
+		//set freq of rtc to 4
+
+		response = rtc_write(0,(const void*)&freq,4);
+		if(response == -1)
+			break;
+		for(i = 1; i <= 7;i++) {
+			//polls until RTC calls an interrupt
+			response = rtc_read(0,(void *)&freq,4);
+			if(response == -1)
+				break;
+			//write into terminal
+			char* ch = "c";
+			response = terminal_write(0,ch,1);
+			if(response == -1)
+				break;
+		}
+		if(response == -1) {
+			printf("error");
+			break;
+		}
+	}
+	terminal_close();
+	rtc_close();
+	putc('\n');
+	if(response == -1)
+		return FAIL;
+	return PASS;
+}
+
+/* int negative_null_rtc_read_write();
+ * calling rtc_write() with wrong # of bytes
+ * Inputs: none
+ * Return Value: none
+ * SIDE EFFECTS: changes   */
+int negative_null_rtc_read_write() {
+	//call rtc_write with 4 bytes but buf of 8/16/64 bytes
+	int response;
+	printf("calling rtc_write with negative number of bytes\n");
+	rtc_open();
+	terminal_open();
+	//check if negative bytes does something
+	int32_t FOUR_BYTES = 64;
+	rtc_write(0,(const void*)&FOUR_BYTES,4);
+	response = rtc_read(0,(void *)&FOUR_BYTES,4);
+	if(response == -1)
+		return FAIL;
+	char* ch = "c";
+	response = terminal_write(0,ch,-1);
+	if(response != -1)
+		return FAIL;
+	printf("negative bytes not written\n");
+
+	//check if it writes to NULL buffer
+	printf("calling rtc_write with NULL buffer\n");
+	ch = NULL;
+	response = terminal_write(0,ch,1);
+	if(response != -1)
+		return FAIL;
+	//it didnt write to NULL buffer
+	printf("NULL buffer not written\n");
+
+
+	//close rtc and terminal
+	rtc_close();
+	terminal_close();
+
+	return PASS;
+}
+
+/*
+ * tests terminal_read and terminal_write
+ * with simple 10 character limit
+ * INPUTS: none
+ * OUTPUTS: PASS for doing correctly
+ *          FAIL if it doesn't
+ * SIDE EFFECTS: calls upon keyboard
+ */
+int terminal_read_write() {
+	//keeps track of pass or fail
+	int passorfail;
+	char buf[10];
+	//open terminal
+	terminal_open();
+	printf("Type in 10 characters\n");
+
+	//read in 10 characters using terminal_read
+	passorfail = terminal_read(0,buf,10);
+	if(passorfail == -1)
+		return FAIL;
+	//newline before writing
+	putc('\n');
+	passorfail = terminal_write(0,buf,10);
+	if(passorfail == -1)
+		return FAIL;
+	//everything passed, so 10 characters should be outputted
+	printf("\n10 characters typed\n");
+	return PASS;
+
+}
+
+/*
+ * tests terminal_read and terminal_write
+ * with garbage input
+ * INPUTS: none
+ * OUTPUTS: PASS for doing correctly
+ *          FAIL if it doesn't
+ * SIDE EFFECTS: calls upon keyboard
+ */
+int extensive_terminal_read_write() {
+	//keeps track of pass or fail
+	int passorfail;
+	char* buf = NULL;
+
+	//open the terminal
+	terminal_open();
+
+	//TEST CASE: buf = NULL
+	printf("buffer is initalized to null\n");
+	printf("Type in 10 characters\n");
+	//ask for 10 characters
+	passorfail = terminal_read(0,buf,10);
+	if(passorfail != -1)
+		return FAIL;
+	//should fail, if not, pass
+	printf("buffer null test: PASSED\n");
+
+	//TEST CASE: negative bytes in read
+	char buff[10];
+	printf("pass in negatives bytes in read\n");
+	passorfail = terminal_read(0,buff,-1);
+	if(passorfail != -1)
+		return FAIL;
+	//supposed to fail, if not, PASSED
+	printf("negative bytes test: PASSED\n");
+
+	//TEST CASE:pass in 0 bytes
+	printf("pass in 0 bytes in read\n");
+	//printf("Type in 10 characters\n");
+	passorfail = terminal_read(0,buff,0);
+	if(passorfail == -1)
+		return FAIL;
+	//if it failed, then its a fail. otherwise,
+	//suppose to do nothing. so PASS
+	printf("negative bytes test: PASSED\n");
+
+	//TEST CASE: bytes != size of buffer
+	char bigbuff[128];
+	printf("pass in too many bytes in read and to write\n");
+	printf("Type in 127 characters\n");
+
+	passorfail = terminal_read(0,bigbuff,200);
+	if(passorfail == -1)
+		return FAIL;
+	putc('\n');
+	passorfail = terminal_write(0,bigbuff,200);
+	if(passorfail == -1)
+		return FAIL;
+	//otherwise, we passed
+	printf("\ntoo many bytes test: PASSED\n");
+
+	//TEST CASE: # of characters typed < buffer size
+	char fivebuff[10];
+	printf("pass in more bytes than entered\n");
+	printf("Type in 5 characters\n");
+	passorfail = terminal_read(0,fivebuff,10);
+	if(passorfail == -1)
+		return FAIL;
+	putc('\n');
+	passorfail = terminal_write(0,fivebuff,10);
+	if(passorfail == -1)
+		return FAIL;
+	//works, so PASS
+	printf("\npass in more bytes than entered test: PASSED\n");
+
+	//everything works, so return PASS
+	return PASS;
+}
+
+
+
+
+
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */
 /* Checkpoint 5 tests */
@@ -298,11 +493,17 @@ int test_fs() {
 
 /* Test suite entry point */
 void launch_tests(){
+	/* CHECKPOINT 1 TESTS*/
 	TEST_OUTPUT("idt_test", idt_test());
 	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
 	TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
-	TEST_OUTPUT("file_system_test", test_fs());
-
 	// divide_by_zero_test();
 	// paging_test_invalid_region();
+
+	/*CHECKPOINT 2 TESTS*/
+	TEST_OUTPUT("testing rtc read/write", rtc_read_write());
+	TEST_OUTPUT("externsive rtc read/write",negative_null_rtc_read_write());
+	TEST_OUTPUT("testing terminal read/write",terminal_read_write());
+	TEST_OUTPUT("extensive testing terminal read/write",extensive_terminal_read_write());
+	TEST_OUTPUT("file_system_test", test_fs());
 }
