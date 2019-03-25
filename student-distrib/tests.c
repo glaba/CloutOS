@@ -180,7 +180,16 @@ void divide_by_zero_test() {
 	result = num / zero;
 }
 
-/* Checkpoint 2 tests */
+/* CHECKPOINT 2 TESTS */
+
+/*
+ * test_fs
+ * Does an extenstive test of file system
+ *
+ * INPUTS: None
+ * OUTPUTS: None
+ * SIDE EFFECTS: prints out file contents and other details
+ */
 int test_fs() {
 	TEST_HEADER;
 	 dentry_t dentry;
@@ -337,7 +346,8 @@ int rtc_read_write() {
  * calling rtc_write() with wrong # of bytes
  * Inputs: none
  * Return Value: none
- * SIDE EFFECTS: changes   */
+ * SIDE EFFECTS: changes   
+ * */
 int negative_null_rtc_read_write() {
 	//call rtc_write with 4 bytes but buf of 8/16/64 bytes
 	int response;
@@ -481,9 +491,6 @@ int extensive_terminal_read_write() {
 	//everything works, so return PASS
 	return PASS;
 }
-
-
-
 
 
 /* Checkpoint 3 tests */
