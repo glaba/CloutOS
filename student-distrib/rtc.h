@@ -1,5 +1,6 @@
 #ifndef RTC_H
 #define RTC
+#include "types.h"
 
 /* Pin RTC is connected to on IRQ */
 #define RTC_IRQ 8
@@ -28,13 +29,21 @@
 #define _128HZ_ 0x09
 #define _256HZ_ 0x08
 #define _512HZ_ 0x07
-#define _1025HZ_ 0x06
+#define _1024HZ_ 0x06
 
-
+/*basic rtc init and handler*/
 void init_rtc();
 void rtc_handler();
 void NMI_enable();
 void NMI_disable();
 
-#endif
+/*set freqency*/
+int32_t set_freq(int32_t f);
 
+/*open,close,read,write*/
+extern int32_t rtc_open();
+extern int32_t rtc_close();
+extern int32_t rtc_read(int32_t fd, void* buf, int32_t bytes);
+extern int32_t rtc_write(int32_t fd, const void* buf, int32_t bytes);
+
+#endif
