@@ -346,7 +346,7 @@ int rtc_read_write() {
  * calling rtc_write() with wrong # of bytes
  * Inputs: none
  * Return Value: none
- * SIDE EFFECTS: changes   
+ * SIDE EFFECTS: changes
  * */
 int negative_null_rtc_read_write() {
 	//call rtc_write with 4 bytes but buf of 8/16/64 bytes
@@ -397,15 +397,16 @@ int terminal_read_write() {
 	char buf[10];
 	//open terminal
 	terminal_open();
-	printf("Type in 10 characters\n");
+	printf("Read is called with abcd\n");
 
 	//read in 10 characters using terminal_read
 	passorfail = terminal_read(0,buf,10);
 	if(passorfail == -1)
 		return FAIL;
+	printf("\n String: %s",buf);
 	//newline before writing
-	putc('\n');
-	passorfail = terminal_write(0,buf,10);
+	passorfail = terminal_write(0,"abcd\n",5);
+	//terminal_write(0,"abcd\n\n\n\n\n\n",12);
 	if(passorfail == -1)
 		return FAIL;
 	//everything passed, so 10 characters should be outputted
@@ -508,9 +509,9 @@ void launch_tests(){
 	// paging_test_invalid_region();
 
 	/*CHECKPOINT 2 TESTS*/
-	TEST_OUTPUT("testing rtc read/write", rtc_read_write());
-	TEST_OUTPUT("externsive rtc read/write",negative_null_rtc_read_write());
+	//TEST_OUTPUT("testing rtc read/write", rtc_read_write());
+	//TEST_OUTPUT("externsive rtc read/write",negative_null_rtc_read_write());
 	TEST_OUTPUT("testing terminal read/write",terminal_read_write());
-	TEST_OUTPUT("extensive testing terminal read/write",extensive_terminal_read_write());
-	TEST_OUTPUT("file_system_test", test_fs());
+	//TEST_OUTPUT("extensive testing terminal read/write",extensive_terminal_read_write());
+	//TEST_OUTPUT("file_system_test", test_fs());
 }
