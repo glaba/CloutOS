@@ -102,6 +102,35 @@ void clear_char() {
     decrement_location();
 }
 
+/*
+ * Clears the screen by one line
+ *
+ * INPUTS: none
+ * OUTPUTS: none
+ * SIDE EFFECTS: clears 1 char back in memory,
+ *               updates cursor
+ */
+void clear_line() {
+    /* clear video mem and move cursor*/
+    int x,y,i;
+    x = screen_x;
+    y = screen_y-1;
+    if(screen_x <= 0 && screen_y <= 0)
+        return;
+
+    /*linear location is calculated*/
+    for(i = NUM_COLS * screen_y + screen_x-1; i >= NUM_COLS * (screen_y-1) + screen_x; i--) {
+        /*need to clear byte before*/
+        *(uint8_t *)(video_mem + ((i) << 1)) = ' ';
+        *(uint8_t *)(video_mem + ((i) << 1) + 1) = attrib;
+    }
+    putc('e');
+    // Update the screen coordinates
+    update_cursor();
+}
+
+
+
 /* Standard printf().
  * Only supports the following format strings:
  * %%  - print a literal '%' character

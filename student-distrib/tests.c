@@ -3,6 +3,7 @@
 #include "lib.h"
 #include "init_idt.h"
 #include "exception_handlers.h"
+#include "file_system.h"
 #include "keyboard.h"
 #include "rtc.h"
 
@@ -179,7 +180,128 @@ void divide_by_zero_test() {
 	result = num / zero;
 }
 
-/* Checkpoint 2 tests */
+/* CHECKPOINT 2 TESTS */
+
+/*
+ * test_fs
+ * Does an extenstive test of file system
+ *
+ * INPUTS: None
+ * OUTPUTS: None
+ * SIDE EFFECTS: prints out file contents and other details
+ */
+int test_fs() {
+	TEST_HEADER;
+	 dentry_t dentry;
+	 dentry_t dentry2;
+	 uint8_t buf_text[250];
+	 //uint8_t buf_non_text[500];
+	 uint8_t buf_large_text[6000];
+	 // uint8_t buf_dir[120];
+	 uint32_t i;
+	 uint32_t buf_len;
+	 /* test read directory */
+
+	 printf("TESTING READ DIRECTORY read by name\n");
+	 buf_len = 1;
+	 while(buf_len != 0){
+		 buf_len = dir_read(buf_text);
+		 if(buf_len == 0) break;
+		 printf("file name: ");
+		 for(i=0; i< buf_len; i++){
+		   putc(buf_text[i]);
+		 }
+		 printf(" bytes read: %d", buf_len);
+		 printf("\n");
+
+		 read_dentry_by_name(buf_text ,&dentry);
+ 		 printf("ftype: %d\n", dentry.filetype);
+ 		 printf("inode: %d\n", dentry.inode);
+		 i = 0;
+ 		 while(i < 429496729) i++;
+	 }
+
+	 printf("TESTING READ BY INDEX\n");
+	 	int j = 0;
+ 		for(j = 0; j < 17; j++){
+ 			read_dentry_by_index(j, &dentry2);
+ 			printf("index: %d\n", j);
+ 			printf("fname: %s\n", dentry2.filename);
+ 			printf("ftype: %d\n", dentry2.filetype);
+ 	 		printf("inode: %d\n", dentry2.inode);
+
+ 			i = 0;
+ 			while(i < 429496729) i++;
+ 		}
+
+
+	 /* test reading large file*/
+	printf("TESTING READ LARGE FILE\n");
+	buf_len = read_data(44,0,buf_large_text,6000);
+	printf("Number bytes read: %d\n", buf_len);
+	printf("Since the file is too large,\nwe print the first and last 400 bytes in the file.\n");
+	printf("\n");
+	printf("First 400 bytes:\n");
+	//for (i=0; i<bytes_read; i++)
+	for (i=0; i<SIZE_THREAD/2; i++){
+		printf("%c", buf_large_text[i]);
+	}
+	printf("\nLast 400 bytes:\n");
+	for (i=buf_len-SIZE_THREAD/2; i<buf_len; i++){
+		printf("%c", buf_large_text[i]);
+	}
+	printf("verylargetextwithverylongname.txt\n");
+
+	i = 0;
+	while(i < 429496729) i++;
+
+	 read_test_text((uint8_t*)"frame0.txt");
+	 	i = 0;
+ 		while(i < 429496729) i++;
+		clear();
+		read_test_text((uint8_t*)"frame1.txt");
+		 i = 0;
+		 while(i < 429496729) i++;
+		 clear();
+	 	read_test_exe((uint8_t*)"cat");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"counter");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"grep");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"hello");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"ls");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"pingpong");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"shell");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"sigtest");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"syserr");
+		i = 0;
+		while(i < 429496729) i++;
+		clear();
+		read_test_exe((uint8_t*)"testprint");
+	return 1;
+}
 
 /* int rtc_read_write();
  * Inputs: void
@@ -224,7 +346,8 @@ int rtc_read_write() {
  * calling rtc_write() with wrong # of bytes
  * Inputs: none
  * Return Value: none
- * SIDE EFFECTS: changes   */
+ * SIDE EFFECTS: changes
+ * */
 int negative_null_rtc_read_write() {
 	//call rtc_write with 4 bytes but buf of 8/16/64 bytes
 	int response;
@@ -274,15 +397,16 @@ int terminal_read_write() {
 	char buf[10];
 	//open terminal
 	terminal_open();
-	printf("Type in 10 characters\n");
+	printf("Read is called with abcd\n");
 
 	//read in 10 characters using terminal_read
 	passorfail = terminal_read(0,buf,10);
 	if(passorfail == -1)
 		return FAIL;
+	printf("\n String: %s",buf);
 	//newline before writing
-	putc('\n');
-	passorfail = terminal_write(0,buf,10);
+	passorfail = terminal_write(0,"abcd\n",5);
+	//terminal_write(0,"abcd\n\n\n\n\n\n",12);
 	if(passorfail == -1)
 		return FAIL;
 	//everything passed, so 10 characters should be outputted
@@ -370,9 +494,6 @@ int extensive_terminal_read_write() {
 }
 
 
-
-
-
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */
 /* Checkpoint 5 tests */
@@ -381,16 +502,16 @@ int extensive_terminal_read_write() {
 /* Test suite entry point */
 void launch_tests(){
 	/* CHECKPOINT 1 TESTS*/
-	//TEST_OUTPUT("idt_test", idt_test());
-	//TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
-	//TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
-
+	TEST_OUTPUT("idt_test", idt_test());
+	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
+	TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
 	// divide_by_zero_test();
 	// paging_test_invalid_region();
 
 	/*CHECKPOINT 2 TESTS*/
-	TEST_OUTPUT("testing rtc read/write", rtc_read_write());
-	TEST_OUTPUT("externsive rtc read/write",negative_null_rtc_read_write());
-	TEST_OUTPUT("testing terminal read/write",terminal_read_write());
-	TEST_OUTPUT("extensive testing terminal read/write",extensive_terminal_read_write());
+	//TEST_OUTPUT("testing rtc read/write", rtc_read_write());
+	//TEST_OUTPUT("externsive rtc read/write",negative_null_rtc_read_write());
+	//TEST_OUTPUT("testing terminal read/write",terminal_read_write());
+	//TEST_OUTPUT("extensive testing terminal read/write",extensive_terminal_read_write());
+	//TEST_OUTPUT("file_system_test", test_fs());
 }
