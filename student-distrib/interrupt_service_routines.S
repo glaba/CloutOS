@@ -1,13 +1,17 @@
 #define ASM     1
+#define SIZE_OF_SYSTEM_CALL_TABLE 10
+
 #include "interrupt_service_routines.h"
 
 .text
 
 .globl keyboard_linkage
 .globl rtc_linkage
-.globl
+.globl system_call_linkage
 
 .align 4
+
+
 
 // Arguments needed to move pointer
 
@@ -42,127 +46,19 @@ rtc_linkage:
 # OUtputs: none
 # Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
 system_call_linkage:
-	jmp *jump_table(,%eax,10)
-
-
-jump_table:
-	.long system_call_halt, system_call_execute, system_call_read, system_call_write,
-	system_call_open, system_call_close, system_call_getargs, system_call_vidmap,
-	system_call_set_handler, system_call_sigreturn
-
-system_call_halt:
 	pushal                      # Push all general purpose registers in 32 bit form
-	pushl %ebx
-	call halt
-	movl 4(%esp),%esp
-	popal                       # Pop general purpose registers
-	cmpl -1, %eax
-	je err
+	#check eax values
+	cmpl $SIZE_OF_TABLE,%eax
+	ja eax_error                # if eax > 10 and eax < 0, go to eax_error
+	pushl %edx                  # Push 1st register
+	pushl %ecx					# Push 2nd register
+	pushl %ebx					# Push 3rd register
+	call *sys_call_table(,%eax,4)
 	sti                         # Enable interrupts due to interrupt gate
 	iret
 
-system_call_execute:
-	pushal                      # Push all general purpose registers in 32 bit form
-	pushl %ebx
-	call execute
-	movl 4(%esp),%esp
-	popal                       # Pop general purpose registers
-	cmpl -1, %eax
-	je err
-	sti                         # Enable interrupts due to interrupt gate
-	iret
 
-system_call_read:
-	pushal                      # Push all general purpose registers in 32 bit form
-	pushl %edx
-	pushl %ecx
-	pushl %ebx
-	call read
-	movl 12(%esp),%esp
-	popal                       # Pop general purpose registers
-	cmpl -1, %eax
-	je err
-	sti                         # Enable interrupts due to interrupt gate
-	iret
-
-system_call_write:
-	pushal                      # Push all general purpose registers in 32 bit form
-	pushl %edx
-	pushl %ecx
-	pushl %ebx
-	call read
-	movl 12(%esp),%esp
-	popal                       # Pop general purpose registers
-	cmpl -1, %eax
-	je err
-	sti                         # Enable interrupts due to interrupt gate
-	iret
-
-system_call_open:
-	pushal                      # Push all general purpose registers in 32 bit form
-	pushl %ebx
-	call read
-	movl 4(%esp),%esp
-	popal                       # Pop general purpose registers
-	cmpl -1, %eax
-	je err
-	sti                         # Enable interrupts due to interrupt gate
-	iret
-
-system_call_close:
-	pushal                      # Push all general purpose registers in 32 bit form
-	pushl %ebx
-	call close
-	movl 4(%esp),%esp
-	popal                       # Pop general purpose registers
-	cmpl -1, %eax
-	je err
-	sti                         # Enable interrupts due to interrupt gate
-	iret
-
-system_call_getargs:
-	pushal                      # Push all general purpose registers in 32 bit form
-	pushl %ecx
-	pushl %ebx
-	call getargs
-	movl 8(%esp),%esp
-	popal                       # Pop general purpose registers
-	cmpl -1, %eax
-	je err
-	sti                         # Enable interrupts due to interrupt gate
-	iret
-
-system_call_vidmap:
-	pushal                      # Push all general purpose registers in 32 bit form
-	pushl %ebx
-	call vidmap
-	movl 4(%esp),%esp
-	popal                       # Pop general purpose registers
-	cmpl -1, %eax
-	je err
-	sti                         # Enable interrupts due to interrupt gate
-	iret
-
-system_call_set_handler:
-	pushal                      # Push all general purpose registers in 32 bit form
-	pushl %ecx
-	pushl %ebx
-	call set_handler
-	movl 8(%esp),%esp
-	popal                       # Pop general purpose registers
-	cmpl -1, %eax
-	je err
-	sti                         # Enable interrupts due to interrupt gate
-	iret
-
-system_call_sigreturn:
-	pushal                      # Push all general purpose registers in 32 bit form
-	call sigreturn
-	popal                       # Pop general purpose registers
-	cmpl -1, %eax
-	je err
-	sti                         # Enable interrupts due to interrupt gate
-	iret
-
-err:
-	# Fixes error
+sys_call_table:
+	.long halt, execute, read, write,
+	open, close, getargs, vidmap,
+	set_handler, sigreturn
