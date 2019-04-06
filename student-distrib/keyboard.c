@@ -259,8 +259,19 @@ void keyboard_handler() {
         /* If buffer is full, remove \n and previous char*/
         /*   set color*/
         set_color(V_BLACK,V_CYAN);
-        /* Call on clear_char*/
-        clear_char();
+
+        // If clearing tab, clear back three characters
+        if(linebuffer[linepos-1] == '\t') {
+            // Clear back 3 characters
+            clear_char();
+            clear_char();
+            clear_char();
+        }
+        else {
+            /* Call on clear_char*/
+            clear_char();
+        }
+        
         /* Clear keyboard buffer at linepos*/
         linebuffer[linepos-1] = '\0';
         /* Decrement linepos*/
@@ -404,24 +415,24 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
     }
 
     int index;
-    /* clear remaining characters written into userspace*/
+    /* Clear remaining characters written into userspace*/
     for(i = 0, index = bytes+1; index < TERMINAL_SIZE;index++)
         linebuffer[i++] = linebuffer[index];
-    //clear rest of linebuffer that has already been copied
+    // Clear rest of linebuffer that has already been copied
     while (i < TERMINAL_SIZE) {
         linebuffer[i] = '\0';
         i++;
     }
-    //SPECIAL CASE: when linepos & bytes are max, only subtract by bytes
+    // SPECIAL CASE: when linepos & bytes are max, only subtract by bytes
     if (linepos == TERMINAL_SIZE-1 && bytes == TERMINAL_SIZE-1) {
         linepos-=bytes;
     }
-    //else, decrement by bytes+1, where 1 represents the \n
+    // Else, decrement by bytes+1, where 1 represents the \n
     else {
         linepos-=(bytes+1);
     }
 
-    //enable interrupts and return # of bytes
+    // Enable interrupts and return # of bytes
     sti();
     return bytes;
 }
@@ -436,17 +447,16 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
  */
 int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes) {
     int i;
-    //if buf is NULL or bytes is negative, function can't complete
+    // If buf is NULL or bytes is negative, function can't complete
     if (buf == NULL || bytes < 0)
         return TERMINAL_FAIL;
-    //if it's 0, then 0 bytes are written to terminal, PASS
+    // If it's 0, then 0 bytes are written to terminal, PASS
     if (bytes == 0)
         return TERMINAL_PASS;
-    //start new line before writing
-    //putc('\n');
+    // Start new line before writing
     for(i = 0; i < bytes;i++) {
         /*should end at \n or at \0*/
-        if (buf[i] != '\n' && buf[i] != '\0') {
+        if (buf[i] != '\0') {
             putc(buf[i]);
         }
         else
