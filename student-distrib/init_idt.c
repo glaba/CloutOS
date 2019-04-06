@@ -9,6 +9,7 @@
 #define SYSTEM_CALL_VECTOR 0x80
 #define KEYBOARD_INTERRUPT 0x21
 #define RTC_INTERRUPT 0x28
+#define PCI_INTERRUPT 0x2B
 
 /*   initialize_idt();
  *   DESCRIPTION: Fills the IDT with entries and sets settings
@@ -16,10 +17,10 @@
  *   INPUTS: NONE
  *   RETURN VALUE: NONE
  *   SIDE EFFECTS: Fills the IDT */ 
-void initialize_idt(){
+void initialize_idt() {
 	int idt_idx;
 	/* For the first 32 entries in IDT which are exceptions */
-	for (idt_idx = 0; idt_idx < END_OF_EXCEPTIONS; idt_idx++){
+	for (idt_idx = 0; idt_idx < END_OF_EXCEPTIONS; idt_idx++) {
 		
 		/* The following reserved bit settings set first 32 entries as TRAP gates */
 		idt[idt_idx].reserved0 = 0x0;
@@ -33,7 +34,7 @@ void initialize_idt(){
 		idt[idt_idx].dpl = 0x0;
 	}
 	/* For the other entries up to 255 for interrupts */
-	for (idt_idx = END_OF_EXCEPTIONS; idt_idx < NUM_VEC; idt_idx++){
+	for (idt_idx = END_OF_EXCEPTIONS; idt_idx < NUM_VEC; idt_idx++) {
 		
 		/* The following reserved bit settings set entries 32 to 255 as interrupt gates */
 		idt[idt_idx].reserved0 = 0x0;
@@ -57,8 +58,8 @@ void initialize_idt(){
 		SET_IDT_ENTRY(idt[idt_idx], exception_handlers[idt_idx]);
 	}
 
-	/* IDT entries for keyboard and RTC */
+	/* IDT entries for interrupt handlers */
 	SET_IDT_ENTRY(idt[KEYBOARD_INTERRUPT], keyboard_linkage);
 	SET_IDT_ENTRY(idt[RTC_INTERRUPT], rtc_linkage);
-	
+	SET_IDT_ENTRY(idt[PCI_INTERRUPT], pci_linkage);
 }

@@ -1,5 +1,6 @@
 #include "pci.h"
 #include "paging.h"
+#include "i8259.h"
 
 // Uncomment PCI_DEBUG_ENABLE to enable debugging
 #define PCI_DEBUG_ENABLE
@@ -66,6 +67,39 @@ uint32_t _pci_config_read(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offse
 void _pci_config_write(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint8_t size, uint32_t data);
 
 /*
+ * Handles all PCI interrupts
+ */
+void pci_irq_handler() {
+	// Acquire the lock
+	unsigned long flags;
+	spin_lock_irqsave(&pci_spin_lock, &flags);
+
+	// Send EOI to the PIC
+	send_eoi(PCI_IRQ);
+
+	PCI_DEBUG("Received PCI interrupt\n");
+
+	// Iterate through all the drivers' interrupt handlers and return 
+	//  if one of them realizes that this interrupt was theirs
+	int i;
+	for (i = 0; i < NUM_DRIVERS; i++) {
+		if (pci_functions[i].inited && pci_drivers[i].irq_handler(&pci_functions[i]) == 0) {
+			PCI_DEBUG("PCI interrupt successfully handled by %s driver\n", pci_drivers[i].name);
+			
+			// Unlock the lock (potentially unmasking interrupts) and return
+			spin_unlock_irqsave(&pci_spin_lock, flags);
+			return;
+		}
+	}
+
+	// If we got here, then no driver returned success and the interrupt was not handled
+	PCI_DEBUG("No driver found to handle interrupt!\n");
+
+	// Unlock the lock 
+	spin_unlock_irqsave(&pci_spin_lock, flags);
+}
+
+/*
  * Registers a PCI device driver which will be applied when enumerate_pci_devices is called
  */
 int register_pci_driver(pci_driver driver) {
@@ -75,7 +109,8 @@ int register_pci_driver(pci_driver driver) {
 	}
 
 	// Lock before we use pci_drivers, pci_functions and num_loaded_drivers
-	spin_lock(&pci_spin_lock);
+	unsigned long flags;
+	spin_lock_irqsave(&pci_spin_lock, &flags);
 	
 	// If there is enough room to register a driver
 	if (num_loaded_drivers < NUM_DRIVERS) {
@@ -85,7 +120,7 @@ int register_pci_driver(pci_driver driver) {
 		pci_functions[num_loaded_drivers].inited = 0;
 		num_loaded_drivers++;
 
-		spin_unlock(&pci_spin_lock);
+		spin_unlock_irqsave(&pci_spin_lock, flags);
 
 		PCI_DEBUG("Registered driver for VendorID 0x%x, DeviceID 0x%x and Function %d\n", 
 			driver.vendor, driver.device, driver.function);
@@ -94,7 +129,7 @@ int register_pci_driver(pci_driver driver) {
 		return 0;
 	}
 
-	spin_unlock(&pci_spin_lock);
+	spin_unlock_irqsave(&pci_spin_lock, flags);
 
 	// Return failure if we cannot add the driver
 	return -1;
@@ -253,7 +288,8 @@ void enumerate_pci_devices() {
 	int i;
 
 	// Lock spinlock so that no new drivers can be added while enumeration is occurring
-	spin_lock(&pci_spin_lock);
+	unsigned long flags;
+	spin_lock_irqsave(&pci_spin_lock, &flags);
 
 	// Iterate through all possible buses, slots, and functions
 	// Basically bruteforce probe all possible devices
@@ -293,7 +329,7 @@ void enumerate_pci_devices() {
 		}
 	}
 
-	spin_unlock(&pci_spin_lock);
+	spin_unlock_irqsave(&pci_spin_lock, flags);
 }
 
 uint32_t pci_config_get_addr(int8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {

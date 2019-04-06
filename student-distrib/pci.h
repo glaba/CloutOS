@@ -34,10 +34,17 @@ typedef struct pci_driver {
 	// The function number of the device
 	uint8_t function;
 
+	// The name of the driver
+	char name[32];
+
 	// Function that is called immediately after the PCI initialization is complete
 	// This should perform device specific initialization
 	// Returns 0 on success and -1 on failure
 	int (*init_device)(pci_function*);
+
+	// Function that is called when a PCI interrupt occurs
+	// Returns 0 if the interrupt was handled and -1 if the interrupt was not for this device
+	int (*irq_handler)(pci_function*);
 } pci_driver;
 
 // Registers a PCI driver for some PCI device
@@ -52,5 +59,8 @@ void enumerate_pci_devices();
 uint32_t pci_config_read(pci_function *func, uint8_t offset, uint8_t size);
 // Writes data to the PCI configuration space for the given PCI function
 void pci_config_write(pci_function *func, uint8_t offset, uint8_t size, uint32_t data);
+// Interrupt handler for all PCI interrupts
+void pci_irq_handler();
+
 
 #endif /* _PCI_H */

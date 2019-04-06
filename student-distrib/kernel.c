@@ -11,6 +11,7 @@
 #include "keyboard.h"
 #include "paging.h"
 #include "rtc.h"
+#include "kheap.h"
 
 #define RUN_TESTS
 
@@ -161,10 +162,17 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Enable paging */
     init_paging();
 
+    /* Initialize the heap */
+    init_kheap();
+
 #ifdef RUN_TESTS
     /* Run tests */
     launch_tests();
 #endif
+    // Check for memory leaks
+    // list_allocated_blocks();
+    // list_free_blocks();
+
     /* Execute the first program ("shell") ... */
 
     /* Spin (nicely, so we don't chew up cycles) */

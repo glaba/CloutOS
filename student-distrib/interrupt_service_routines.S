@@ -5,6 +5,7 @@
 
 .globl keyboard_linkage
 .globl rtc_linkage
+.globl pci_linkage
 
 .align 4
 
@@ -36,4 +37,16 @@ rtc_linkage:
 	sti                         # Enable interrupts due to interrupt gate
 	iret
 
-    
+# Function: pci_linkage
+# Description: linkage between IDT and pci_irq_handler
+# Inputs   : none
+# Outputs  : none
+# Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
+pci_linkage:
+	pushal                      # Push all general purpose registers in 32 bit form
+	pushfl                      # Push flags
+	call pci_irq_handler
+	popfl                       # Pop flags
+	popal                       # Pop general purpose registers
+	sti                         # Enable interrupts due to interrupt gate
+	iret

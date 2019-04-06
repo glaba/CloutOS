@@ -16,7 +16,7 @@
 #define TEST_OUTPUT(name, result)	\
 	printf("[TEST %s] Result = %s\n", name, (result) ? "PASS" : "FAIL");
 
-static inline void assertion_failure(){
+static inline void assertion_failure() {
 	/* Use exception #15 for assertions, otherwise
 	   reserved by Intel */
 	asm volatile("int $15");
@@ -41,7 +41,7 @@ int idt_test(){
 	int result = PASS;
 	for (i = 0; i < 10; ++i){
 		if ((idt[i].offset_15_00 == NULL) && 
-			(idt[i].offset_31_16 == NULL)){
+			(idt[i].offset_31_16 == NULL)) {
 			assertion_failure();
 			result = FAIL;
 		}
@@ -195,36 +195,53 @@ void eth_test() {
 	if (register_pci_driver(e1000_driver) == 0)
 		enumerate_pci_devices();
 
-	unsigned char buffer[50] = "Hello World!";
+	unsigned char buffer[50] = "Hello World!\n";
 	e1000_transmit(buffer, 13);
-
-	while (1);
+	buffer[0] = '1';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '2';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '3';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '4';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '5';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '6';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '7';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '8';
+	e1000_transmit(buffer, 13);
 }
 
 /*
- * Tests kmalloc and kfree in a variety of scenarios, assuming the heap is initially empty
+ * Tests kmalloc and kfree in a variety of scenarios
  *
  * INPUTS: none
  * RETURN VALUE: PASS if the two work as expected and FAIL if they do not
  * SIDE EFFECTS: completely clears the heap
  */
 int kheap_test() {
-	kclear_heap();
+	init_kheap();
 
 	/***********/
 	/* TEST #1 */
 	/***********/
 	if (1) {
-		// Each memory descriptor is 8 bytes, so if we allocate 1016 byte regions,
+		// Each memory descriptor is 16 bytes, so if we allocate 1004 byte regions,
 		//  we should be able to allocate 4MiB / 1024 = 4096 times and fill up the heap
 		int i;
 		for (i = 0; i < 4096; i++) {
-			if (kmalloc(1016) == NULL)
+			if (kmalloc(1004) == NULL) {
+				printf("Index %d\n", i);
+				printf("TEST #1 FAILED\n");
 				goto kheap_test_fail;
+			}
 		}
 	}
 
-	kclear_heap();
+	init_kheap();
 
 	/***********/
 	/* TEST #2 */
@@ -234,7 +251,7 @@ int kheap_test() {
 		int i;
 		void *ptr, *beginning, *middle, *end;
 		for (i = 0; i < 4096; i++) {
-			ptr = kmalloc(1016);
+			ptr = kmalloc(1004);
 			if (i == 0) beginning = ptr;
 			if (i == 69) middle = ptr;
 			if (i == 4095) end = ptr; 
@@ -244,18 +261,21 @@ int kheap_test() {
 		kfree(middle);
 		kfree(end);
 
-		// We should now be able to malloc regions of size 1016 three times without error
-		ptr = (void*)(kmalloc(1016) && kmalloc(1016) && kmalloc(1016));
-		if (ptr == NULL)
+		// We should now be able to malloc regions of size 1004 three times without error
+		ptr = (void*)(kmalloc(1004) && kmalloc(1004) && kmalloc(1004));
+		if (ptr == NULL) {
+			printf("TEST #2 FAILED\n");
 			goto kheap_test_fail;
+		}
 		// One more malloc should not fit and fail
 		ptr = kmalloc(1);
-		if (ptr != NULL)
+		if (ptr != NULL) {
+			printf("TEST #2 FAILED\n");
 			goto kheap_test_fail;
-
+		}
 	}
 
-	kclear_heap();
+	init_kheap();
 	
 	/***********/
 	/* TEST #3 */
@@ -265,22 +285,26 @@ int kheap_test() {
 		int i;
 		void *ptr, *first, *second;
 		for (i = 0; i < 4096; i++) {
-			ptr = kmalloc(1016);
+			ptr = kmalloc(1004);
 			if (i == 690) first = ptr;
 			if (i == 691) second = ptr;
 		}
 
 		kfree(first);
 		// Mallocing 1200 bytes should fail now
-		if (kmalloc(1200) != NULL)
+		if (kmalloc(1200) != NULL) {
+			printf("TEST #3 FAILED\n");
 			goto kheap_test_fail;
+		}
 		kfree(second);
 		// Mallocing 1200 bytes should succeed now
-		if (kmalloc(1200) == NULL)
+		if (kmalloc(1200) == NULL) {
+			printf("TEST #3 FAILED\n");
 			goto kheap_test_fail;
+		}
 	}
 
-	kclear_heap();
+	init_kheap();
 
 	/***********/
 	/* TEST #4 */
@@ -290,37 +314,40 @@ int kheap_test() {
 		int i;
 		void *ptr, *middle;
 		for (i = 0; i < 4096; i++) {
-			ptr = kmalloc(1016);
+			ptr = kmalloc(1004);
 			if (i == 50) middle = ptr;
 		}
 
 		kfree(middle);
 
-		// Now, we should be able to allocate 2 regions of size 504 (plus 2 descriptors of size 8 bytes makes 1024)
-		if (kmalloc(504) && kmalloc(504) == NULL)
+		// Now, we should be able to allocate 2 regions of size 492 (plus 2 descriptors of size 16 bytes each makes 1024)
+		if (kmalloc(492) && kmalloc(492) == NULL) {
+			printf("TEST #4 FAILED\n");
 			goto kheap_test_fail;
+		}
 		// We should not be able to allocate any more
-		if (kmalloc(1) != NULL)
+		if (kmalloc(1) != NULL) {
+			printf("TEST #4 FAILED\n");
 			goto kheap_test_fail;
+		}
 	}
 
-	kclear_heap();
+	init_kheap();
 	return PASS;
 
 kheap_test_fail:
-	kclear_heap();
+	init_kheap();
 	return FAIL;
 }
 
 /* Test suite entry point */
 void launch_tests() {
-
-	TEST_OUTPUT("idt_test", idt_test());
-	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
-	TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
-	TEST_OUTPUT("kheap_test", kheap_test());
+	// TEST_OUTPUT("idt_test", idt_test());
+	// TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
+	// TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
+	// TEST_OUTPUT("kheap_test", kheap_test());
 
 	// divide_by_zero_test();
 	// paging_test_invalid_region();
-	// eth_test();
+	eth_test();
 }

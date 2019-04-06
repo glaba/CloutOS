@@ -16,4 +16,7 @@
 // Accesses a 8-bit value in a uint8_t array starting at the given offset
 #define GET_8(arr, offset) (arr)[offset]
 
+// The maximum size of an Ethernet packet, in bytes
+#define ETH_MAX_PACKET_SIZE 1518
+
 #endif
