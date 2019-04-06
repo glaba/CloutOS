@@ -40,7 +40,7 @@ unsigned char linebuffer[(TERMINAL_SIZE)];
  * where we got the following scancode to ascii mapping */
 
 // Array mapping keyboard scan codes to ASCII characters
-const unsigned char kbdus[128] = {
+const unsigned char kbdus[TERMINAL_SIZE] = {
     0,  27,
     '1', '2', '3', '4', '5', '6', '7', '8','9', '0', '-', '=', '\b' /* Backspace */,
     '\t' /* Tab */,
@@ -79,7 +79,7 @@ const unsigned char kbdus[128] = {
 };
 
 /* Array mapping keyboard scan codes to ASCII characters when the shift key is pressed*/
-const unsigned char shift_kbdus[128] = {
+const unsigned char shift_kbdus[TERMINAL_SIZE] = {
     0,  27,
     '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b',
     '\t',                                               /*Tab*/
@@ -142,16 +142,13 @@ void init_keyboard() {
 
     /* Enable interrupt after all setup is complete */
     enable_irq(KEYBOARD_IRQ);
-
-    /* initialize line buffer */
-    for (i = 0; i < 128;i++) {
+    // Initialize line buffer
+    for(i = 0; i < TERMINAL_SIZE;i++) {
       linebuffer[i] = '\0';
     }
-
-    /* update cursor to point at beginning */
+    // Update cursor to point at beginning
     update_cursor();
-
-    /* say keyboard_init is done */
+    // Say keyboard_init is done
     keyboard_init = 1;
 }
 
@@ -169,17 +166,17 @@ void keyboard_handler() {
     /* Check for shift,ctrl,alt,CapsLock,Backspace, and tab*/
     unsigned char is_shift, is_ctrl, is_alt, is_caps_lock, is_backspace, is_tab;
 
-    /* Used for loops later */
+    /* Used for loops later*/
     int i;
 
-    /* Keeps track of if ctrl+L was clicked */
+    /* Keeps track of if ctrl+L was clicked*/
     int ctrlL = 0;
 
     /* Read the scan code and check if it corresponds to a key press or a key release */
     scancode = inb(KEYBOARD_CONTROLLER_DATA_PORT);
     key_down = ((scancode & KEY_DOWN_MASK) == 0);
 
-    /* Check if the keys are either shift, ctrl, alt, caps lock, tab, or backspace */
+    /* Check if the keys are either shift, ctrl, alt, caps lock, tab, or backspace*/
     is_shift     = ((scancode & SCAN_CODE_MASK) == LEFT_SHIFT_CODE || (scancode & SCAN_CODE_MASK) == RIGHT_SHIFT_CODE);
     is_ctrl      = ((scancode & SCAN_CODE_MASK) == LEFT_CTRL_CODE);
     is_alt       = ((scancode & SCAN_CODE_MASK) == LEFT_ALT_CODE);
@@ -199,41 +196,36 @@ void keyboard_handler() {
     if ( (keyboard_key_status & CTRL) != 0) {
         /* all CTRL+ commands HERE */
 
-        /* if CTRL+L clear screen and put cursor in upper right corner */
+    /* Check for ctrl+ something command*/
+    if ( (keyboard_key_status & CTRL) != 0) {
+        /* All CTRL+ commands HERE*/
+
+        /* If CTRL+L
+           clear screen and put cursor in upper right corner*/
         if (kbdus[(scancode & SCAN_CODE_MASK)] == 'l') {
             set_color(V_BLACK,V_CYAN);
             clear();
-
             /* Print linebuffer*/
-            for (i = 0; i < linepos; i++) {
-
-                /* Don't print anything b/c linebuffer[127] = '\n' */
-                if (i == BUFFER_MAX_SIZE-1) {
+            for(i = 0; i <= linepos;i++) {
+                /* Print 3 spaces for tab*/
+                if (linebuffer[i] == '\t') {
+                    putc(' ');
+                    putc(' ');
+                    putc(' ');
+                }
+                /* Move 1 ahead b/c linebuffer[TERMINAL_SIZE-1] = '\n'*/
+                else if (i == TERMINAL_SIZE-1) {
                     increment_location();
                     continue;
-                }
-
-                /* Print 3 spaces for tab */
-                else if (linebuffer[i] == '\t') {
-                    putc(' ');
-                    putc(' ');
-                    putc(' ');
-                }
-                else if(linebuffer[i] == '\n') {
-                    putc('a');
-                    putc('\n');
-                    putc('a');
                 }
                 else
                   putc(linebuffer[i]);
             }
-
-            /* Set CTRL+L to pressed */
+            // Set CTRL+L to pressed
             ctrlL = 1;
-
-            /* In the end decrement location so */
-            /* blinking cursor is at correct location */
-            //decrement_location();
+            /* In the end decrement location so blinking cursor
+                is at correct location*/
+            decrement_location();
 
         }
 
@@ -263,29 +255,53 @@ void keyboard_handler() {
     }
 
 
+        // Clear the buffer
+        for (i = 0; i < TERMINAL_SIZE; i++) {
+            linebuffer[i] = '\0';
+        }
+        linepos = 0;
+
+    }
+
+
     /*BACKSPACE
       Clear 1 byte back in memory*/
-    if (is_backspace && key_down && linepos > 0) {
+    if (is_backspace && key_down && linepos > 0 && linepos < TERMINAL_SIZE) {
         /* If buffer is full, remove \n and previous char*/
-        /*    set color*/
+        /*   set color*/
         set_color(V_BLACK,V_CYAN);
 
-        /* Call on clear_char*/
-        clear_char();
+        // If clearing tab, clear back three characters
+        if(linebuffer[linepos-1] == '\t') {
+            // Clear back 3 characters
+            clear_char();
+            clear_char();
+            clear_char();
+        }
+        else {
+            /* Call on clear_char*/
+            clear_char();
+        }
 
         /* Clear keyboard buffer at linepos*/
-        linebuffer[linepos] = '\0';
+        linebuffer[linepos-1] = '\0';
         /* Decrement linepos*/
         if (linepos > 0) {
             linepos--;
         }
     }
+    // If linepos is at 0 clear it in memory
+    else if(is_backspace && key_down && linepos == 0) {
+        /* Clear keyboard buffer at 0*/
+        linebuffer[linepos] = '\0';
+    }
+
 
     if (key_down) {
 
         // Use the shifted set if it's alphabetical and uppercase
         //   OR if it's non alphabetical but the shift key is down
-        if ((is_alphabetical && uppercase) || (!is_alphabetical && use_shift))
+        if ( (is_alphabetical && uppercase) || (!is_alphabetical && use_shift) )
             character = shift_kbdus[scancode & SCAN_CODE_MASK];
 
         /* Only print the character if:
@@ -293,8 +309,8 @@ void keyboard_handler() {
          *    - backspace is NOT being used
          *    - terminal buffer is NOT full
          */
-        if (character && ctrlL == 0 && character != '\n' && (!is_backspace) && (linepos < BUFFER_MAX_SIZE-1)) {
-            /* If it's a tab, print 3 spaces */
+        if (character && ctrlL == 0 && (!is_backspace) && (linepos < TERMINAL_SIZE-1) && character != '\n') {
+            // If it's a tab, print 3 spaces
             if (is_tab && key_down) {
                 putc(' ');
                 putc(' ');
@@ -303,14 +319,18 @@ void keyboard_handler() {
             else {
                 putc(character);
             }
-            /* Store character into line */
+            // Store character into line
             linebuffer[linepos] = character;
             linepos++;
             last_ch = 0;
             update_cursor();
         }
+        // If enter is pressed ONLY print the \n character
+        else if (character == '\n' && key_down) {
+            putc('\n');
+        }
         /* If buffer is full, then put \n as last character*/
-        else if (linepos == BUFFER_MAX_SIZE-1) {
+        else if (linepos == TERMINAL_SIZE-1) {
             character = '\n';
             linebuffer[linepos] = character;
             enter_flag = 0;
@@ -318,6 +338,8 @@ void keyboard_handler() {
         else if (character == '\n' && linepos < BUFFER_MAX_SIZE-1) {
             putc('\n');
         }
+
+
 
     }
 
@@ -335,13 +357,9 @@ void keyboard_handler() {
  */
 int32_t terminal_open(void) {
     int32_t i;
-
-    // If keyboard isn't initalized
     if (!keyboard_init)
         init_keyboard();
-
-    // Clear the buffer
-    for (i = 0; i < BUFFER_MAX_SIZE-1; i++) {
+    for(i = 0; i < TERMINAL_SIZE;i++) {
         linebuffer[i] = '\0';
     }
 
@@ -360,13 +378,10 @@ int32_t terminal_open(void) {
  */
 int32_t terminal_close(void) {
     int32_t i;
-
-    // Clear the buffer
-    for (i = 0; i < BUFFER_MAX_SIZE-1; i++) {
+    // Clear buffer
+    for(i = 0; i < TERMINAL_SIZE;i++) {
         linebuffer[i] = '\0';
     }
-
-    // Nothing to do, so it automatically PASSes
     return TERMINAL_PASS;
 }
 
@@ -407,8 +422,9 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
 
     /* Loop over possible loop to copy into userspace buf */
     int i;
-    for (i = 0; i < bytes; i++) {
-        // If linebuffer reaches \n, buf should only contain that much
+    for(i = 0; i < bytes;i++) {
+        //if linebuffer reaches \n, buf should only
+        //contain that much
         if (linebuffer[i] != '\n') {
             buf[i] = linebuffer[i];
         }
@@ -423,17 +439,22 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
 
     /* Clear remaining characters written into userspace*/
     int index;
-    for (i = 0, index = bytes+1; index < TERMINAL_SIZE; index++)
+    /* Clear remaining characters written into userspace*/
+    for(i = 0, index = bytes+1; index < TERMINAL_SIZE;index++)
         linebuffer[i++] = linebuffer[index];
-
     // Clear rest of linebuffer that has already been copied
     while (i < TERMINAL_SIZE) {
         linebuffer[i] = '\0';
         i++;
     }
-
-    // Reset linepos bc of copying done
-    linepos = 0;
+    // SPECIAL CASE: when linepos & bytes are max, only subtract by bytes
+    if (linepos == TERMINAL_SIZE-1 && bytes == TERMINAL_SIZE-1) {
+        linepos-=bytes;
+    }
+    // Else, decrement by bytes+1, where 1 represents the \n
+    else {
+        linepos-=(bytes+1);
+    }
 
     // Enable interrupts and return # of bytes
     sti();
@@ -450,19 +471,15 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
  */
 int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes) {
     int i;
-
     // If buf is NULL or bytes is negative, function can't complete
     if (buf == NULL || bytes < 0)
         return TERMINAL_FAIL;
-
     // If it's 0, then 0 bytes are written to terminal, PASS
     if (bytes == 0)
         return TERMINAL_PASS;
-
     // Start new line before writing
-    for (i = 0; i < bytes; i++) {
-
-        /* Should end at \0 */
+    for(i = 0; i < bytes;i++) {
+        /*should end at \n or at \0*/
         if (buf[i] != '\0') {
             putc(buf[i]);
         }
