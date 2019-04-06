@@ -25,7 +25,7 @@ int32_t execute(const uint8_t* command){
         size_of_args++;
     uint8_t args_in_mem[size_of_args-size_of_executable];
 
-    // 
+    //
     for (uint32_t i = 0; i <= size_of_args; i++) {
         args_in_mem[i] = command[i];
     }
