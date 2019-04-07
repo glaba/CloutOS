@@ -29,6 +29,6 @@
 #define FLOATING_POINT_EXCEPTION_E    19
 
 /* Array of function pointers to exception handlers */
-extern void (*exception_handlers[NUM_EXCEPTION_HANDLERS])();
+extern uint32_t exception_handlers[NUM_EXCEPTION_HANDLERS];
 
 #endif

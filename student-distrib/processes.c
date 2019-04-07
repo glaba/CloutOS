@@ -46,7 +46,7 @@ int32_t start_process(const char *command) {
 	void *virt_prog_location = (void*)EXECUTABLE_VIRT_PAGE_START + EXECUTABLE_PAGE_OFFSET;
 
 	// Page in the memory region where the executable will be located so that we can write the executable
-	if (map_region(program_page, virt_prog_page, 1, PAGE_CACHE | PAGE_READ_WRITE | PAGE_USER_LEVEL) != 0) {
+	if (map_region(program_page, virt_prog_page, 1, PAGE_READ_WRITE | PAGE_USER_LEVEL) != 0) {
 		sti();
 		return -1;
 	}
@@ -67,34 +67,43 @@ int32_t start_process(const char *command) {
 	void *entrypoint = *((void**)(EXECUTABLE_VIRT_PAGE_START + EXECUTABLE_PAGE_OFFSET + ENTRYPOINT_OFFSET));
 
 	// Set the stack pointer for the new program to just point to the top of the program
-	void *program_esp = virt_prog_page + LARGE_PAGE_SIZE;
+	void *program_esp = virt_prog_page + LARGE_PAGE_SIZE - 1;
 
 	// Set the TSS's SS0 and ESP0 fields
 	// SS0 should point to the kernel's stack segment
-	tss.ss0 = KERNEL_CS;
+	tss.ss0 = KERNEL_DS;
 	// ESP0 should point to the 8KB kernel stack for this process, which collectively all begin
 	//  below the bottom of the kernel stack (which ranges from 8MB-8KB to 8MB)
 	tss.esp0 = KERNEL_START_ADDR + LARGE_PAGE_SIZE - KERNEL_STACK_SIZE * (1 + cur_pid);
 
-	// Get a pointer to where we will put the PCB in this process' kernel stack 
-	pcb_t *pcb = (pcb_t*)(tss.esp0 - sizeof(pcb_t));
+	// Decrement esp0 for the pcb
+	tss.esp0 -= sizeof(pcb_t);
+	// Put the pcb on the stack
+	pcb_t *pcb = (pcb_t*)tss.esp0;
 
 	// Initialize the fields of the PCB
 	for (i = 0; i < MAX_NUM_FILES; i++)
 		pcb->files[i].in_use = 0;
 	pcb->pid = cur_pid;
 
-	asm volatile ("            \n\
+	asm volatile ("         \n\
+		movl %k0, %%eax     \n\
+		movw %%ax, %%ds     \n\
+		movw %%ax, %%es     \n\
+		movw %%ax, %%fs     \n\
+		movw %%ax, %%gs     \n\
 		pushl %k0           \n\
 		pushl %k1           \n\
 		pushfl              \n\
 		orl $0x200, (%%esp) \n\
 		pushl %k2           \n\
-		pushl %k3           \n\
-		iret"
+		pushl %k3           \n"
 		:
 		: "r"((USER_DS)), "r"((program_esp)), "r"((USER_CS)), "r"((entrypoint))
+		: "eax", "esp" // It clobbers a lot more than this but let's just put this much there for consistency
 	);
+
+	asm volatile ("iret");
 
 	return 0;
 }
