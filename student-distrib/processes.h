@@ -5,7 +5,7 @@
 
 // Magic number that must appear in the first 4 bytes of all executables
 #define ELF_MAGIC 0x464C457F
-// The virtual address that all processes' data is mapped to 
+// The virtual address that all processes' data is mapped to
 #define EXECUTABLE_VIRT_PAGE_START 0x8000000
 // The offset within a page that an executable should be copied to
 #define EXECUTABLE_PAGE_OFFSET 0x48000
@@ -44,4 +44,4 @@ typedef struct pcb_t {
 // Starts the process associated with the given shell command
 int32_t start_process(const char *command);
 
-#endif 
+#endif
