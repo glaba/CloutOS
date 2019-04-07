@@ -45,6 +45,15 @@ void initialize_idt(){
 		idt[idt_idx].size = 0x1;
 		idt[idt_idx].present = 0x1;
 		idt[idt_idx].dpl = 0x0;
+		
+		if (idt_idx == SYSTEM_CALL_VECTOR) {
+			/* The following reserved bit settings set first 32 entries as TRAP gates */
+			idt[idt_idx].reserved0 = 0x0;
+			idt[idt_idx].reserved1 = 0x1;
+			idt[idt_idx].reserved2 = 0x1;
+			idt[idt_idx].reserved3 = 0x0;
+			idt[idt_idx].reserved4 = 0x0;
+		}
 	}
 	/* Make sure system call handler is accessible from user space */
 	idt[SYSTEM_CALL_VECTOR].dpl = 0x3;

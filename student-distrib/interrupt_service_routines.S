@@ -36,25 +36,3 @@ rtc_linkage:
 	popal                       # Pop general purpose registers
 	sti                         # Enable interrupts due to interrupt gate
 	iret
-
-# Function: system_call_linkage
-# Description: linkage between IDT and system_call_handler
-# Inputs: none
-# OUtputs: none
-# Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
-system_call_linkage:
-	pushal                      			# Push all general purpose registers in 32 bit form
-	cmpl %eax, SIZE_OF_SYSTEM_CALL_TABLE	# check eax values
-	ja eax_error                			# if eax > 10 and eax < 0, go to eax_error
-	pushl %edx                  			# Push 1st register
-	pushl %ecx								# Push 2nd register
-	pushl %ebx								# Push 3rd register
-	addl %eax, -1							# Subtract 1 for 0 based index
-	call *sys_call_table(, %eax, 4)			# Jumps to correct system call
-eax_error:	
-	sti                         			# Enable interrupts due to interrupt gate
-	iret
-
-
-sys_call_table:
-	.long halt, execute, read, write, open, close, getargs, vidmap, set_handler, sigreturn
