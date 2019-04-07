@@ -3,6 +3,11 @@
 
 #include "lib.h"
 
+// The size of a large 4MB page (4MB)
+#define LARGE_PAGE_SIZE 0x400000
+// The size of a normal 4KB page (4KB)
+#define NORMAL_PAGE_SIZE 0x1000
+
 // The number of page directory entries in a page directory (each is 4 bytes)
 #define PAGE_DIRECTORY_SIZE 1024
 // The number of page table entries in a page table (each is 4 bytes)
@@ -11,7 +16,9 @@
 #define PAGE_ALIGNMENT      4096
 
 // The kernel starts at 4MB in physical memory
-#define KERNEL_START_ADDR   0x400000
+#define KERNEL_START_ADDR        0x400000
+// Userspace programs start at 16MB in physical memory
+#define USER_PROGRAMS_START_ADDR 0x1000000
 
 /////////////////////////////////////////////////
 // Page table / page directory entry constants //
@@ -32,5 +39,12 @@
 // Initializes paging by setting Page Directory Base Register to page directory
 //  that maps the 4M kernel page as well as video memory
 void init_paging();
+
+// Unconditionally unmaps the 4MB aligned region containing the specified region
+void unmap_region_from_kernel(void* start_addr, int size);
+
+// Finds a 4MB aligned region containing the specified region, adds it to the kernel page
+//  directory and flushes the TLB
+int map_region_into_kernel(void* start_addr, int size, unsigned int flags);
 
 #endif /* _PAGING_H */

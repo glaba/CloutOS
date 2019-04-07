@@ -67,7 +67,7 @@ int32_t fs_read(const int8_t * fname, uint32_t offset, uint8_t * buf, uint32_t l
 int32_t fs_write(void);
 
 /* Loads an executable file into memory and prepares to begin the new process */
-int32_t fs_load(const int8_t * fname, uint32_t address);
+int32_t fs_load(const int8_t *fname, void *address);
 
 /* Initializes global variables associated with the file system. */
 void fs_init(uint32_t fs_start, uint32_t fs_end);

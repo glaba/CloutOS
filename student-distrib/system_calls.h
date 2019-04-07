@@ -3,8 +3,14 @@
 
 #include "types.h"
 
-#define KERNEL_STACK_SIZE   0x2000
-#define KERNEL_MEM_END 	 	0x800000
+// Magic number that must appear in the first 4 bytes of all executables
+#define ELF_MAGIC 0x464C457F
+
+// The offset within a page that an executable should be copied to
+#define EXECUTABLE_PAGE_OFFSET 0x48000
+
+// The offset in the executable where the entrypoint of the program is stored
+#define ENTRYPOINT_OFFSET 24
 
 /* The ten system calls */
 int32_t halt(uint8_t status);

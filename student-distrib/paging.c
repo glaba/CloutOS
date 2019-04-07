@@ -47,6 +47,78 @@ static inline void enable_page_size_extension() {
 }
 
 /*
+ * Unconditionally unmaps the 4MB aligned region containing the specified region 
+ *  from the kernel page directory
+ *
+ * INPUTS: start_addr: the start address of the region to unmap
+ *         size: the size of the region in bytes
+ * SIDE EFFECTS: modifies the kernel page directory
+ */
+void unmap_region_from_kernel(void* start_addr, int size) {
+	// The start address rounded down to the nearest 4MB (1 << 22 bytes)
+	void* start_addr_aligned = (void*)((unsigned int)start_addr / (1 << 22) * (1 << 22));
+	// The number of page directory entries to mark as present
+	// We take the original # bytes and add on the extra bytes occupied by aligning to 4MB boundary
+	//  and then divide by 4MB to get the number of page directory entries
+	unsigned int num_pdes = (size + (unsigned int)(start_addr - start_addr_aligned)) / (1 << 22);
+
+	// Mark all the desired pages as not present
+	unsigned int i, cur_pde_index;
+	for (i = 0; i < num_pdes; i++) {
+		cur_pde_index = (unsigned int)(start_addr_aligned) / (1 << 22) + i;
+
+		kernel_page_directory[cur_pde_index] = 0;
+	}
+
+	// Reload the page directory
+	write_cr3(&kernel_page_directory);
+}
+
+/*
+ * Finds a 4MB aligned region containing the specified region, adds it to the kernel page
+ *  directory and flushes the TLB
+ *
+ * INPUTS: start_addr: the start address of the region to map in
+ *         size: the size of the region in bytes
+ *         flags: flags to assign to the page directory entry (PAGE_PRESENT and PAGE_SIZE_IS_4M added by default)
+ * OUTPUTS: 0 if it succeeded or -1 if the region is being used for something else
+ *           which includes the case where it's mapped into the kernel but not fully
+ */
+int map_region_into_kernel(void* start_addr, int size, unsigned int flags) {
+	// The start address rounded down to the nearest 4MB (1 << 22 bytes)
+	void* start_addr_aligned = (void*)((unsigned int)start_addr / (1 << 22) * (1 << 22));
+	// The number of page directory entries to mark as present
+	// We take the original # bytes and add on the extra bytes occupied by aligning to 4MB boundary
+	//  and then divide by 4MB to get the number of page directory entries
+	unsigned int num_pdes = (size + (unsigned int)(start_addr - start_addr_aligned)) / (1 << 22);
+
+	// Check if the memory is partially mapped at any of the desired page directory entries, we fail if so
+	unsigned int i, cur_pde_index, cur_pde;
+	for (i = 0; i < num_pdes; i++) {
+		cur_pde_index = (unsigned int)(start_addr_aligned) / (1 << 22);
+		cur_pde = kernel_page_directory[cur_pde_index];
+
+		// If the page is already present but it isn't a full 4MB page, then we don't
+		//  want to mess with whatever is already going on there
+		if ((cur_pde | PAGE_PRESENT) && !(cur_pde | PAGE_SIZE_IS_4M))
+			return -1;
+	}
+
+	// Mark all the desired pages as 4M, present pages
+	for (i = 0; i < num_pdes; i++) {
+		cur_pde_index = (unsigned int)(start_addr_aligned) / (1 << 22) + i;
+
+		kernel_page_directory[cur_pde_index] = (cur_pde_index * PAGE_TABLE_SIZE * PAGE_ALIGNMENT) |
+			flags | PAGE_SIZE_IS_4M | PAGE_PRESENT;
+	}
+
+	// Reload the page directory
+	write_cr3(&kernel_page_directory);
+
+	return 0;
+}
+
+/*
  * Initializes the kernel page directory
  * Sets CR0 and CR4 to correctly support paging
  * Sets Page Directory Base Register (PDBR / CR3) to point to the kernel page directory

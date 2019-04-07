@@ -100,26 +100,30 @@ int32_t fs_write(void){
 
 /*
  * Description: Loads an executable file into memory and prepares to begin the
- *              new process.
+ *              new process, if the executable file will fit within a 4MB page boundary
  * Inputs: fname- name of file
  *         address- address of read - offset
  * Returns: -1- failure
  *           0- success
  */
-int32_t fs_load(const int8_t * fname, uint32_t address){
+int32_t fs_load(const int8_t *fname, void *address) {
 	/* Local variables. */
 	dentry_t dentry;
 
 	/* Check for invalid file name or buffer. */
-	if(fname == NULL)
+	if (fname == NULL)
 		return -1;
 
 	/* Extract dentry information using the filename passed in. */
-	if(read_dentry_by_name((uint8_t *)fname, &dentry) == -1)
+	if (read_dentry_by_name((uint8_t*)fname, &dentry) == -1)
+		return -1;
+
+	// Check that the executable will not cross a 4MB page boundary 
+	if ((inodes[dentry.inode].size + (uint32_t)address) / 0x400000 != (uint32_t)address / 0x400000)
 		return -1;
 
 	/* Load the entire file at the address passed in. */
-	if(read_data(dentry.inode, 0, (uint8_t *)address, inodes[dentry.inode].size)){
+	if (read_data(dentry.inode, 0, (uint8_t*)address, inodes[dentry.inode].size)) {
 		return -1;
 	}
 
