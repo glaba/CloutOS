@@ -345,10 +345,18 @@ int32_t file_close(void){
  * -1- failure (invalid parameters, nonexistent file)
  *  0- success
  */
-int32_t file_read(file_t* fd, void* buf, int32_t nbytes){
-	int32_t ofset =  read_data(fd->inode, fd->file_pos, (uint8_t*)buf, nbytes);
-	fd->file_pos += nbytes;
-	return 0;
+int32_t file_read(int32_t fd, void* buf, int32_t nbytes){
+	int32_t bytes_read;
+ 	pcb_t * pcb;
+ 	file_t * file;
+
+ 	pcb = getpcb(); //placeholder
+ 	file = &pcb->files[fd];
+
+ 	bytes_read = read_data(file->inode, file->file_pos, (int8_t*)buf, nbytes);
+ 	file->file_pos += bytes_read;
+
+ 	return bytes_read;
 }
 
 /*
@@ -388,9 +396,16 @@ int32_t dir_close(void){
  *
  * Returns: n- number of bytes in buf
  */
-int32_t dir_read(file_t* fd, void* buf, int32_t nbytes){
-	bytes_read = read_directory_entry(fd -> pos, (uint8_t*)buf, nbytes);
- 	fd -> pos++;
+int32_t dir_read(int32_t fd, void* buf, int32_t nbytes){
+	int32_t bytes_read;
+ 	pcb_t * pcb;
+ 	fd_t * file;
+
+ 	pcb = getpcb(); //to implement
+ 	file = &pcb->files[fd];
+
+ 	bytes_read = read_directory_entry(file->file_pos, (uint8_t*)buf, nbytes);
+ 	file->file_pos++;
 
  	return bytes_read;
 }

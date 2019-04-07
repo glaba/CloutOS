@@ -6,6 +6,7 @@
 #include "types.h"
 #include "lib.h"
 #include "processes.h"
+#include "system_calls.h"
 
 
 
@@ -96,7 +97,7 @@ int32_t file_open(void);
 int32_t file_close(void);
 
 /* Performs a fs_read. */
-int32_t file_read(file_t* fd, void* buf, int32_t nbytes);
+int32_t file_read(int32_t fd, void* buf, int32_t nbytes);
 
 /* Returns -1 */
 int32_t file_write(void);
@@ -108,7 +109,7 @@ int32_t dir_open(void);
 int32_t dir_close(void);
 
 /* Implements ls. */
-int32_t dir_read(file_t* fd, void* buf, int32_t nbytes);
+int32_t dir_read(int32_t fd, void* buf, int32_t nbytes);
 
 /* Return -1 */
 int32_t dir_write(void);
