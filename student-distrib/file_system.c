@@ -123,7 +123,7 @@ int32_t fs_load(const int8_t *fname, void *address) {
 		return -1;
 
 	/* Load the entire file at the address passed in. */
-	if (read_data(dentry.inode, 0, (uint8_t*)address, inodes[dentry.inode].size)) {
+	if (read_data(dentry.inode, 0, (uint8_t*)address, inodes[dentry.inode].size) <= 0) {
 		return -1;
 	}
 
@@ -220,7 +220,6 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
  *
  * Returns:
  * -1- failure (bad data block number within inode)
- * 0- end of file has been reached
  * n- number of bytes read and placed in the buffer
  */
 int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
@@ -240,7 +239,7 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
 
 	/* Check for invalid offset. */
 	if( offset >= inodes[inode].size )
-		return 0;
+		return -1;
 
 	/* Calculate the starting data block for this read. */
 	cur_data_block = offset/FS_PAGE_SIZE;

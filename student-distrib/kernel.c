@@ -12,6 +12,7 @@
 #include "paging.h"
 #include "rtc.h"
 #include "file_system.h"
+#include "processes.h"
 
 #define RUN_TESTS
 
@@ -167,10 +168,11 @@ void entry(unsigned long magic, unsigned long addr) {
 
 #ifdef RUN_TESTS
     /* Run tests */
-    launch_tests();
+    // launch_tests();
 #endif
     /* Execute the first program ("shell") ... */
-    
+    start_process("hello");
+
     /* Spin (nicely, so we don't chew up cycles) */
     asm volatile (".1: hlt; jmp .1;");
 }

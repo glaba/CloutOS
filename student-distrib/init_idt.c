@@ -47,13 +47,9 @@ void initialize_idt(){
 		idt[idt_idx].dpl = 0x0;
 		
 		if (idt_idx == SYSTEM_CALL_VECTOR) {
-			/* The following reserved bit settings set first 32 entries as TRAP gates 
+			/* The following reserved bit setting sets first 32 entries as TRAP gates 
 			   which means that interrupts will not be disabled */
-			idt[idt_idx].reserved0 = 0x0;
-			idt[idt_idx].reserved1 = 0x1;
-			idt[idt_idx].reserved2 = 0x1;
 			idt[idt_idx].reserved3 = 0x0;
-			idt[idt_idx].reserved4 = 0x0;
 		
 			/* Make sure system call handler is accessible from user space */
 			idt[idt_idx].dpl = 0x3;

@@ -43,12 +43,6 @@ void init_keyboard();
 // Interrupt handler for IRQ1 (keyboard interrupt)
 void keyboard_handler();
 
-/*pass or fail*/
-#define TERMINAL_PASS 0
-#define TERMINAL_FAIL -1
-
-//read,write,open,closes
-
 //open
 extern int32_t terminal_open(void);
 //close
@@ -57,7 +51,5 @@ extern int32_t terminal_close(void);
 extern int32_t terminal_read(int32_t fd, char* buf, int32_t bytes);
 //write
 extern int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes);
-
-
 
 #endif

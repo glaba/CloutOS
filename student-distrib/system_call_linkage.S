@@ -14,12 +14,10 @@
 # Function: system_call_linkage
 # Description: linkage between IDT and system_call_handler
 # Inputs: none
-# OUtputs: none
+# Outputs: none
 # Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
 system_call_linkage:
-    pushl %ebp
-	pushl %edi
-	pushl %esi
+    pushal
 	pushl %edx                  			# Push 1st register
 	pushl %ecx								# Push 2nd register
 	pushl %ebx								# Push 3rd register
@@ -38,9 +36,7 @@ return_normal:
     popl %ebx
     popl %ecx
     popl %edx
-    popl %esi
-    popl %edi
-    popl %ebp
+    popal
 	
 	iret
 

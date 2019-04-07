@@ -348,7 +348,7 @@ int32_t terminal_open(void) {
         linebuffer[i] = '\0';
     }
     update_cursor();
-    return TERMINAL_PASS;
+    return 0;
 }
 
 /*
@@ -363,27 +363,25 @@ int32_t terminal_close(void) {
     for(i = 0; i < TERMINAL_SIZE;i++) {
         linebuffer[i] = '\0';
     }
-    return TERMINAL_PASS;
+    return 0;
 }
 
 /*
- * initializes vairables if needed and if keyboard
- * has not been initialized, initialize it
+ * Initializes variables if needed and if keyboard has not been initialized, initialize it
  * INPUTS: int32_t fd = file descriptor
  *         char* buf = buffer to copy into
  *         int32_t bytes = number of bytes to copy into buf
  * OUTPUTS: 0, to indicate it went well
- * SIDE EFFECTS: modifies linwbuffer
+ * SIDE EFFECTS: modifies linebuffer
  */
 int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
     /*if userspace to copy into is NULL, can't write anything
     into NULL.*/
     if (buf == NULL || bytes < 0)
-        return TERMINAL_FAIL;
+        return -1;
     /*if 0 bytes to copy, do nothing*/
     else if (bytes == 0)
-        return TERMINAL_PASS;
-
+        return 0;
 
     /*let the program spin until an enter has been pressed*/
     while (enter_flag) {}
@@ -449,21 +447,19 @@ int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes) {
     int i;
     // If buf is NULL or bytes is negative, function can't complete
     if (buf == NULL || bytes < 0)
-        return TERMINAL_FAIL;
+        return -1;
     // If it's 0, then 0 bytes are written to terminal, PASS
     if (bytes == 0)
-        return TERMINAL_PASS;
+        return 0;
     // Start new line before writing
-    for(i = 0; i < bytes;i++) {
-        /*should end at \n or at \0*/
+    for (i = 0; i < bytes; i++) {
+        // Should end at \0
         if (buf[i] != '\0') {
             putc(buf[i]);
-        }
-        else
+        } else
             break;
-
     }
-    //end with new line
-    return TERMINAL_PASS;
+    // End with new line
+    return 0;
 
 }

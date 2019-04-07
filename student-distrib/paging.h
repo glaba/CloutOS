@@ -2,6 +2,7 @@
 #define _PAGING_H
 
 #include "lib.h"
+#include "types.h"
 
 // The size of a large 4MB page (4MB)
 #define LARGE_PAGE_SIZE 0x400000
@@ -19,6 +20,8 @@
 #define KERNEL_START_ADDR        0x400000
 // Userspace programs start at 16MB in physical memory
 #define USER_PROGRAMS_START_ADDR 0x1000000
+// The size of a kernel stack 
+#define KERNEL_STACK_SIZE        0x2000
 
 /////////////////////////////////////////////////
 // Page table / page directory entry constants //
@@ -41,10 +44,13 @@
 void init_paging();
 
 // Unconditionally unmaps the 4MB aligned region containing the specified region
-void unmap_region_from_kernel(void* start_addr, int size);
+void unmap_region(void* start_addr, int size);
 
-// Finds a 4MB aligned region containing the specified region, adds it to the kernel page
-//  directory and flushes the TLB
-int map_region_into_kernel(void* start_addr, int size, unsigned int flags);
+// If there is no mapping already existing, maps a region of specified size starting from the
+//  given virtual address to the region of the same size starting from the given physical address
+int32_t map_region(void *start_phys_addr, void *start_virt_addr, uint32_t size, uint32_t flags);
+
+// Identity maps the smallest 4MB aligned region containing the provided region with the given PDE flags
+int32_t identity_map_region(void* start_addr, int size, unsigned int flags);
 
 #endif /* _PAGING_H */
