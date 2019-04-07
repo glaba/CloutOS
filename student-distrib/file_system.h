@@ -4,10 +4,6 @@
 
 
 #include "types.h"
-#include "lib.h"
-#include "processes.h"
-#include "system_calls.h"
-
 
 
 /* Constants. */

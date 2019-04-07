@@ -6,7 +6,7 @@ x86_desc.o: x86_desc.S x86_desc.h types.h
 exception_handlers.o: exception_handlers.c x86_desc.h types.h lib.h \
   i8259.h exception_handlers.h
 file_system.o: file_system.c file_system.h types.h lib.h system_calls.h \
-  x86_desc.h
+  x86_desc.h processes.h
 i8259.o: i8259.c i8259.h types.h lib.h
 init_idt.o: init_idt.c x86_desc.h types.h lib.h i8259.h init_idt.h \
   exception_handlers.h interrupt_service_routines.h keyboard.h rtc.h \

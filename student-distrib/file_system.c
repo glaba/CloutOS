@@ -2,6 +2,8 @@
 #include "system_calls.h"
 #include "x86_desc.h"
 #include "lib.h"
+#include "processes.h"
+
 
 /* Variable to ensure only one 'open' of the file system. */
 uint32_t fs_is_open;
