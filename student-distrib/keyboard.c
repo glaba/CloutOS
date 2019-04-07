@@ -25,9 +25,6 @@ static unsigned int linepos = 0;
 /*store whether keyboard has been initialized or not*/
 static unsigned int keyboard_init = 0;
 
-/*if last character is edited then no more*/
-static int32_t last_ch = 0;
-
 //line buffer to store everything typed into terminal
 unsigned char linebuffer[(TERMINAL_SIZE)];
 
@@ -129,19 +126,20 @@ void init_keyboard() {
     unsigned char ccb;
     int i;/*used for loop*/
 
-    /* Read value of CCB */
+    // Read value of CCB
     outb(CCB_READ, KEYBOARD_CONTROLLER_STATUS_PORT);
     ccb = inb(KEYBOARD_CONTROLLER_DATA_PORT);
 
-    /* Update CCB to enable keyboard interrupts */
+    // Update CCB to enable keyboard interrupts
     ccb |= KEYBOARD_INTERRUPT_ENABLE | TRANSLATE_KEYBOARD_SCANCODE | DISABLE_MOUSE;
 
-    /* Write update value to CCB */
+    // Write update value to CCB
     outb(CCB_WRITE, KEYBOARD_CONTROLLER_STATUS_PORT);
     outb(ccb, KEYBOARD_CONTROLLER_DATA_PORT);
 
-    /* Enable interrupt after all setup is complete */
+    // Enable interrupt after all setup is complete
     enable_irq(KEYBOARD_IRQ);
+
     // Initialize line buffer
     for(i = 0; i < TERMINAL_SIZE;i++) {
       linebuffer[i] = '\0';
@@ -183,18 +181,15 @@ void keyboard_handler() {
     is_caps_lock = ((scancode & SCAN_CODE_MASK) == CAPS_LOCK_CODE);
     is_backspace = ((scancode & SCAN_CODE_MASK) == BACKSPACE_CODE);
     is_tab       = ((scancode & SCAN_CODE_MASK) == TAB_CODE);
-    /* Set shift, ctrl, alt based on whether the key is down or up */
+    // Set shift, ctrl, alt based on whether the key is down or up
     if (is_shift) SET_BIT(keyboard_key_status, SHIFT, key_down);
     if (is_ctrl)  SET_BIT(keyboard_key_status, CTRL,  key_down);
     if (is_alt)   SET_BIT(keyboard_key_status, ALT,   key_down);
 
-    /* Set caps lock to the opposite of what it was */
+    // Set caps lock to the opposite of what it was
     if (is_caps_lock && key_down)
         SET_BIT(keyboard_key_status, CAPS_LOCK, !(keyboard_key_status & CAPS_LOCK));
 
-    /* Check for ctrl+ something command */
-    if ( (keyboard_key_status & CTRL) != 0) {
-        /* all CTRL+ commands HERE */
 
     /* Check for ctrl+ something command*/
     if ( (keyboard_key_status & CTRL) != 0) {
@@ -231,29 +226,23 @@ void keyboard_handler() {
 
     }
 
-    /* If the character is alphabetical: */
-    /* The printed character should be uppercase if either shift or caps lock is on (but not both, hence the XOR) */
+
+
+    // If the character is alphabetical:
+    // The printed character should be uppercase if either shift or caps lock is on (but not both, hence the XOR)
     unsigned char uppercase = ((keyboard_key_status & SHIFT) != 0) ^ ((keyboard_key_status & CAPS_LOCK) != 0);
 
-    /* If the character is not alphabetical: */
-    /* Whether or not to use the shifted character set */
+    // If the character is not alphabetical:
+    // Whether or not to use the shifted character set
     unsigned char use_shift = ((keyboard_key_status & SHIFT) != 0);
 
-    /* Print the character */
+    // Print the character
     char character = kbdus[scancode & SCAN_CODE_MASK];
     char is_alphabetical = (character >= 'a' && character <= 'z');
 
-    /* If it's a new line, clear the buffer */
+
     if (character == '\n' && key_down) {
         enter_flag = 0;
-        //clear linebuffer
-        for (i = 0; i < 128;i++) {
-            linebuffer[i] = '\0';
-        }
-        //reset linepos
-        linepos = 0;
-    }
-
 
         // Clear the buffer
         for (i = 0; i < TERMINAL_SIZE; i++) {
@@ -282,7 +271,7 @@ void keyboard_handler() {
             /* Call on clear_char*/
             clear_char();
         }
-
+        
         /* Clear keyboard buffer at linepos*/
         linebuffer[linepos-1] = '\0';
         /* Decrement linepos*/
@@ -322,7 +311,6 @@ void keyboard_handler() {
             // Store character into line
             linebuffer[linepos] = character;
             linepos++;
-            last_ch = 0;
             update_cursor();
         }
         // If enter is pressed ONLY print the \n character
@@ -334,9 +322,6 @@ void keyboard_handler() {
             character = '\n';
             linebuffer[linepos] = character;
             enter_flag = 0;
-        }
-        else if (character == '\n' && linepos < BUFFER_MAX_SIZE-1) {
-            putc('\n');
         }
 
 
@@ -362,11 +347,7 @@ int32_t terminal_open(void) {
     for(i = 0; i < TERMINAL_SIZE;i++) {
         linebuffer[i] = '\0';
     }
-
-    // Updating the cursor
     update_cursor();
-
-    // Everything works, so return PASS
     return TERMINAL_PASS;
 }
 
@@ -395,32 +376,28 @@ int32_t terminal_close(void) {
  * SIDE EFFECTS: modifies linwbuffer
  */
 int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
-
-    /* If userspace to copy into is NULL, can't write anything
+    /*if userspace to copy into is NULL, can't write anything
     into NULL.*/
     if (buf == NULL || bytes < 0)
         return TERMINAL_FAIL;
-
-    /* If 0 bytes to copy, do nothing*/
+    /*if 0 bytes to copy, do nothing*/
     else if (bytes == 0)
         return TERMINAL_PASS;
 
-    /* Let the program spin until an enter has been pressed*/
+
+    /*let the program spin until an enter has been pressed*/
     while (enter_flag) {}
     enter_flag = 1;
-
-    /* If the bytes to read > TERMINAL_SIZE supported,
-       just copy the the number of bytes possible.*/
+    /*if the bytes to read > TERMINAL_SIZE supported,
+     just copy the the number of bytes possible.*/
     cli();
     if (bytes > TERMINAL_SIZE)
         bytes = TERMINAL_SIZE;
-
-    /* If bytes to read is moe than wahts being read from keyboard,
+    /* if bytes to read is moe than wahts being read from keyboard,
        set bytes to what's been read so far*/
     if (bytes > linepos+1)
         bytes = linepos;
-
-    /* Loop over possible loop to copy into userspace buf */
+    /* loop over possible loop to copy into userspace buf */
     int i;
     for(i = 0; i < bytes;i++) {
         //if linebuffer reaches \n, buf should only
@@ -429,15 +406,14 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
             buf[i] = linebuffer[i];
         }
         else {
-            // End with null terminate
-            buf[i] = '\n';
+            //end with null terminate
+            buf[i] = '\0';
             bytes = i;
             break;
         }
+
     }
 
-
-    /* Clear remaining characters written into userspace*/
     int index;
     /* Clear remaining characters written into userspace*/
     for(i = 0, index = bytes+1; index < TERMINAL_SIZE;index++)
@@ -487,8 +463,7 @@ int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes) {
             break;
 
     }
-
-    // End with new line
+    //end with new line
     return TERMINAL_PASS;
 
 }

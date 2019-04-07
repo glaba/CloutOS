@@ -1,20 +1,17 @@
 #define ASM     1
-#define SIZE_OF_SYSTEM_CALL_TABLE 10
 
 #include "interrupt_service_routines.h"
 
 .text
+
+.data 
+	SIZE_OF_SYSTEM_CALL_TABLE = 10
 
 .globl keyboard_linkage
 .globl rtc_linkage
 .globl system_call_linkage
 
 .align 4
-
-
-
-// Arguments needed to move pointer
-
 
 # Function: keyboard_linkage
 # Description: linkage between IDT and keyboard_handler
@@ -46,19 +43,18 @@ rtc_linkage:
 # OUtputs: none
 # Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
 system_call_linkage:
-	pushal                      # Push all general purpose registers in 32 bit form
-	#check eax values
-	cmpl $SIZE_OF_TABLE,%eax
-	ja eax_error                # if eax > 10 and eax < 0, go to eax_error
-	pushl %edx                  # Push 1st register
-	pushl %ecx					# Push 2nd register
-	pushl %ebx					# Push 3rd register
-	call *sys_call_table(,%eax,4)
-	sti                         # Enable interrupts due to interrupt gate
+	pushal                      			# Push all general purpose registers in 32 bit form
+	cmpl %eax, SIZE_OF_SYSTEM_CALL_TABLE	# check eax values
+	ja eax_error                			# if eax > 10 and eax < 0, go to eax_error
+	pushl %edx                  			# Push 1st register
+	pushl %ecx								# Push 2nd register
+	pushl %ebx								# Push 3rd register
+	addl %eax, -1							# Subtract 1 for 0 based index
+	call *sys_call_table(, %eax, 4)			# Jumps to correct system call
+eax_error:	
+	sti                         			# Enable interrupts due to interrupt gate
 	iret
 
 
 sys_call_table:
-	.long halt, execute, read, write,
-	open, close, getargs, vidmap,
-	set_handler, sigreturn
+	.long halt, execute, read, write, open, close, getargs, vidmap, set_handler, sigreturn
