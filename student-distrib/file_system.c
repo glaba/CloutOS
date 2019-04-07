@@ -401,7 +401,7 @@ int32_t dir_close(void){
 int32_t dir_read(int32_t fd, void* buf, int32_t nbytes){
 	int32_t bytes_read;
  	pcb_t * pcb;
- 	fd_t * file;
+ 	file_t * file;
 
  	pcb = getpcb(); //to implement
  	file = &pcb->files[fd];
