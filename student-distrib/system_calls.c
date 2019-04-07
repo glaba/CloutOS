@@ -11,7 +11,7 @@ int32_t execute(const char *command) {
 }
 
 int32_t read(int32_t fd, void* buf, int32_t nbytes) {
-	return terminal_read(fd, buf, nbytes);	
+	return terminal_read(fd, buf, nbytes);
 }
 
 int32_t write(int32_t fd, const void* buf, int32_t nbytes) {

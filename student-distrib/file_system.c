@@ -118,7 +118,7 @@ int32_t fs_load(const int8_t *fname, void *address) {
 	if (read_dentry_by_name((uint8_t*)fname, &dentry) == -1)
 		return -1;
 
-	// Check that the executable will not cross a 4MB page boundary 
+	// Check that the executable will not cross a 4MB page boundary
 	if ((inodes[dentry.inode].size + (uint32_t)address) / 0x400000 != (uint32_t)address / 0x400000)
 		return -1;
 
@@ -313,8 +313,10 @@ int32_t file_close(void){
  * -1- failure (invalid parameters, nonexistent file)
  *  0- success
  */
-int32_t file_read( uint8_t * buf, uint32_t length, const int8_t * fname, uint32_t offset ){
-	return fs_read(fname, offset, buf, length);
+int32_t file_read(file_t* fd, void* buf, int32_t nbytes){
+	int32_t ofset =  read_data(fd->inode, fd->file_pos, buf, nbytes);
+	fd->file_pos += nbytes;
+	return 0;
 }
 
 /*
@@ -323,7 +325,7 @@ int32_t file_read( uint8_t * buf, uint32_t length, const int8_t * fname, uint32_
  * Returns: -1- always
  */
 int32_t file_write(void){
-	return -1;
+	return 0;
 }
 
 /**** Directory operations. ****/
