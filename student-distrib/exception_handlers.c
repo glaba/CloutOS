@@ -2,6 +2,7 @@
 #include "lib.h"
 #include "i8259.h"
 #include "exception_handlers.h"
+#include "processes.h"
 
 /*
  * This macro generates an exception handler
@@ -16,6 +17,7 @@ int line1_##handler_name(uint32_t err_code) {line1_gen return 0;}           \
 int line2_##handler_name(uint32_t err_code) {line2_gen return 0;}           \
 void handler_name(args) {                                                   \
 	cli();                                                                  \
+	check_userspace_exception();                                            \
 	print_error(err, line1_##handler_name, line2_##handler_name, 0);        \
 	while (1);                                                              \
 	sti();                                                                  \
@@ -34,6 +36,7 @@ int line1_##handler_name(uint32_t err_code) {line1_gen return 0;}               
 int line2_##handler_name(uint32_t err_code) {line2_gen return 0;}                 \
 void handler_name(uint32_t err_code) {                                            \
 	cli();                                                                        \
+	check_userspace_exception();                                                  \
 	print_error(err, line1_##handler_name, line2_##handler_name, err_code);       \
 	while (1);                                                                    \
 	sti();                                                                        \
@@ -56,6 +59,19 @@ const char* skeleton = "\n\n\n\n\n\n\
    || ||   \n\
    || ||   \n\
   ==' '==\n\n\n\n\n";
+
+/*
+ * Checks if the current exception was raised by a userspace program, and calls halt on the
+ *  program with a status of 256
+ *
+ * SIDE EFFECTS: returns execution to the parent process if the exception was raised by a
+ *               userspace process
+ */
+void check_userspace_exception() {
+	if (in_userspace) {
+		process_halt(256);
+	}
+}
 
 /*
  * Prints the error message for the provided exception name and two function pointers
@@ -82,10 +98,10 @@ void print_error(const char* err, int (*line1)(uint32_t), int (*line2)(uint32_t)
 	y += 1;
 	set_cursor_location(19, y);
 	printf("you have encountered a %s", err);
-	
+
 	y += 2;
 	set_cursor_location(17, y);
-	
+
 	if (line1(err_code))
 		y++;
 
@@ -99,7 +115,7 @@ void print_error(const char* err, int (*line1)(uint32_t), int (*line2)(uint32_t)
 
 	set_cursor_location(17, y + 2);
 	printf("Regards,");
-	
+
 	set_cursor_location(17, y + 3);
 	printf("Flex Master Susan");
 }

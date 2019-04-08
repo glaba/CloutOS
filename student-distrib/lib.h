@@ -29,6 +29,9 @@
 #define V_YELLOW       0xE
 #define V_WHITE        0xF
 
+// A useful constant...
+#define NULL 0
+
 // Sets the color with which subsequent text will be drawn
 void set_color(uint8_t back_color, uint8_t fore_color);
 

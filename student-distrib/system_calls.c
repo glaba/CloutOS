@@ -2,28 +2,24 @@
 #include "processes.h"
 #include "keyboard.h"
 
+// The total number of file types
 #define MAX_FILE_TYPE 3
-// Used for determining whether something is NULL
-#define NULL 0
-// Instead of finding out true or false, used labels/macros
-#define FALSE 0
-#define TRUE 1
+
 // Instead of return -1 or 0, used labels/macros
 #define PASS 0
 #define FAIL -1
-
 
 /* Jump table for specific read/write/open/close functions */
 static struct fops_t rtc_table = {.open = &rtc_open, .close = &rtc_close, .read = &rtc_read, .write = &rtc_write};
 static struct fops_t file_table = {.open = &file_open, .close = &file_close, .read = &file_read, .write = &file_write};
 static struct fops_t dir_table = {.open = &dir_open, .close = &dir_close, .read = &dir_read, .write = &dir_write};
 
-int32_t halt(uint8_t status) {
-	return FAIL;
+int32_t halt(uint32_t status) {
+	return process_halt(status & 0xFF);
 }
 
 int32_t execute(const char *command) {
-	return start_process(command);
+	return process_execute(command, 1);
 }
 
 /*
@@ -41,12 +37,11 @@ int32_t read(int32_t fd, void* buf, int32_t nbytes) {
 	if (fd < 0 || fd >= MAX_FILE_TYPE)
 		return FAIL;
 	// Check if cur_pcb is in use
-	if (cur_pcb->files[fd].in_use == FALSE)
+	if (!cur_pcb->files[fd].in_use)
 		return FAIL;
 	// Return appropriate read function
-	return ((cur_pcb->files[fd]).fd_table)->read(fd,buf,nbytes);
+	return ((cur_pcb->files[fd]).fd_table)->read(fd, buf, nbytes);
 }
-
 
 /*
  * SYSTEM CALL that then refers to the appropriate fd then invokes it
@@ -66,7 +61,7 @@ int32_t write(int32_t fd, const void* buf, int32_t nbytes) {
 	if (!cur_pcb->files[fd].in_use)
 		return FAIL;
 	// Return appropriate read function
-	return ((cur_pcb->files[fd]).fd_table)->write(fd,buf,nbytes);
+	return ((cur_pcb->files[fd]).fd_table)->write(fd, buf, nbytes);
 }
 
 /*
@@ -92,23 +87,23 @@ int32_t open(const uint8_t* filename) {
 		return FAIL;
 	// Create a new dentry to help access type of file
 	dentry_t dentry;
-	if (read_dentry_by_name(filename,&dentry) == FAIL)
+	if (read_dentry_by_name(filename, &dentry) == FAIL)
 		return FAIL;
 	// Now use a switch case on type of filename
 	switch (dentry.filetype) {
 		case RTC_FILE:
-				cur_pcb->files[i].in_use = TRUE;
+				cur_pcb->files[i].in_use = 1;
 				cur_pcb->files[i].file_pos = 0;
 				cur_pcb->files[i].inode = 0;
 				cur_pcb->files[i].fd_table = &(rtc_table);
 				break;
 		case DIRECTORY:
-				cur_pcb->files[i].in_use = TRUE;
+				cur_pcb->files[i].in_use = 1;
 				cur_pcb->files[i].file_pos = 0;
 				cur_pcb->files[i].fd_table = &(dir_table);
 				break;
 		case REG_FILE:
-				cur_pcb->files[i].in_use = TRUE;
+				cur_pcb->files[i].in_use = 1;
 				cur_pcb->files[i].file_pos = 0;
 				cur_pcb->files[i].inode = dentry.inode; // Use an inode
 				cur_pcb->files[i].fd_table = &(file_table);

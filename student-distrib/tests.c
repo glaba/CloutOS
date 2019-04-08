@@ -201,7 +201,7 @@ void divide_by_zero_test() {
 // 	 uint32_t i;
 // 	 uint32_t buf_len;
 // 	 /* test read directory */
-//
+
 // 	 printf("TESTING READ DIRECTORY read by name\n");
 // 	 buf_len = 1;
 // 	 while(buf_len != 0){
@@ -213,14 +213,12 @@ void divide_by_zero_test() {
 // 		 }
 // 		 printf(" bytes read: %d", buf_len);
 // 		 printf("\n");
-//
 // 		 read_dentry_by_name(buf_text ,&dentry);
 //  		 printf("ftype: %d\n", dentry.filetype);
 //  		 printf("inode: %d\n", dentry.inode);
 // 		 i = 0;
 //  		 while(i < 429496729) i++;
 // 	 }
-//
 // 	 printf("TESTING READ BY INDEX\n");
 // 	 	int j = 0;
 //  		for(j = 0; j < 17; j++){
@@ -255,6 +253,7 @@ void divide_by_zero_test() {
 // 	i = 0;
 // 	while(i < 429496729) i++;
 //
+
 // 	 read_test_text((uint8_t*)"frame0.txt");
 // 	 	i = 0;
 //  		while(i < 429496729) i++;
@@ -505,6 +504,7 @@ void launch_tests(){
 	//TEST_OUTPUT("idt_test", idt_test());
 	//TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
 	//TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
+
 	// divide_by_zero_test();
 	// paging_test_invalid_region();
 

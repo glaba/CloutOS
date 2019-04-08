@@ -13,10 +13,17 @@
 // The offset in the executable where the entrypoint of the program is stored
 #define ENTRYPOINT_OFFSET 24
 
+// Bitmask for ESP that will yield the base of the kernel stack
+#define KERNEL_STACK_BASE_BITMASK 0xFFFFE000
+
 // The maximum number of processes that can be running at the same time
 #define MAX_NUM_PROCESSES 6
 // The maximum number of files that can be open for a process
 #define MAX_NUM_FILES 8
+
+// The static file descriptors assigned to stdin and stdout for all programs
+#define STDIN  0
+#define STDOUT 1
 
 // Bitmask that masks out lower 8 bits of address
 #define KERNEL_STACK_BASE_BITMASK 0xFFFFE000
@@ -27,7 +34,6 @@ typedef struct fops_t {
 	int32_t (*read )(int32_t fd, void *buf, int32_t bytes);
 	int32_t (*write)(int32_t fd, const void *buf, int32_t bytes);
 } fops_t;
-
 
 typedef struct file_t {
 	//Stores pointer to open/close/read/write
@@ -45,13 +51,19 @@ typedef struct pcb_t {
 	file_t files[MAX_NUM_FILES];
 	// The PID of the process
 	int32_t pid;
+	// The PID of the parent process
+	int32_t parent_pid;
 } pcb_t;
 
-
 // Starts the process associated with the given shell command
-int32_t start_process(const char *command);
+int32_t process_execute(const char *command, uint8_t has_parent);
+// Halts the current process and returns the provided status code to the parent process
+int32_t process_halt(uint16_t status);
 
 // Gets the current pcb from the stack
-extern pcb_t* get_pcb();
+pcb_t* get_pcb();
+
+// Set to 1 if a userspace process is currently running, and 0 if the kernel is running
+extern uint8_t in_userspace;
 
 #endif

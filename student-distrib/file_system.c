@@ -166,19 +166,19 @@ void fs_init(uint32_t fs_start, uint32_t fs_end){
  * Returns: -1- failure (non-existent file)
  *           0- success
  */
-int32_t read_dentry_by_name(const uint8_t * fname, dentry_t * dentry){
+int32_t read_dentry_by_name(const uint8_t *fname, dentry_t *dentry){
 	/* Local variables. */
 	int i;
 
 	/* Find the entry in the array. */
-	for ( i = 0; i < MAX_NUM_FS_DENTRIES; i++ ){
-		if (0 == strncmp(fs_dentries[i].filename, (int8_t *)fname, strlen((int8_t *)fname))){
-				strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[i].filename, MAX_FILENAME_LENGTH);
-				dentry->filename[MAX_FILENAME_LENGTH] = '\0';
-				dentry->filetype = fs_dentries[i].filetype;
-				dentry->inode = fs_dentries[i].inode;
-				return 0;
-			}
+	for (i = 0; i < MAX_NUM_FS_DENTRIES; i++) {
+		if (0 == strncmp(fs_dentries[i].filename, (int8_t*)fname, strlen((int8_t*)fname))) {
+			strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[i].filename, MAX_FILENAME_LENGTH);
+			dentry->filename[MAX_FILENAME_LENGTH] = '\0';
+			dentry->filetype = fs_dentries[i].filetype;
+			dentry->inode = fs_dentries[i].inode;
+			return 0;
+		}
 	}
 
 	/* If we did not find the file, return failure. */
@@ -194,9 +194,9 @@ int32_t read_dentry_by_name(const uint8_t * fname, dentry_t * dentry){
  * Returns: -1- failure (invalid index)
  *           0- success
  */
-int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
+int32_t read_dentry_by_index(uint32_t index, dentry_t *dentry){
 	/* Check for an invalid index. */
-	if ( index >= MAX_NUM_FS_DENTRIES )
+	if (index >= MAX_NUM_FS_DENTRIES)
 		return -1;
 
 	strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[index].filename, MAX_FILENAME_LENGTH);
@@ -217,29 +217,29 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
  *    SIDE EFFECTS: fills the first arg (buf) with the bytes read from
  *					the file
  */
- uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length){
- 	uint32_t i;
- 	uint32_t buf_idx = 0;
- 	uint32_t ret_val = 0;
- 	dentry_t dentry;
+uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length){
+	uint32_t i;
+	uint32_t buf_idx = 0;
+	uint32_t ret_val = 0;
+	dentry_t dentry;
 	// Check if out of bounds
- 	if (dir_entry >= fs_stats.num_dentries || dir_entry < 0)
+	if (dir_entry >= fs_stats.num_dentries || dir_entry < 0)
 		return 0;
 	// Read dentry
- 	read_dentry_by_index(dir_entry, &dentry);
+	read_dentry_by_index(dir_entry, &dentry);
 	// Fill in buffer
- 	for (i = 0; i < strlen((int8_t*)dentry.filename); i++){
- 		if (ret_val < length){
- 			buf[buf_idx++] = dentry.filename[i];
- 			ret_val++;
- 		}
- 	}
+	for (i = 0; i < strlen((int8_t*)dentry.filename); i++){
+		if (ret_val < length){
+			buf[buf_idx++] = dentry.filename[i];
+			ret_val++;
+		}
+	}
 	// End buffer with new line and '\0'
- 	buf[buf_idx++]= '\n';
- 	buf[buf_idx] = '\0';
+	buf[buf_idx++]= '\n';
+	buf[buf_idx] = '\0';
 	// Return bytes read
- 	return ret_val;
- }
+	return ret_val;
+}
 
 /*
  * Description:
