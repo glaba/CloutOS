@@ -4,9 +4,6 @@
 
 .text
 
-.data 
-	SIZE_OF_SYSTEM_CALL_TABLE = 10
-
 .globl system_call_linkage
 
 .align 4
@@ -22,15 +19,16 @@ system_call_linkage:
 	pushl %ecx								# Push 2nd register
 	pushl %ebx								# Push 3rd register
 	
-    cmpl %eax, SIZE_OF_SYSTEM_CALL_TABLE	# check eax values
-	ja eax_error                			# if eax > 10 and eax < 0, go to eax_error
-	addl %eax, -1							# Subtract 1 for 0 based index
+    cmpl $10, %eax                          # check eax values
+	ja eax_error                			# if eax > 10 or eax < 0, go to eax_error
+	cmpl $0, %eax                           # check eax == 0
+	je eax_error
+	addl $-1, %eax							# Subtract 1 for 0 based index
 	call *sys_call_table(, %eax, 4)			# Jumps to correct system call
     jmp return_normal
 
 eax_error:	
-    xorl %eax, %eax                 
-    addl %eax, -1                           # When system call number is wrong return -1
+	movl $-1, %eax                          # When system call number is wrong return -1
 
 return_normal:
     popl %ebx

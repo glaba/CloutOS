@@ -2,6 +2,8 @@
 #include "system_calls.h"
 #include "x86_desc.h"
 #include "lib.h"
+#include "processes.h"
+
 
 /* Variable to ensure only one 'open' of the file system. */
 uint32_t fs_is_open;
@@ -118,7 +120,7 @@ int32_t fs_load(const int8_t *fname, void *address) {
 	if (read_dentry_by_name((uint8_t*)fname, &dentry) == -1)
 		return -1;
 
-	// Check that the executable will not cross a 4MB page boundary 
+	// Check that the executable will not cross a 4MB page boundary
 	if ((inodes[dentry.inode].size + (uint32_t)address) / 0x400000 != (uint32_t)address / 0x400000)
 		return -1;
 
@@ -205,6 +207,38 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
 
 	return 0;
 }
+
+/* read_directory_entry
+ *	  DESCRIPTION: copies over 'length' bytes of directory entries into 'buf'
+ *    INPUTS: entry - directory entry to copy over
+ *			  buf - buffer to be filled by the bytes read from the file
+ *			  length - number of bytes to read
+ *    OUTPUTS: none
+ *    RETURN VALUE: number of bytes read and placed in the buffer
+ *    SIDE EFFECTS: fills the first arg (buf) with the bytes read from
+ *					the file
+ */
+ uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length){
+ 	uint32_t i;
+ 	uint32_t buf_idx = 0;
+ 	uint32_t ret_val = 0;
+ 	dentry_t dentry;
+
+ 	if(dir_entry >= bootblock -> dir_entries_cnt || dir_entry < 0) return 0;
+
+ 	read_dentry_by_index(dir_entry, &dentry);
+
+ 	for(i = 0; i < strlen((int8_t*)dentry.fname); i++){
+ 		if(ret_val < length){
+ 			buf[buf_idx++] = dentry.fname[i];
+ 			ret_val++;
+ 		}
+ 	}
+ 	buf[buf_idx++]= '\n';
+ 	buf[buf_idx] = '\0';
+
+ 	return ret_val;
+ }
 
 /*
  * Description:
@@ -313,8 +347,18 @@ int32_t file_close(void){
  * -1- failure (invalid parameters, nonexistent file)
  *  0- success
  */
-int32_t file_read( uint8_t * buf, uint32_t length, const int8_t * fname, uint32_t offset ){
-	return fs_read(fname, offset, buf, length);
+int32_t file_read(int32_t fd, void* buf, int32_t nbytes){
+	int32_t bytes_read;
+ 	pcb_t * pcb;
+ 	file_t * file;
+
+ 	pcb = getpcb(); //placeholder
+ 	file = &pcb->files[fd];
+
+ 	bytes_read = read_data(file->inode, file->file_pos, (int8_t*)buf, nbytes);
+ 	file->file_pos += bytes_read;
+
+ 	return bytes_read;
 }
 
 /*
@@ -354,24 +398,18 @@ int32_t dir_close(void){
  *
  * Returns: n- number of bytes in buf
  */
-int32_t dir_read(uint8_t * buf){
-	/*
-	 * Reset dir_reads and return if we've already read
-	 * the whole file system.
-	 */
-	if(dir_reads >= fs_stats.num_dentries){
-		dir_reads = 0;
-		return 0;
-	}
+int32_t dir_read(int32_t fd, void* buf, int32_t nbytes){
+	int32_t bytes_read;
+ 	pcb_t * pcb;
+ 	file_t * file;
 
-	/* Copy the next filename into buf. */
-	strncpy((int8_t *)buf, (const int8_t *)fs_dentries[dir_reads].filename, MAX_FILENAME_LENGTH);
+ 	pcb = getpcb(); //to implement
+ 	file = &pcb->files[fd];
 
-	/* Increment the number of directory reads. */
-	dir_reads++;
+ 	bytes_read = read_directory_entry(file->file_pos, (uint8_t*)buf, nbytes);
+ 	file->file_pos++;
 
-	/* Return the length of the filename. */
-	return strlen((int8_t *)buf);
+ 	return bytes_read;
 }
 
 /*

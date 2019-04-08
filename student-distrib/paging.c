@@ -72,10 +72,12 @@ int32_t map_region(void *start_phys_addr, void *start_virt_addr, uint32_t size, 
 	}
 
 	// Mark all the desired pages as 4M, present pages, as well as the custom flags
+	unsigned int cur_phys_index;
 	for (i = 0; i < size; i++) {
 		cur_pde_index = (unsigned int)(start_virt_addr) / (1 << 22) + i;
+		cur_phys_index = (unsigned int)(start_phys_addr) / (1 << 22) + i;
 
-		kernel_page_directory[cur_pde_index] = (cur_pde_index * PAGE_TABLE_SIZE * PAGE_ALIGNMENT) |
+		kernel_page_directory[cur_pde_index] = (cur_phys_index * PAGE_TABLE_SIZE * PAGE_ALIGNMENT) |
 			flags | PAGE_SIZE_IS_4M | PAGE_PRESENT;
 	}
 

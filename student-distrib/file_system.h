@@ -4,8 +4,6 @@
 
 
 #include "types.h"
-#include "lib.h"
-
 
 
 /* Constants. */
@@ -85,6 +83,9 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry);
 /* Reads bytes starting from 'offset' in the file with the inode 'inode'. */
 int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf, uint32_t length);
 
+/*reads directory entry*/
+uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length);
+
 /* Returns 0 */
 int32_t file_open(void);
 
@@ -92,7 +93,7 @@ int32_t file_open(void);
 int32_t file_close(void);
 
 /* Performs a fs_read. */
-int32_t file_read( uint8_t * buf, uint32_t length, const int8_t * fname, uint32_t offset );
+int32_t file_read(int32_t fd, void* buf, int32_t nbytes);
 
 /* Returns -1 */
 int32_t file_write(void);
@@ -104,7 +105,7 @@ int32_t dir_open(void);
 int32_t dir_close(void);
 
 /* Implements ls. */
-int32_t dir_read(uint8_t * buf);
+int32_t dir_read(int32_t fd, void* buf, int32_t nbytes);
 
 /* Return -1 */
 int32_t dir_write(void);
