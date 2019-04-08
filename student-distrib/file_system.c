@@ -224,7 +224,7 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
  	uint32_t ret_val = 0;
  	dentry_t dentry;
 
- 	if(dir_entry >= fs_stats_t.num_dentries || dir_entry < 0) return 0;
+ 	if(dir_entry >= fs_stats.num_dentries || dir_entry < 0) return 0;
 
  	read_dentry_by_index(dir_entry, &dentry);
 
@@ -349,11 +349,11 @@ int32_t file_close(void){
  */
 int32_t file_read(int32_t fd, void* buf, int32_t nbytes){
 	int32_t bytes_read;
- 	pcb_t * pcb;
+ 	pcb_t pcb;
  	file_t * file;
 
  	pcb = get_pcb();
- 	file = &pcb->files[fd];
+ 	file = pcb.files[fd];
 
  	bytes_read = read_data(file->inode, file->file_pos, buf, nbytes);
  	file->file_pos += bytes_read;
@@ -400,11 +400,11 @@ int32_t dir_close(void){
  */
 int32_t dir_read(int32_t fd, void* buf, int32_t nbytes){
 	int32_t bytes_read;
- 	pcb_t * pcb;
+ 	pcb_t pcb;
  	file_t * file;
 
- 	pcb = get_pcb(); //to implement
- 	file = &pcb->files[fd];
+ 	pcb = get_pcb();
+ 	file = pcb.files[fd];
 
  	bytes_read = read_directory_entry(file->file_pos, buf, nbytes);
  	file->file_pos++;
