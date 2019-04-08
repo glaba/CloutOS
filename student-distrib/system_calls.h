@@ -22,19 +22,11 @@ int32_t vidmap(uint8_t** screen_start);
 int32_t set_handler(int32_t signum, void* handler_address);
 int32_t sigreturn(void);
 
-typedef struct fops_t {
-	int32_t (*open )(void);
-	int32_t (*close)(void);
-	int32_t (*read )(int32_t fd, void *buf, int32_t bytes);
-	int32_t (*write)(int32_t fd, const void *buf, int32_t bytes);
-} fops_t;
 
 
 
-/* Jump table for specific read/write/open/close functions */
-static struct fops_t rtc_table = {.open = &rtc_open, .close = &rtc_close, .read = &rtc_read, .write = &rtc_write};
-static struct fops_t dir_table = {.open = &dir_open, .close = &dir_close, .read = &dir_read, .write = &dir_write};
-static struct fops_t file_table = {.open = &file_open, .close = &file_close, .read = &file_read, .write = &file_write};
+
+
 
 
 // MACROS to specify type of name

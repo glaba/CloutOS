@@ -1,5 +1,4 @@
 #include "file_system.h"
-#include "system_calls.h"
 #include "x86_desc.h"
 #include "lib.h"
 #include "processes.h"
@@ -36,7 +35,7 @@ uint32_t dir_reads;
  */
 int32_t fs_open(uint32_t fs_start, uint32_t fs_end){
 	/* Return error if the file system is already open. */
-	if(fs_is_open == 1)
+	if (fs_is_open == 1)
 		return -1;
 
 	/* Initialize the file system. */
@@ -54,7 +53,7 @@ int32_t fs_open(uint32_t fs_start, uint32_t fs_end){
  */
 int32_t fs_close(void){
 	/* Return error if the file system isn't open. */
-	if(fs_is_open == 0)
+	if (fs_is_open == 0)
 		return -1;
 
 	/* Clear the flag indicating an open file system. */
@@ -80,11 +79,11 @@ int32_t fs_read(const int8_t * fname, uint32_t offset, uint8_t * buf,
 	dentry_t dentry;
 
 	/* Check for invalid file name or buffer. */
-	if(buf == NULL || fname == NULL)
+	if (buf == NULL || fname == NULL)
 		return -1;
 
 	/* Extract dentry information using the filename passed in. */
-	if(read_dentry_by_name((uint8_t *)fname, &dentry) == -1)
+	if (read_dentry_by_name((uint8_t *)fname, &dentry) == -1)
 		return -1;
 
 	/* Use read_data to read the file into the buffer passed in. */
@@ -172,8 +171,8 @@ int32_t read_dentry_by_name(const uint8_t * fname, dentry_t * dentry){
 	int i;
 
 	/* Find the entry in the array. */
-	for( i = 0; i < MAX_NUM_FS_DENTRIES; i++ ){
-		if(0 == strncmp(fs_dentries[i].filename, (int8_t *)fname, strlen((int8_t *)fname))){
+	for ( i = 0; i < MAX_NUM_FS_DENTRIES; i++ ){
+		if (0 == strncmp(fs_dentries[i].filename, (int8_t *)fname, strlen((int8_t *)fname))){
 				strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[i].filename, MAX_FILENAME_LENGTH);
 				dentry->filename[MAX_FILENAME_LENGTH] = '\0';
 				dentry->filetype = fs_dentries[i].filetype;
@@ -197,7 +196,7 @@ int32_t read_dentry_by_name(const uint8_t * fname, dentry_t * dentry){
  */
 int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
 	/* Check for an invalid index. */
-	if( index >= MAX_NUM_FS_DENTRIES )
+	if ( index >= MAX_NUM_FS_DENTRIES )
 		return -1;
 
 	strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[index].filename, MAX_FILENAME_LENGTH);
@@ -208,7 +207,7 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
 	return 0;
 }
 
-/* read_directory_entry
+/*
  *	  DESCRIPTION: copies over 'length' bytes of directory entries into 'buf'
  *    INPUTS: entry - directory entry to copy over
  *			  buf - buffer to be filled by the bytes read from the file
@@ -223,22 +222,22 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
  	uint32_t buf_idx = 0;
  	uint32_t ret_val = 0;
  	dentry_t dentry;
-	//check if out of bounds
- 	if(dir_entry >= fs_stats.num_dentries || dir_entry < 0)
+	// Check if out of bounds
+ 	if (dir_entry >= fs_stats.num_dentries || dir_entry < 0)
 		return 0;
-	//read dentry
+	// Read dentry
  	read_dentry_by_index(dir_entry, &dentry);
-	//fill in buffer
- 	for(i = 0; i < strlen((int8_t*)dentry.filename); i++){
- 		if(ret_val < length){
+	// Fill in buffer
+ 	for (i = 0; i < strlen((int8_t*)dentry.filename); i++){
+ 		if (ret_val < length){
  			buf[buf_idx++] = dentry.filename[i];
  			ret_val++;
  		}
  	}
-	//end buffer with new line and '\0'
+	// End buffer with new line and '\0'
  	buf[buf_idx++]= '\n';
  	buf[buf_idx] = '\0';
-	//return bytes read
+	// Return bytes read
  	return ret_val;
  }
 
@@ -270,18 +269,18 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
 	total_successful_reads = 0;
 
 	/* Check for an invalid inode number. */
-	if( inode >= fs_stats.num_inodes )
+	if ( inode >= fs_stats.num_inodes )
 		return -1;
 
 	/* Check for invalid offset. */
-	if( offset >= inodes[inode].size )
+	if ( offset >= inodes[inode].size )
 		return -1;
 
 	/* Calculate the starting data block for this read. */
 	cur_data_block = offset/FS_PAGE_SIZE;
 
 	/* Check for an invalid data block. */
-	if(inodes[inode].data_blocks[cur_data_block] >= fs_stats.num_datablocks)
+	if (inodes[inode].data_blocks[cur_data_block] >= fs_stats.num_datablocks)
 		return -1;
 
 	/* Calculate the location within the starting data block. */
@@ -293,15 +292,15 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
 				offset % FS_PAGE_SIZE);
 
 	/* Read all the data. */
-	while( total_successful_reads < length ){
-		if( location_in_block >= FS_PAGE_SIZE ){
+	while ( total_successful_reads < length ){
+		if ( location_in_block >= FS_PAGE_SIZE ){
 			location_in_block = 0;
 
 			/* Move to the next data block. */
 			cur_data_block++;
 
 			/* Check for an invalid data block. */
-			if( inodes[inode].data_blocks[cur_data_block] >= fs_stats.num_datablocks ){
+			if ( inodes[inode].data_blocks[cur_data_block] >= fs_stats.num_datablocks ){
 				return -1;
 			}
 
@@ -310,7 +309,7 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
 		}
 
 		/* See if we've reached the end of the file. */
-		if( total_successful_reads + offset >= inodes[inode].size ){
+		if ( total_successful_reads + offset >= inodes[inode].size ){
 			return total_successful_reads;
 		}
 
@@ -352,14 +351,12 @@ int32_t file_close(void){
 int32_t file_read(int32_t fd, void* buf, int32_t nbytes){
 	int32_t bytes_read;
  	pcb_t* pcb;
- 	file_t * file;
 
  	pcb = get_pcb();
-	// Get file pointer to current file_t
- 	file = &(pcb->files[fd]);
+	uint32_t manesh = (pcb->files[fd]).inode;
 	// Read the data from current location in file to buffer
- 	bytes_read = read_data((pcb->files[fd]).inode, (pcb->files[fd]).fd_table, buf, nbytes);
-	//increment file position
+ 	bytes_read = read_data(manesh, (pcb->files[fd]).file_pos, buf, nbytes);
+	// Increment file position
  	(pcb->files[fd]).file_pos += bytes_read;
 
  	return bytes_read;
@@ -370,7 +367,11 @@ int32_t file_read(int32_t fd, void* buf, int32_t nbytes){
  *
  * Returns: -1- always
  */
-int32_t file_write(void){
+int32_t file_write(int32_t fd, const void* buf, int32_t bytes){
+	//To ensure parameters have been used
+	(void) fd;
+	(void) buf;
+	(void) bytes;
 	return -1;
 }
 
@@ -395,21 +396,15 @@ int32_t dir_close(void){
 }
 
 /*
- * Description:
- * Implements ls.
- *
+ * Description: Implements ls.
  * Inputs: none
- *
  * Returns: n- number of bytes in buf
  */
 int32_t dir_read(int32_t fd, void* buf, int32_t nbytes){
 	int32_t bytes_read;
  	pcb_t* pcb;
- 	file_t * file;
 
- 	pcb = get_pcb(); //to implement
-	//pointer to file t of current file directory
- 	file = &(pcb->files[fd]);
+ 	pcb = get_pcb();
 	//load in the directory entry to the buffer
  	bytes_read = read_directory_entry((pcb->files[fd]).file_pos, buf, nbytes);
 	//increment file pos in directory
@@ -423,18 +418,22 @@ int32_t dir_read(int32_t fd, void* buf, int32_t nbytes){
  *
  * Returns: -1- always
  */
-int32_t dir_write(void){
+int32_t dir_write(int32_t fd, const void* buf, int32_t bytes){
+	(void) fd;
+	(void) buf;
+	(void) bytes;
 	return -1;
 }
 
 /***************test cases**********************/
 
-// read_test_text:
-// Print out a text file and/or an executable.
-// Print out the size in bytes of a text file and/or an executable.
-// input: none
-// output: none
-// effect: print out the content in the specific file, depending on the file flag
+/*
+ * Print out a text file and/or an executable.
+ * Print out the size in bytes of a text file and/or an executable.
+ * input: none
+ * output: none
+ * effect: print out the content in the specific file, depending on the file flag
+ */
 void read_test_text(uint8_t* filename){
 	printf("test reading file...\n");
 	clear();
@@ -448,15 +447,15 @@ void read_test_text(uint8_t* filename){
 
 	uint32_t buffer_size = SMALL_BUF;
 	uint8_t buffer[buffer_size];
-	if(read_dentry_by_name((uint8_t*)filename, &test_file)==-1){
+	if (read_dentry_by_name((uint8_t*)filename, &test_file)==-1){
 		printf("failed reading file");
 		return;
 	}
-	read_dentry_by_name((uint8_t*)filename, &test_file);   // read the text file
+	read_dentry_by_name((uint8_t*)filename, &test_file);   // Read the text file
 
 	printf("The file type the file:%d\n", test_file.filetype);
 	printf("The inode index of the file:%d\n", test_file.inode);
-	bytes_read = read_data(test_file.inode, 0, buffer, buffer_size);  // size of file
+	bytes_read = read_data(test_file.inode, 0, buffer, buffer_size);  // Size of file
 	printf("size of file is : %d btyes\n", (int32_t)bytes_read);
 
 	if (bytes_read <= 0){
@@ -464,12 +463,11 @@ void read_test_text(uint8_t* filename){
 		return;
 	}
 
-	// print the content of file depending on how large it is
+	// Print the content of file depending on how large it is
 	if (bytes_read>=SIZE_THREAD){
 		printf("Since the file is too large,\nwe print the first and last 200 bytes in the file.\n");
 		printf("\n");
 		printf("First 400 bytes:\n");
-		//for (i=0; i<bytes_read; i++)
 		for (i=0; i<SIZE_THREAD/2; i++){
 			printf("%c", buffer[i]);
 		}
@@ -488,12 +486,13 @@ void read_test_text(uint8_t* filename){
 }
 
 
-// read_test_exe:
-// Print out a text file and/or an executable.
-// Print out the size in bytes of a text file and/or an executable.
-// input: none
-// output: none
-// effect: print out the content in the specific file, depending on the file flag
+/*
+ * Print out a text file and/or an executable.
+ * Print out the size in bytes of a text file and/or an executable.
+ * input: none
+ * output: none
+ * effect: print out the content in the specific file, depending on the file flag
+ */
 void read_test_exe(uint8_t* filename){
 	printf("test reading file...\n");
 	clear();
@@ -508,15 +507,15 @@ void read_test_exe(uint8_t* filename){
 
 	uint32_t buffer_size = LARGE_BUF;
 	uint8_t buffer[buffer_size];
-	if(read_dentry_by_name((uint8_t*)filename, &test_file)==-1){
+	if (read_dentry_by_name((uint8_t*)filename, &test_file)==-1){
 		printf("failed reading file");
 		return;
 	}
-	read_dentry_by_name((uint8_t*)filename, &test_file);   // read the execute file
+	read_dentry_by_name((uint8_t*)filename, &test_file);   // Read the execute file
 
 	printf("The file type the file:%d\n", test_file.filetype);
 	printf("The inode index of the file:%d\n", test_file.inode);
-	bytes_read = read_data(test_file.inode, 0, buffer, buffer_size);  // size of file
+	bytes_read = read_data(test_file.inode, 0, buffer, buffer_size);  // Size of file
 	printf("size of file is : %d btyes\n", (int32_t)bytes_read);
 
 	if (bytes_read <= 0){
@@ -524,12 +523,11 @@ void read_test_exe(uint8_t* filename){
 		return;
 	}
 
-	// print the content of file depending on how large it is
+	// Print the content of file depending on how large it is
 	if (bytes_read>=SIZE_THREAD){
 		printf("Since the file is too large,\nwe print the first and last 200 bytes in the file.\n");
 		printf("\n");
 		printf("First 400 bytes:\n");
-		//for (i=0; i<bytes_read; i++)
 		for (i=0; i<SIZE_THREAD/2; i++){
 			printf("%c", buffer[i]);
 		}

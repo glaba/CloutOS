@@ -190,118 +190,118 @@ void divide_by_zero_test() {
  * OUTPUTS: None
  * SIDE EFFECTS: prints out file contents and other details
  */
-int test_fs() {
-	TEST_HEADER;
-	 dentry_t dentry;
-	 dentry_t dentry2;
-	 uint8_t buf_text[250];
-	 //uint8_t buf_non_text[500];
-	 uint8_t buf_large_text[6000];
-	 // uint8_t buf_dir[120];
-	 uint32_t i;
-	 uint32_t buf_len;
-	 /* test read directory */
-
-	 printf("TESTING READ DIRECTORY read by name\n");
-	 buf_len = 1;
-	 while(buf_len != 0){
-		 buf_len = dir_read(buf_text);
-		 if(buf_len == 0) break;
-		 printf("file name: ");
-		 for(i=0; i< buf_len; i++){
-		   putc(buf_text[i]);
-		 }
-		 printf(" bytes read: %d", buf_len);
-		 printf("\n");
-
-		 read_dentry_by_name(buf_text ,&dentry);
- 		 printf("ftype: %d\n", dentry.filetype);
- 		 printf("inode: %d\n", dentry.inode);
-		 i = 0;
- 		 while(i < 429496729) i++;
-	 }
-
-	 printf("TESTING READ BY INDEX\n");
-	 	int j = 0;
- 		for(j = 0; j < 17; j++){
- 			read_dentry_by_index(j, &dentry2);
- 			printf("index: %d\n", j);
- 			printf("fname: %s\n", dentry2.filename);
- 			printf("ftype: %d\n", dentry2.filetype);
- 	 		printf("inode: %d\n", dentry2.inode);
-
- 			i = 0;
- 			while(i < 429496729) i++;
- 		}
-
-
-	 /* test reading large file*/
-	printf("TESTING READ LARGE FILE\n");
-	buf_len = read_data(44,0,buf_large_text,6000);
-	printf("Number bytes read: %d\n", buf_len);
-	printf("Since the file is too large,\nwe print the first and last 400 bytes in the file.\n");
-	printf("\n");
-	printf("First 400 bytes:\n");
-	//for (i=0; i<bytes_read; i++)
-	for (i=0; i<SIZE_THREAD/2; i++){
-		printf("%c", buf_large_text[i]);
-	}
-	printf("\nLast 400 bytes:\n");
-	for (i=buf_len-SIZE_THREAD/2; i<buf_len; i++){
-		printf("%c", buf_large_text[i]);
-	}
-	printf("verylargetextwithverylongname.txt\n");
-
-	i = 0;
-	while(i < 429496729) i++;
-
-	 read_test_text((uint8_t*)"frame0.txt");
-	 	i = 0;
- 		while(i < 429496729) i++;
-		clear();
-		read_test_text((uint8_t*)"frame1.txt");
-		 i = 0;
-		 while(i < 429496729) i++;
-		 clear();
-	 	read_test_exe((uint8_t*)"cat");
-		i = 0;
-		while(i < 429496729) i++;
-		clear();
-		read_test_exe((uint8_t*)"counter");
-		i = 0;
-		while(i < 429496729) i++;
-		clear();
-		read_test_exe((uint8_t*)"grep");
-		i = 0;
-		while(i < 429496729) i++;
-		clear();
-		read_test_exe((uint8_t*)"hello");
-		i = 0;
-		while(i < 429496729) i++;
-		clear();
-		read_test_exe((uint8_t*)"ls");
-		i = 0;
-		while(i < 429496729) i++;
-		clear();
-		read_test_exe((uint8_t*)"pingpong");
-		i = 0;
-		while(i < 429496729) i++;
-		clear();
-		read_test_exe((uint8_t*)"shell");
-		i = 0;
-		while(i < 429496729) i++;
-		clear();
-		read_test_exe((uint8_t*)"sigtest");
-		i = 0;
-		while(i < 429496729) i++;
-		clear();
-		read_test_exe((uint8_t*)"syserr");
-		i = 0;
-		while(i < 429496729) i++;
-		clear();
-		read_test_exe((uint8_t*)"testprint");
-	return 1;
-}
+// int test_fs() {
+// 	TEST_HEADER;
+// 	 dentry_t dentry;
+// 	 dentry_t dentry2;
+// 	 uint8_t buf_text[250];
+// 	 //uint8_t buf_non_text[500];
+// 	 uint8_t buf_large_text[6000];
+// 	 // uint8_t buf_dir[120];
+// 	 uint32_t i;
+// 	 uint32_t buf_len;
+// 	 /* test read directory */
+//
+// 	 printf("TESTING READ DIRECTORY read by name\n");
+// 	 buf_len = 1;
+// 	 while(buf_len != 0){
+// 		 buf_len = dir_read(buf_text);
+// 		 if (buf_len == 0) break;
+// 		 printf("file name: ");
+// 		 for(i=0; i< buf_len; i++){
+// 		   putc(buf_text[i]);
+// 		 }
+// 		 printf(" bytes read: %d", buf_len);
+// 		 printf("\n");
+//
+// 		 read_dentry_by_name(buf_text ,&dentry);
+//  		 printf("ftype: %d\n", dentry.filetype);
+//  		 printf("inode: %d\n", dentry.inode);
+// 		 i = 0;
+//  		 while(i < 429496729) i++;
+// 	 }
+//
+// 	 printf("TESTING READ BY INDEX\n");
+// 	 	int j = 0;
+//  		for(j = 0; j < 17; j++){
+//  			read_dentry_by_index(j, &dentry2);
+//  			printf("index: %d\n", j);
+//  			printf("fname: %s\n", dentry2.filename);
+//  			printf("ftype: %d\n", dentry2.filetype);
+//  	 		printf("inode: %d\n", dentry2.inode);
+//
+//  			i = 0;
+//  			while(i < 429496729) i++;
+//  		}
+//
+//
+// 	 /* test reading large file*/
+// 	printf("TESTING READ LARGE FILE\n");
+// 	buf_len = read_data(44,0,buf_large_text,6000);
+// 	printf("Number bytes read: %d\n", buf_len);
+// 	printf("Since the file is too large,\nwe print the first and last 400 bytes in the file.\n");
+// 	printf("\n");
+// 	printf("First 400 bytes:\n");
+// 	//for (i=0; i<bytes_read; i++)
+// 	for (i=0; i<SIZE_THREAD/2; i++){
+// 		printf("%c", buf_large_text[i]);
+// 	}
+// 	printf("\nLast 400 bytes:\n");
+// 	for (i=buf_len-SIZE_THREAD/2; i<buf_len; i++){
+// 		printf("%c", buf_large_text[i]);
+// 	}
+// 	printf("verylargetextwithverylongname.txt\n");
+//
+// 	i = 0;
+// 	while(i < 429496729) i++;
+//
+// 	 read_test_text((uint8_t*)"frame0.txt");
+// 	 	i = 0;
+//  		while(i < 429496729) i++;
+// 		clear();
+// 		read_test_text((uint8_t*)"frame1.txt");
+// 		 i = 0;
+// 		 while(i < 429496729) i++;
+// 		 clear();
+// 	 	read_test_exe((uint8_t*)"cat");
+// 		i = 0;
+// 		while(i < 429496729) i++;
+// 		clear();
+// 		read_test_exe((uint8_t*)"counter");
+// 		i = 0;
+// 		while(i < 429496729) i++;
+// 		clear();
+// 		read_test_exe((uint8_t*)"grep");
+// 		i = 0;
+// 		while(i < 429496729) i++;
+// 		clear();
+// 		read_test_exe((uint8_t*)"hello");
+// 		i = 0;
+// 		while(i < 429496729) i++;
+// 		clear();
+// 		read_test_exe((uint8_t*)"ls");
+// 		i = 0;
+// 		while(i < 429496729) i++;
+// 		clear();
+// 		read_test_exe((uint8_t*)"pingpong");
+// 		i = 0;
+// 		while(i < 429496729) i++;
+// 		clear();
+// 		read_test_exe((uint8_t*)"shell");
+// 		i = 0;
+// 		while(i < 429496729) i++;
+// 		clear();
+// 		read_test_exe((uint8_t*)"sigtest");
+// 		i = 0;
+// 		while(i < 429496729) i++;
+// 		clear();
+// 		read_test_exe((uint8_t*)"syserr");
+// 		i = 0;
+// 		while(i < 429496729) i++;
+// 		clear();
+// 		read_test_exe((uint8_t*)"testprint");
+// 	return 1;
+// }
 
 /* int rtc_read_write();
  * Inputs: void
@@ -316,20 +316,20 @@ int rtc_read_write() {
 		//set freq of rtc to 4
 
 		response = rtc_write(0,(const void*)&freq,4);
-		if(response == -1)
+		if (response == -1)
 			break;
 		for(i = 1; i <= 7;i++) {
 			//polls until RTC calls an interrupt
 			response = rtc_read(0,(void *)&freq,4);
-			if(response == -1)
+			if (response == -1)
 				break;
 			//write into terminal
 			char* ch = "c";
 			response = terminal_write(0,ch,1);
-			if(response == -1)
+			if (response == -1)
 				break;
 		}
-		if(response == -1) {
+		if (response == -1) {
 			printf("error");
 			break;
 		}
@@ -337,7 +337,7 @@ int rtc_read_write() {
 	terminal_close();
 	rtc_close();
 	putc('\n');
-	if(response == -1)
+	if (response == -1)
 		return FAIL;
 	return PASS;
 }
@@ -358,11 +358,11 @@ int negative_null_rtc_read_write() {
 	int32_t FOUR_BYTES = 64;
 	rtc_write(0,(const void*)&FOUR_BYTES,4);
 	response = rtc_read(0,(void *)&FOUR_BYTES,4);
-	if(response == -1)
+	if (response == -1)
 		return FAIL;
 	char* ch = "c";
 	response = terminal_write(0,ch,-1);
-	if(response != -1)
+	if (response != -1)
 		return FAIL;
 	printf("negative bytes not written\n");
 
@@ -370,7 +370,7 @@ int negative_null_rtc_read_write() {
 	printf("calling rtc_write with NULL buffer\n");
 	ch = NULL;
 	response = terminal_write(0,ch,1);
-	if(response != -1)
+	if (response != -1)
 		return FAIL;
 	//it didnt write to NULL buffer
 	printf("NULL buffer not written\n");
@@ -401,13 +401,13 @@ int terminal_read_write() {
 
 	//read in 10 characters using terminal_read
 	passorfail = terminal_read(0,buf,10);
-	if(passorfail == -1)
+	if (passorfail == -1)
 		return FAIL;
 	printf("\n String: %s",buf);
 	//newline before writing
 	passorfail = terminal_write(0,"abcd\n",5);
 	//terminal_write(0,"abcd\n\n\n\n\n\n",12);
-	if(passorfail == -1)
+	if (passorfail == -1)
 		return FAIL;
 	//everything passed, so 10 characters should be outputted
 	printf("\n10 characters typed\n");
@@ -436,7 +436,7 @@ int extensive_terminal_read_write() {
 	printf("Type in 10 characters\n");
 	//ask for 10 characters
 	passorfail = terminal_read(0,buf,10);
-	if(passorfail != -1)
+	if (passorfail != -1)
 		return FAIL;
 	//should fail, if not, pass
 	printf("buffer null test: PASSED\n");
@@ -445,7 +445,7 @@ int extensive_terminal_read_write() {
 	char buff[10];
 	printf("pass in negatives bytes in read\n");
 	passorfail = terminal_read(0,buff,-1);
-	if(passorfail != -1)
+	if (passorfail != -1)
 		return FAIL;
 	//supposed to fail, if not, PASSED
 	printf("negative bytes test: PASSED\n");
@@ -454,7 +454,7 @@ int extensive_terminal_read_write() {
 	printf("pass in 0 bytes in read\n");
 	//printf("Type in 10 characters\n");
 	passorfail = terminal_read(0,buff,0);
-	if(passorfail == -1)
+	if (passorfail == -1)
 		return FAIL;
 	//if it failed, then its a fail. otherwise,
 	//suppose to do nothing. so PASS
@@ -466,11 +466,11 @@ int extensive_terminal_read_write() {
 	printf("Type in 127 characters\n");
 
 	passorfail = terminal_read(0,bigbuff,200);
-	if(passorfail == -1)
+	if (passorfail == -1)
 		return FAIL;
 	putc('\n');
 	passorfail = terminal_write(0,bigbuff,200);
-	if(passorfail == -1)
+	if (passorfail == -1)
 		return FAIL;
 	//otherwise, we passed
 	printf("\ntoo many bytes test: PASSED\n");
@@ -480,11 +480,11 @@ int extensive_terminal_read_write() {
 	printf("pass in more bytes than entered\n");
 	printf("Type in 5 characters\n");
 	passorfail = terminal_read(0,fivebuff,10);
-	if(passorfail == -1)
+	if (passorfail == -1)
 		return FAIL;
 	putc('\n');
 	passorfail = terminal_write(0,fivebuff,10);
-	if(passorfail == -1)
+	if (passorfail == -1)
 		return FAIL;
 	//works, so PASS
 	printf("\npass in more bytes than entered test: PASSED\n");
@@ -502,9 +502,9 @@ int extensive_terminal_read_write() {
 /* Test suite entry point */
 void launch_tests(){
 	/* CHECKPOINT 1 TESTS*/
-	TEST_OUTPUT("idt_test", idt_test());
-	TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
-	TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
+	//TEST_OUTPUT("idt_test", idt_test());
+	//TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
+	//TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
 	// divide_by_zero_test();
 	// paging_test_invalid_region();
 

@@ -21,20 +21,17 @@
 // Bitmask that masks out lower 8 bits of address
 #define KERNEL_STACK_BASE_BITMASK 0xFFFFE000
 
+typedef struct fops_t {
+	int32_t (*open )(void);
+	int32_t (*close)(void);
+	int32_t (*read )(int32_t fd, void *buf, int32_t bytes);
+	int32_t (*write)(int32_t fd, const void *buf, int32_t bytes);
+} fops_t;
+
+
 typedef struct file_t {
 	//Stores pointer to open/close/read/write
 	fops_t* fd_table;
-
-	// // Returns -1 if could not open the file and 0 otherwise
-	// int32_t (*open)(const uint8_t* filename);
-	// // Returns -1 on failure
-	// int32_t (*close)(int32_t fd);
-	// // Returns the number of bytes read
-	// int32_t (*read)(int32_t fd, void *buf, int32_t bytes);
-	// // Returns the number of bytes written or -1 on failure
-	// int32_t (*write)(int32_t fd, void *buf, int32_t bytes);
-
-
 	// The inode number of the file (only valid for data file, should be 0 for directories)
 	uint32_t inode;
 	// The current position in the file
@@ -50,10 +47,11 @@ typedef struct pcb_t {
 	int32_t pid;
 } pcb_t;
 
+
 // Starts the process associated with the given shell command
 int32_t start_process(const char *command);
 
-//Gets the current pcb from the stack
- pcb_t* get_pcb();
+// Gets the current pcb from the stack
+extern pcb_t* get_pcb();
 
 #endif

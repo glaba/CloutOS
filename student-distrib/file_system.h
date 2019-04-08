@@ -4,6 +4,7 @@
 
 
 #include "types.h"
+#include "system_calls.h"
 
 
 /* Constants. */
@@ -52,6 +53,29 @@ typedef struct{
 	uint32_t data_blocks[INODE_BLOCKS];
 } inode_t;
 
+/* Returns 0 */
+extern int32_t file_open(void);
+/* Returns 0 */
+extern int32_t file_close(void);
+
+/* Performs a fs_read. */
+extern int32_t file_read(int32_t fd, void* buf, int32_t nbytes);
+
+/* Returns -1 */
+extern int32_t file_write(int32_t fd, const void* buf, int32_t bytes);
+
+/* Returns 0 */
+extern int32_t dir_open(void);
+
+/* Returns 0 */
+extern int32_t dir_close(void);
+
+/* Implements ls. */
+extern int32_t dir_read(int32_t fd, void* buf, int32_t nbytes);
+
+/* Return -1 */
+extern int32_t dir_write(int32_t fd, const void* buf, int32_t bytes);
+
 /* Opens the file system by calling fs_init. */
 int32_t fs_open(uint32_t fs_start, uint32_t fs_end);
 
@@ -86,28 +110,6 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf, uint32_t lengt
 /*reads directory entry*/
 uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length);
 
-/* Returns 0 */
-int32_t file_open(void);
 
-/* Returns 0 */
-int32_t file_close(void);
-
-/* Performs a fs_read. */
-int32_t file_read(int32_t fd, void* buf, int32_t nbytes);
-
-/* Returns -1 */
-int32_t file_write(void);
-
-/* Returns 0 */
-int32_t dir_open(void);
-
-/* Returns 0 */
-int32_t dir_close(void);
-
-/* Implements ls. */
-int32_t dir_read(int32_t fd, void* buf, int32_t nbytes);
-
-/* Return -1 */
-int32_t dir_write(void);
 
 #endif /* FILES_H */

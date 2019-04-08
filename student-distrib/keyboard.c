@@ -261,7 +261,7 @@ void keyboard_handler() {
         set_color(V_BLACK,V_CYAN);
 
         // If clearing tab, clear back three characters
-        if(linebuffer[linepos-1] == '\t') {
+        if (linebuffer[linepos-1] == '\t') {
             // Clear back 3 characters
             clear_char();
             clear_char();
@@ -271,7 +271,7 @@ void keyboard_handler() {
             /* Call on clear_char*/
             clear_char();
         }
-        
+
         /* Clear keyboard buffer at linepos*/
         linebuffer[linepos-1] = '\0';
         /* Decrement linepos*/
@@ -280,7 +280,7 @@ void keyboard_handler() {
         }
     }
     // If linepos is at 0 clear it in memory
-    else if(is_backspace && key_down && linepos == 0) {
+    else if (is_backspace && key_down && linepos == 0) {
         /* Clear keyboard buffer at 0*/
         linebuffer[linepos] = '\0';
     }
