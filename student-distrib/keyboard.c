@@ -204,8 +204,9 @@ void keyboard_handler() {
 			clear();
 			/* Print linebuffer*/
 			for(i = 0; i <= linepos;i++) {
-				/* Print 3 spaces for tab*/
+				/* Print 4 spaces for tab*/
 				if (linebuffer[i] == '\t') {
+					putc(' ');
 					putc(' ');
 					putc(' ');
 					putc(' ');
@@ -250,9 +251,10 @@ void keyboard_handler() {
 		//   set color
 		set_color(V_BLACK,V_CYAN);
 
-		// If clearing tab, clear back three characters
+		// If clearing tab, clear back four characters
 		if (linebuffer[linepos-1] == '\t') {
-			// Clear back 3 characters
+			// Clear back 4 characters
+			clear_char();
 			clear_char();
 			clear_char();
 			clear_char();
@@ -288,8 +290,9 @@ void keyboard_handler() {
 		 *    - terminal buffer is NOT full
 		 */
 		if (character && ctrlL == 0 && (!is_backspace) && (linepos < TERMINAL_SIZE - 1) && character != '\n') {
-			// If it's a tab, print 3 spaces
+			// If it's a tab, print 4 spaces
 			if (is_tab && key_down) {
+				putc(' ');
 				putc(' ');
 				putc(' ');
 				putc(' ');

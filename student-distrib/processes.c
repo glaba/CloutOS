@@ -54,7 +54,7 @@ pcb_t* get_pcb() {
 }
 
 /*
- * Halts the process corresponding to the current kernel stack
+ * Halts the current process and returns the provided status code to the parent process
  * INPUTS: status: the status with which the program existed (256 for exception, [0-256) otherwise)
  * SIDE EFFECTS: it jumps to the kernel stack for the parent process and returns
  *               the correct status value from execute
