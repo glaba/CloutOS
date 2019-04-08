@@ -224,13 +224,13 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
  	uint32_t ret_val = 0;
  	dentry_t dentry;
 
- 	if(dir_entry >= bootblock -> dir_entries_cnt || dir_entry < 0) return 0;
+ 	if(dir_entry >= fs_stats_t.num_dentries || dir_entry < 0) return 0;
 
  	read_dentry_by_index(dir_entry, &dentry);
 
- 	for(i = 0; i < strlen((int8_t*)dentry.fname); i++){
+ 	for(i = 0; i < strlen((int8_t*)dentry.filename); i++){
  		if(ret_val < length){
- 			buf[buf_idx++] = dentry.fname[i];
+ 			buf[buf_idx++] = dentry.filename[i];
  			ret_val++;
  		}
  	}
@@ -355,7 +355,7 @@ int32_t file_read(int32_t fd, void* buf, int32_t nbytes){
  	pcb = getpcb(); //placeholder
  	file = &pcb->files[fd];
 
- 	bytes_read = read_data(file->inode, file->file_pos, (int8_t*)buf, nbytes);
+ 	bytes_read = read_data(file->inode, file->file_pos, buf, nbytes);
  	file->file_pos += bytes_read;
 
  	return bytes_read;
@@ -406,7 +406,7 @@ int32_t dir_read(int32_t fd, void* buf, int32_t nbytes){
  	pcb = getpcb(); //to implement
  	file = &pcb->files[fd];
 
- 	bytes_read = read_directory_entry(file->file_pos, (uint8_t*)buf, nbytes);
+ 	bytes_read = read_directory_entry(file->file_pos, buf, nbytes);
  	file->file_pos++;
 
  	return bytes_read;
