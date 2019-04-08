@@ -57,7 +57,7 @@ int32_t start_process(const char *command) {
 		return -1;
 	}
 
-	// Check that the magic number is present	
+	// Check that the magic number is present
 	if (*(uint32_t*)virt_prog_location != ELF_MAGIC) {
 		sti();
 		return -1;
@@ -106,4 +106,21 @@ int32_t start_process(const char *command) {
 	asm volatile ("iret");
 
 	return 0;
+}
+
+/*
+ * Get the current pcb from esp pointer
+ * INPUTS: N/A
+ */
+pcb_t* get_pcb() {
+    // Initialize pcb pointer that will be moved
+    void* addr_of_pcb;
+    // Mask out lower 8 kB to get to prev 8kB
+    addr_of_pcb = (void*)(tss.esp0 & KERNEL_STACK_BASE_BITMASK);
+    // Add 8kB in order to round up to the base of the stack
+    addr_of_pcb += KERNEL_STACK_SIZE;
+    // Decrement to get to the start address of the pcb
+    addr_of_pcb -= sizeof(pcb_t);
+    // Put the pcb on the stack
+    return (pcb_t*)addr_of_pcb;
 }

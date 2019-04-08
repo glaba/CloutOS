@@ -2,6 +2,7 @@
 #define _PROCESSES_H
 
 #include "types.h"
+#include "system_calls.h"
 
 // Magic number that must appear in the first 4 bytes of all executables
 #define ELF_MAGIC 0x464C457F
@@ -17,9 +18,12 @@
 // The maximum number of files that can be open for a process
 #define MAX_NUM_FILES 8
 
+// Bitmask that masks out lower 8 bits of address
+#define KERNEL_STACK_BASE_BITMASK 0xFFFFE000
+
 typedef struct file_t {
 	//Stores pointer to open/close/read/write
-	int32_t* fd_table;
+	fops_t* fd_table;
 
 	// // Returns -1 if could not open the file and 0 otherwise
 	// int32_t (*open)(const uint8_t* filename);
@@ -48,5 +52,8 @@ typedef struct pcb_t {
 
 // Starts the process associated with the given shell command
 int32_t start_process(const char *command);
+
+//Gets the current pcb from the stack
+ pcb_t* get_pcb();
 
 #endif

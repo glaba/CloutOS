@@ -351,16 +351,16 @@ int32_t file_close(void){
  */
 int32_t file_read(int32_t fd, void* buf, int32_t nbytes){
 	int32_t bytes_read;
- 	pcb_t pcb;
+ 	pcb_t* pcb;
  	file_t * file;
 
  	pcb = get_pcb();
 	// Get file pointer to current file_t
- 	file = &pcb->files[fd];
+ 	file = &(pcb->files[fd]);
 	// Read the data from current location in file to buffer
- 	bytes_read = read_data(file->inode, file->file_pos, buf, nbytes);
+ 	bytes_read = read_data((pcb->files[fd]).inode, (pcb->files[fd]).fd_table, buf, nbytes);
 	//increment file position
- 	file->file_pos += bytes_read;
+ 	(pcb->files[fd]).file_pos += bytes_read;
 
  	return bytes_read;
 }
@@ -404,16 +404,16 @@ int32_t dir_close(void){
  */
 int32_t dir_read(int32_t fd, void* buf, int32_t nbytes){
 	int32_t bytes_read;
- 	pcb_t pcb;
+ 	pcb_t* pcb;
  	file_t * file;
 
  	pcb = get_pcb(); //to implement
 	//pointer to file t of current file directory
- 	file = &pcb->files[fd];
+ 	file = &(pcb->files[fd]);
 	//load in the directory entry to the buffer
- 	bytes_read = read_directory_entry(file->file_pos, buf, nbytes);
+ 	bytes_read = read_directory_entry((pcb->files[fd]).file_pos, buf, nbytes);
 	//increment file pos in directory
- 	file->file_pos++;
+ 	((pcb->files[fd]).file_pos)++;
 
  	return bytes_read;
 }
