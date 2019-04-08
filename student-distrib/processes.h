@@ -34,7 +34,7 @@ typedef struct fops_t {
 } fops_t;
 
 typedef struct file_t {
-	//Stores pointer to open/close/read/write
+	// Stores pointer to open/close/read/write
 	fops_t* fd_table;
 	// The inode number of the file (only valid for data file, should be 0 for directories)
 	uint32_t inode;

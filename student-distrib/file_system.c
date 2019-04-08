@@ -166,7 +166,7 @@ void fs_init(uint32_t fs_start, uint32_t fs_end){
  * Returns: -1- failure (non-existent file)
  *           0- success
  */
-int32_t read_dentry_by_name(const uint8_t *fname, dentry_t *dentry){
+int32_t read_dentry_by_name(const uint8_t *fname, dentry_t *dentry) {
 	/* Local variables. */
 	int i;
 
@@ -217,7 +217,7 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t *dentry){
  *    SIDE EFFECTS: fills the first arg (buf) with the bytes read from
  *					the file
  */
-uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length){
+uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length) {
 	uint32_t i;
 	uint32_t buf_idx = 0;
 	uint32_t ret_val = 0;
@@ -228,15 +228,12 @@ uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length)
 	// Read dentry
 	read_dentry_by_index(dir_entry, &dentry);
 	// Fill in buffer
-	for (i = 0; i < strlen((int8_t*)dentry.filename); i++){
-		if (ret_val < length){
+	for (i = 0; i < strlen((int8_t*)dentry.filename); i++) {
+		if (ret_val < length) {
 			buf[buf_idx++] = dentry.filename[i];
 			ret_val++;
 		}
 	}
-	// End buffer with new line and '\0'
-	buf[buf_idx++]= '\n';
-	buf[buf_idx] = '\0';
 	// Return bytes read
 	return ret_val;
 }
@@ -254,11 +251,11 @@ uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length)
  * length- number of bytes
  *
  * Returns:
- * -1- failure (bad data block number within inode)
+ * -1- failure (bad inode, bad data block)
  * n- number of bytes read and placed in the buffer
  */
 int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
-                  uint32_t length){
+                  uint32_t length) {
 	/* Local variables. */
 	uint32_t  total_successful_reads;
 	uint32_t  location_in_block;
@@ -269,15 +266,15 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
 	total_successful_reads = 0;
 
 	/* Check for an invalid inode number. */
-	if ( inode >= fs_stats.num_inodes )
+	if (inode >= fs_stats.num_inodes)
 		return -1;
 
-	/* Check for invalid offset. */
-	if ( offset >= inodes[inode].size )
-		return -1;
+	/* Check for invalid offset. We return 0 bytes read in this case */
+	if (offset >= inodes[inode].size)
+		return 0;
 
 	/* Calculate the starting data block for this read. */
-	cur_data_block = offset/FS_PAGE_SIZE;
+	cur_data_block = offset / FS_PAGE_SIZE;
 
 	/* Check for an invalid data block. */
 	if (inodes[inode].data_blocks[cur_data_block] >= fs_stats.num_datablocks)
@@ -287,25 +284,25 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
 	location_in_block = offset % FS_PAGE_SIZE;
 
 	/* Calculate the address to start reading from. */
-	read_addr = (uint8_t *)(data_start +
+	read_addr = (uint8_t*)(data_start +
 				(inodes[inode].data_blocks[cur_data_block])*FS_PAGE_SIZE +
 				offset % FS_PAGE_SIZE);
 
 	/* Read all the data. */
-	while ( total_successful_reads < length ){
-		if ( location_in_block >= FS_PAGE_SIZE ){
+	while (total_successful_reads < length) {
+		if (location_in_block >= FS_PAGE_SIZE) {
 			location_in_block = 0;
 
 			/* Move to the next data block. */
 			cur_data_block++;
 
 			/* Check for an invalid data block. */
-			if ( inodes[inode].data_blocks[cur_data_block] >= fs_stats.num_datablocks ){
+			if (inodes[inode].data_blocks[cur_data_block] >= fs_stats.num_datablocks) {
 				return -1;
 			}
 
 			/* Find the start of the next data block. */
-			read_addr = (uint8_t *)(data_start + (inodes[inode].data_blocks[cur_data_block])*FS_PAGE_SIZE);
+			read_addr = (uint8_t*)(data_start + (inodes[inode].data_blocks[cur_data_block])*FS_PAGE_SIZE);
 		}
 
 		/* See if we've reached the end of the file. */

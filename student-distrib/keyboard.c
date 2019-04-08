@@ -158,6 +158,9 @@ void init_keyboard() {
  * SIDE EFFECTS: outputs a key to the console when the keyboard interrupt is fired
  */
 void keyboard_handler() {
+	// Send EOI
+	send_eoi(KEYBOARD_IRQ);
+
 	unsigned char scancode;
 	unsigned char key_down;
 
@@ -309,9 +312,6 @@ void keyboard_handler() {
 			enter_flag = 0;
 		}
 	}
-
-	// Send EOI
-	send_eoi(KEYBOARD_IRQ);
 }
 
 /*
