@@ -2,12 +2,12 @@
 #include "processes.h"
 #include "keyboard.h"
 
-int32_t halt(uint8_t status) {
-	return -1;
+int32_t halt(uint32_t status) {
+	return process_halt(status & 0xFF);
 }
 
 int32_t execute(const char *command) {
-	return start_process(command);
+	return process_execute(command, 1);
 }
 
 int32_t read(int32_t fd, void* buf, int32_t nbytes) {

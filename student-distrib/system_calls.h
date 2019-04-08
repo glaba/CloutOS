@@ -4,7 +4,7 @@
 #include "types.h"
 
 /* The ten system calls */
-int32_t halt(uint8_t status);
+int32_t halt(uint32_t status);
 int32_t execute(const char* command);
 int32_t read(int32_t fd, void* buf, int32_t nbytes);
 int32_t write(int32_t fd, const void* buf, int32_t nbytes);

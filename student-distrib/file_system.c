@@ -218,28 +218,28 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t * dentry){
  *    SIDE EFFECTS: fills the first arg (buf) with the bytes read from
  *					the file
  */
- uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length){
- 	uint32_t i;
- 	uint32_t buf_idx = 0;
- 	uint32_t ret_val = 0;
- 	dentry_t dentry;
-	//check if out of bounds
- 	if(dir_entry >= fs_stats_t.num_dentries || dir_entry < 0) return 0;
-	//read dentry
- 	read_dentry_by_index(dir_entry, &dentry);
-	//fill in buffer
- 	for(i = 0; i < strlen((int8_t*)dentry.filename); i++){
- 		if(ret_val < length){
- 			buf[buf_idx++] = dentry.filename[i];
- 			ret_val++;
- 		}
- 	}
-	//end buffer with new line and '\0'
- 	buf[buf_idx++]= '\n';
- 	buf[buf_idx] = '\0';
-	//return bytes read
- 	return ret_val;
- }
+ // uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length){
+ // 	uint32_t i;
+ // 	uint32_t buf_idx = 0;
+ // 	uint32_t ret_val = 0;
+ // 	dentry_t dentry;
+	// //check if out of bounds
+ // 	if(dir_entry >= fs_stats_t.num_dentries || dir_entry < 0) return 0;
+	// //read dentry
+ // 	read_dentry_by_index(dir_entry, &dentry);
+	// //fill in buffer
+ // 	for(i = 0; i < strlen((int8_t*)dentry.filename); i++){
+ // 		if(ret_val < length){
+ // 			buf[buf_idx++] = dentry.filename[i];
+ // 			ret_val++;
+ // 		}
+ // 	}
+	// //end buffer with new line and '\0'
+ // 	buf[buf_idx++]= '\n';
+ // 	buf[buf_idx] = '\0';
+	// //return bytes read
+ // 	return ret_val;
+ // }
 
 /*
  * Description:
@@ -348,21 +348,21 @@ int32_t file_close(void){
  * -1- failure (invalid parameters, nonexistent file)
  *  0- success
  */
-int32_t file_read(int32_t fd, void* buf, int32_t nbytes){
-	int32_t bytes_read;
- 	pcb_t * pcb;
- 	file_t * file;
+// int32_t file_read(int32_t fd, void* buf, int32_t nbytes){
+// 	int32_t bytes_read;
+//  	pcb_t * pcb;
+//  	file_t * file;
 
- 	pcb = getpcb(); //placeholder
-	//get file pointer to current file_t
- 	file = &pcb->files[fd];
-	//read the data from current location in file to buffer
- 	bytes_read = read_data(file->inode, file->file_pos, buf, nbytes);
-	//increment file position
- 	file->file_pos += bytes_read;
+//  	pcb = getpcb(); //placeholder
+// 	//get file pointer to current file_t
+//  	file = &pcb->files[fd];
+// 	//read the data from current location in file to buffer
+//  	bytes_read = read_data(file->inode, file->file_pos, buf, nbytes);
+// 	//increment file position
+//  	file->file_pos += bytes_read;
 
- 	return bytes_read;
-}
+//  	return bytes_read;
+// }
 
 /*
  * Inputs: none
@@ -401,21 +401,21 @@ int32_t dir_close(void){
  *
  * Returns: n- number of bytes in buf
  */
-int32_t dir_read(int32_t fd, void* buf, int32_t nbytes){
-	int32_t bytes_read;
- 	pcb_t * pcb;
- 	file_t * file;
+// int32_t dir_read(int32_t fd, void* buf, int32_t nbytes){
+// 	int32_t bytes_read;
+//  	pcb_t * pcb;
+//  	file_t * file;
 
- 	pcb = getpcb(); //to implement
-	//pointer to file t of current file directory
- 	file = &pcb->files[fd];
-	//load in the directory entry to the buffer
- 	bytes_read = read_directory_entry(file->file_pos, buf, nbytes);
-	//increment file pos in directory
- 	file->file_pos++;
+//  	pcb = getpcb(); //to implement
+// 	//pointer to file t of current file directory
+//  	file = &pcb->files[fd];
+// 	//load in the directory entry to the buffer
+//  	bytes_read = read_directory_entry(file->file_pos, buf, nbytes);
+// 	//increment file pos in directory
+//  	file->file_pos++;
 
- 	return bytes_read;
-}
+//  	return bytes_read;
+// }
 
 /*
  * Inputs: none
