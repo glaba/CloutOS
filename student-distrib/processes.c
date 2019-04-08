@@ -4,11 +4,22 @@
 #include "paging.h"
 #include "x86_desc.h"
 
-// Set to 1 if a userspace process is currently running, and 0 if the kernel is running
-uint8_t in_userspace = 0;
-
 // An array indicating which PIDs are currently in use by running programs
 static uint8_t used_pids[MAX_NUM_PROCESSES];
+
+static struct fops_t stdin_table  = {.open = NULL, .close = NULL, 
+	                                 .read = (int32_t (*)(int32_t, void*, int32_t))&terminal_read, 
+	                                 .write = NULL};
+static struct fops_t stdout_table = {.open = NULL, .close = NULL, 
+	                                 .read = NULL, 
+	                                 .write = (int32_t (*)(int32_t, const void*, int32_t))&terminal_write};
+
+/*
+ * Sets the value of in_userspace to the given input
+ */
+void set_in_userspace(uint32_t value) {
+	in_userspace = value & 0x1;
+}
 
 /*
  * Returns an unused PID, which is also the index of the kernel stack that will be used
@@ -177,7 +188,10 @@ int32_t process_execute(const char *command, uint8_t has_parent) {
 	pcb->pid = cur_pid;
 	pcb->parent_pid = parent_pid;
 	// Set stdin and stdout as files 0 and 1 respectively
-
+	pcb->files[STDIN].in_use = 1;
+	pcb->files[STDIN].fd_table = &stdin_table;
+	pcb->files[STDOUT].in_use = 1;
+	pcb->files[STDOUT].fd_table = &stdout_table;
 
 	// We are switching to userspace
 	in_userspace = 1;

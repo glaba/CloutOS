@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "system_calls.h"
+#include "system_call_linkage.h"
 
 // Magic number that must appear in the first 4 bytes of all executables
 #define ELF_MAGIC 0x464C457F
@@ -24,9 +25,6 @@
 // The static file descriptors assigned to stdin and stdout for all programs
 #define STDIN  0
 #define STDOUT 1
-
-// Bitmask that masks out lower 8 bits of address
-#define KERNEL_STACK_BASE_BITMASK 0xFFFFE000
 
 typedef struct fops_t {
 	int32_t (*open )(void);
@@ -62,8 +60,5 @@ int32_t process_halt(uint16_t status);
 
 // Gets the current pcb from the stack
 pcb_t* get_pcb();
-
-// Set to 1 if a userspace process is currently running, and 0 if the kernel is running
-extern uint8_t in_userspace;
 
 #endif

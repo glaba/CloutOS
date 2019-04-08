@@ -4,10 +4,14 @@
 
 .text
 
-.extern is_userspace
 .globl system_call_linkage
+.globl in_userspace
 
 .align 4
+
+// Set to 1 if a userspace process is currently running, and 0 if the kernel is running
+in_userspace:
+	.long 0
 
 # Function: system_call_linkage
 # Description: linkage between IDT and system_call_handler

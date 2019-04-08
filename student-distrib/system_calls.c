@@ -39,7 +39,10 @@ int32_t read(int32_t fd, void* buf, int32_t nbytes) {
 	// Check if cur_pcb is in use
 	if (!cur_pcb->files[fd].in_use)
 		return FAIL;
-	// Return appropriate read function
+	// Check if a read function exists for this file, and return 0 if not
+	if (cur_pcb->files[fd].fd_table->read == NULL)
+		return 0;
+	// Return appropriate read function 
 	return ((cur_pcb->files[fd]).fd_table)->read(fd, buf, nbytes);
 }
 
@@ -60,6 +63,9 @@ int32_t write(int32_t fd, const void* buf, int32_t nbytes) {
 	// Check if cur_pcb is in use
 	if (!cur_pcb->files[fd].in_use)
 		return FAIL;
+	// Check if a write function exists for this file, and return 0 if not
+	if (cur_pcb->files[fd].fd_table->write == NULL)
+		return 0;
 	// Return appropriate read function
 	return ((cur_pcb->files[fd]).fd_table)->write(fd, buf, nbytes);
 }
@@ -134,6 +140,9 @@ int32_t close(int32_t fd) {
 	// Check if cur_pcb is in use
 	if (!cur_pcb->files[fd].in_use)
 		return FAIL;
+	// Check if a close function exists for this file and use it if so
+	if (cur_pcb->files[fd].fd_table->close != NULL)
+		cur_pcb->files[fd].fd_table->close();
 	/* Clear through everything in the current
 	   file descriptor table */
 	cur_pcb->files[fd].in_use = 0;
