@@ -2,6 +2,7 @@
 #include "paging.h"
 #include "i8259.h"
 #include "irq_defs.h"
+#include "kheap.h"
 
 // Uncomment PCI_DEBUG_ENABLE to enable debugging
 #define PCI_DEBUG_ENABLE
@@ -48,16 +49,13 @@
 #define NUM_SLOTS     256
 #define NUM_FUNCTIONS 8
 
-// This is how it will be for now, until we figure out dynamically loading drivers
-#define NUM_DRIVERS 8
-
 // Spinlock that prevents multiple initialization of PCI devices
 static struct spinlock_t pci_spin_lock = SPIN_LOCK_UNLOCKED;
 
-// Array of drivers
-pci_driver pci_drivers[NUM_DRIVERS];
-// Array of PCI function data corresponding to the drivers in pci_drivers
-pci_function pci_functions[NUM_DRIVERS];
+// Linked list of drivers
+pci_driver_list_item *pci_drivers_head;
+// Linked list of PCI function data corresponding to the drivers in pci_drivers
+pci_function_list_item *pci_functions_head;
 // Number of drivers loaded
 int num_loaded_drivers = 0;
 
@@ -77,10 +75,15 @@ void pci_irq_handler() {
 
 	// Iterate through all the drivers' interrupt handlers and return 
 	//  if one of them realizes that this interrupt was theirs
-	int i;
-	for (i = 0; i < NUM_DRIVERS; i++) {
-		if (pci_functions[i].inited && pci_drivers[i].irq_handler(&pci_functions[i]) == 0) {
-			PCI_DEBUG("PCI interrupt successfully handled by %s driver\n", pci_drivers[i].name);
+	pci_driver_list_item *cur_driver;
+	pci_function_list_item *cur_function;
+
+	for (cur_driver = pci_drivers_head, cur_function = pci_functions_head;
+	     cur_driver != NULL && cur_function != NULL;
+	     cur_driver = cur_driver->next, cur_function = cur_function->next) {
+
+		if (cur_function->data.inited && cur_driver->data.irq_handler(&cur_function->data) == 0) {
+			PCI_DEBUG("PCI interrupt successfully handled by %s driver\n", cur_driver->data.name);
 			
 			// Unlock the lock
 			spin_unlock(&pci_spin_lock);
@@ -113,27 +116,40 @@ int register_pci_driver(pci_driver driver) {
 	// Lock before we use pci_drivers, pci_functions and num_loaded_drivers
 	spin_lock(&pci_spin_lock);
 	
-	// If there is enough room to register a driver
-	if (num_loaded_drivers < NUM_DRIVERS) {
-		// Add an item into the drivers array
-		pci_drivers[num_loaded_drivers] = driver;
-		// Set the device as uninitialized
-		pci_functions[num_loaded_drivers].inited = 0;
-		num_loaded_drivers++;
+	// Allocate memory for the new driver and function
+	pci_driver_list_item *driver_list_item = kmalloc(sizeof(pci_driver_list_item));
+	if (driver_list_item == NULL)
+		return -1;
 
-		spin_unlock(&pci_spin_lock);
-
-		PCI_DEBUG("Registered driver for VendorID 0x%x, DeviceID 0x%x and Function %d\n", 
-			driver.vendor, driver.device, driver.function);
-
-		// Return success since we were able to add the driver
-		return 0;
+	pci_function_list_item *func_list_item = kmalloc(sizeof(pci_function_list_item));
+	if (func_list_item == NULL) {
+		kfree(driver_list_item);
+		return -1;
 	}
+
+	// Copy the driver into the list item
+	driver_list_item->data = driver;
+
+	// Set the device as uninitialized
+	func_list_item->data.inited = 0;
+
+	// Add the driver and function to the heads of the linked lists
+	driver_list_item->next = pci_drivers_head;
+	pci_drivers_head = driver_list_item;
+
+	func_list_item->next = pci_functions_head;
+	pci_functions_head = func_list_item;
+
+	// Keep track of the total number of drivers
+	num_loaded_drivers++;
 
 	spin_unlock(&pci_spin_lock);
 
-	// Return failure if we cannot add the driver
-	return -1;
+	PCI_DEBUG("Registered driver for VendorID 0x%x, DeviceID 0x%x and Function %d\n", 
+		driver.vendor, driver.device, driver.function);
+
+	// Return success since we were able to add the driver
+	return 0;
 }
 
 /*
@@ -286,7 +302,6 @@ pci_init_failed:
  */
 void enumerate_pci_devices() {
 	uint16_t vendor, device, function, bus, slot;
-	int i;
 
 	// Lock spinlock so that no new drivers can be added while enumeration is occurring
 	spin_lock(&pci_spin_lock);
@@ -305,21 +320,29 @@ void enumerate_pci_devices() {
 					PCI_DEBUG("Detected device with VendorID 0x%x and DeviceID 0x%x\n", vendor, device);
 
 					// Check if there is a driver for this device
-					for (i = 0; i < NUM_DRIVERS; i++) {
-						if (pci_drivers[i].vendor == vendor && 
-							pci_drivers[i].device == device && 
-							pci_drivers[i].function == function) {
+					pci_driver_list_item *cur_driver;
+					pci_function_list_item *cur_function;
+
+					for (cur_driver = pci_drivers_head, cur_function = pci_functions_head;
+						 cur_driver != NULL && cur_function != NULL;
+						 cur_driver = cur_driver->next, cur_function = cur_function->next) {
+
+						if (cur_driver->data.vendor == vendor && 
+							cur_driver->data.device == device && 
+							cur_driver->data.function == function) {
 
 							// Initialize the function's memory mapped I/O and interrupts
-							if (initialize_pci_function(&pci_drivers[i], &pci_functions[i], bus, slot, function) == 0) {
+							if (initialize_pci_function(&cur_driver->data, 
+									&cur_function->data, bus, slot, function) == 0) {
+
 								// Use the driver to initialize the device if regular init succeeded
 								PCI_DEBUG("Begin driver initialization - VendorID 0x%x, DeviceID 0x%x\n", 
-									pci_drivers[i].vendor, pci_drivers[i].device);
+									cur_driver->data.vendor, cur_driver->data.device);
 
-								if (pci_drivers[i].init_device(&pci_functions[i]) != 0) {
+								if (cur_driver->data.init_device(&cur_function->data) != 0) {
 									PCI_DEBUG("Driver initialization failed\n");
 									// If the driver init failed, uninitialize everything
-									uninitialize_pci_function(&pci_functions[i]);
+									uninitialize_pci_function(&cur_function->data);
 								}
 							}
 						}
@@ -332,6 +355,13 @@ void enumerate_pci_devices() {
 	spin_unlock(&pci_spin_lock);
 }
 
+/*
+ * Gets the configuration space address for the given device (bus, slot, func) 
+ *  and the given offset into that device's configuration space
+ * INPUTS: bus, slot, func: three values which specify the position of the device in the PCI bus
+ *         offset: the offset into the device's configuration space
+ * OUTPUTS: an address that can be outputted to the PCI_CONFIG_ADDRESS port to access PCI config space
+ */
 uint32_t pci_config_get_addr(int8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
 	uint32_t address;
 	uint32_t lbus  = (uint32_t)bus;

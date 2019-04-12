@@ -4,6 +4,7 @@
 #include "lib.h"
 #include "spinlock.h"
 #include "irq_defs.h"
+#include "list.h"
 
 #define NUM_BASE_ADDRESS_REGS 6
 
@@ -46,6 +47,9 @@ typedef struct pci_driver {
 	// Returns 0 if the interrupt was handled and -1 if the interrupt was not for this device
 	int (*irq_handler)(pci_function*);
 } pci_driver;
+
+typedef LIST_ITEM(pci_driver) pci_driver_list_item;
+typedef LIST_ITEM(pci_function) pci_function_list_item;
 
 // Registers a PCI driver for some PCI device
 // Should be called before enumerate_pci_devices

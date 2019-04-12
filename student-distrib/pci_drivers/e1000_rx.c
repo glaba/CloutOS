@@ -104,7 +104,7 @@ static int cur_descriptor = 0;
  *         interrupt_cause: the contents of the Interrupt Cause Read register
  * OUTPUTS: 0 if the interrupt was handled and -1 if not
  */
-int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause) {
+inline int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause) {
 	// Make sure this interrupt is for ethernet frame reception
 	if (!(interrupt_cause & ETH_IMS_RXT0 || interrupt_cause & ETH_IMS_RXDMT0))
 		return -1;

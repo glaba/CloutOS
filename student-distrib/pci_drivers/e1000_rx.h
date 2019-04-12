@@ -70,6 +70,6 @@ struct rx_descriptor {
 // Initializes transmission using the E1000 network card
 int e1000_init_rx(volatile uint8_t *eth_mmio_base);
 // Interrupt handler for reception
-int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause);
+inline int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause);
 
 #endif

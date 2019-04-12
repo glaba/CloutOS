@@ -63,5 +63,7 @@ int e1000_init_tx(volatile uint8_t *eth_mmio_base);
 int add_tx_descriptor(volatile uint8_t *eth_mmio_base, struct tx_descriptor *desc);
 // Fills in the tx_descriptor field for a given input packet 
 int create_tx_descriptor(uint8_t *buf, uint16_t size, struct tx_descriptor *desc);
+// Interrupt handler for transmission
+inline int e1000_tx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause);
 
 #endif

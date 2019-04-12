@@ -2,12 +2,16 @@
 #include "e1000_misc.h"
 #include "../pci.h"
 #include "../kheap.h"
+#include "../spinlock.h"
 
 // The descriptor buffer that will be shared between the ethernet controller and the kernel
 static volatile uint8_t tx_desc_buf[TX_DESCRIPTOR_BUFFER_SIZE * TX_DESCRIPTOR_SIZE] __attribute__((aligned (TX_DESCRIPTOR_BUFFER_ALIGNMENT)));
 
 // The index of the first unfreed block in tx_desc_buf
 static uint16_t first_unfreed_block = 0;
+
+// Spinlock that prevents simultaneous access to tx_desc_buf as well as TDH and TDT
+static struct spinlock_t eth_tx_spinlock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Initializes transmission using the E1000 network card
@@ -87,6 +91,9 @@ void deserialize_tx_descriptor(volatile uint8_t serialized[TX_DESCRIPTOR_SIZE], 
  * SIDE EFFECTS: modifies the transmittion descriptor buffer and notifies the E1000
  */
 int add_tx_descriptor(volatile uint8_t *eth_mmio_base, struct tx_descriptor *desc) {
+	// Acquire the lock since we are modifying the descriptor array
+	spin_lock(&eth_tx_spinlock);
+
 	// The current value of the tail "pointer" (it's really an index into tx_desc_buf)
 	uint32_t cur_tail = GET_32(eth_mmio_base, ETH_TX_DESCRIPTOR_TAIL);
 
@@ -96,32 +103,22 @@ int add_tx_descriptor(volatile uint8_t *eth_mmio_base, struct tx_descriptor *des
 	struct tx_descriptor next;
 	deserialize_tx_descriptor(tx_desc_buf + cur_tail * TX_DESCRIPTOR_SIZE, &next);
 
-	// Free all the unfreed buffers that have finished since the last invocation of add_tx_descriptor
-	struct tx_descriptor cur_buf;
-	while (first_unfreed_block != cur_tail) {
-		deserialize_tx_descriptor(tx_desc_buf + first_unfreed_block * TX_DESCRIPTOR_SIZE, &cur_buf);
-
-		// If this descriptor has been pushed out by the ethernet controller
-		//  free the associated buffer and update the counter
-		if ((cur_buf.cmd & TX_DESC_CMD_REPORT_STATUS) && (cur_buf.status & TX_DESC_STATUS_DESCRIPTOR_DONE)) {
-			kfree(cur_buf.buf_addr);
-			first_unfreed_block = (first_unfreed_block + 1) % TX_DESCRIPTOR_BUFFER_SIZE;
-		} else {
-			break;
-		}
-	}
-
 	// If the next element in the buffer was previously filled by us
 	//  and it is not done, then the buffer is full
 	if ((next.cmd & TX_DESC_CMD_REPORT_STATUS) &&
 		!(next.status & TX_DESC_STATUS_DESCRIPTOR_DONE)) {
 
 		ETH_DEBUG("Transmit buffer full, could not send packet\n");
+		spin_unlock(&eth_tx_spinlock);
 		return -1;
 	}
 
 	// Serialize the transmit descriptor into the buffer
 	serialize_tx_descriptor(desc, tx_desc_buf + cur_tail * TX_DESCRIPTOR_SIZE);
+	
+	// Unlock before updating the tail pointer because the interrupt may arrive while the lock
+	//  is still locked
+	spin_unlock(&eth_tx_spinlock);
 
 	// Update the tail pointer
 	GET_32(eth_mmio_base, ETH_TX_DESCRIPTOR_TAIL) = (cur_tail + 1) % TX_DESCRIPTOR_BUFFER_SIZE;
@@ -139,6 +136,7 @@ int add_tx_descriptor(volatile uint8_t *eth_mmio_base, struct tx_descriptor *des
  */
 int create_tx_descriptor(uint8_t *buf, uint16_t size, struct tx_descriptor *desc) {
 	desc->buf_addr = kmalloc(size);
+
 	if (desc->buf_addr == NULL)
 		return -1;
 
@@ -155,5 +153,42 @@ int create_tx_descriptor(uint8_t *buf, uint16_t size, struct tx_descriptor *desc
 	desc->css = 0;
 	desc->special = 0;
 
+	return 0;
+}
+
+/*
+ * Interrupt handler for freeing memory after packets are transmitted
+ * INPUTS: eth_mmio_base: pointer to the start of memory-mapped I/O for the E1000
+ *         interrupt_cause: the contents of the Interrupt Cause Read register
+ * OUTPUTS: 0 if the interrupt was handled and -1 if not
+ */
+inline int e1000_tx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause) {
+	// Make sure this interrupt is for ethernet transmission
+	if (!(interrupt_cause & ETH_IMS_TXDW))
+		return -1;
+
+	// Acquire the lock since we will be using the tx_desc array
+	spin_lock(&eth_tx_spinlock);
+
+	// Get the current value of TDT
+	uint32_t cur_tail = GET_32(eth_mmio_base, ETH_TX_DESCRIPTOR_TAIL);
+	
+	// Free all the unfreed buffers that have finished
+	struct tx_descriptor cur_buf;
+	while (first_unfreed_block != cur_tail) {
+		deserialize_tx_descriptor(tx_desc_buf + first_unfreed_block * TX_DESCRIPTOR_SIZE, &cur_buf);
+
+		// If this descriptor has been pushed out by the ethernet controller
+		//  free the associated buffer and update the counter
+		if ((cur_buf.cmd & TX_DESC_CMD_REPORT_STATUS) && (cur_buf.status & TX_DESC_STATUS_DESCRIPTOR_DONE)) {
+			kfree(cur_buf.buf_addr);
+			first_unfreed_block = (first_unfreed_block + 1) % TX_DESCRIPTOR_BUFFER_SIZE;
+		} else {
+			break;
+		}
+	}	
+
+	// Release the lock and return success
+	spin_unlock(&eth_tx_spinlock);
 	return 0;
 }
