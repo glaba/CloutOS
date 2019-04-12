@@ -4,12 +4,13 @@
 #include "init_idt.h"
 #include "exception_handlers.h"
 #include "interrupt_service_routines.h"
+#include "irq_defs.h"
 
 #define END_OF_EXCEPTIONS 32
 #define SYSTEM_CALL_VECTOR 0x80
-#define KEYBOARD_INTERRUPT 0x21
-#define RTC_INTERRUPT 0x28
-#define PCI_INTERRUPT 0x2B
+#define KEYBOARD_INTERRUPT (0x20 + KEYBOARD_IRQ)
+#define RTC_INTERRUPT (0x20 + RTC_IRQ)
+#define PCI_INTERRUPT (0x20 + PCI_IRQ)
 
 /*   initialize_idt();
  *   DESCRIPTION: Fills the IDT with entries and sets settings

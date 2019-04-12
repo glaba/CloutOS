@@ -193,8 +193,8 @@ void divide_by_zero_test() {
  */
 void eth_test() {
 	if (register_pci_driver(e1000_driver) == 0)
-		enumerate_pci_devices();
-
+        enumerate_pci_devices();
+	
 	unsigned char buffer[50] = "Hello World!\n";
 	e1000_transmit(buffer, 13);
 	buffer[0] = '1';

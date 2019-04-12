@@ -38,9 +38,6 @@ int e1000_init_device(pci_function *func_) {
 		goto eth_init_failed;
 	}
 
-	// Enable interrupts for packet reception (and transmission complete later)
-	GET_16(eth_mmio_base, ETH_INTERRUPT_MASK_SET) = 0xFFFF; //ETH_IMS_RXT0 | ETH_IMS_RXDMT0 | ETH_IMS_TXDW;
-
 	// Initialize transmission
 	if (e1000_init_tx(eth_mmio_base) != 0) {
 		ETH_DEBUG("   Initializing transmission failed\n");
@@ -53,6 +50,9 @@ int e1000_init_device(pci_function *func_) {
 		goto eth_init_failed;
 	}
 
+	// Enable interrupts for packet reception (and transmission complete later)
+	GET_32(eth_mmio_base, ETH_INTERRUPT_MASK_SET) = ETH_IMS_RXT0 | ETH_IMS_RXDMT0;// | ETH_IMS_TXDW;
+
 	ETH_DEBUG("Successfully initialized E1000\n");
 
 	return 0;
@@ -64,9 +64,13 @@ eth_init_failed:
 
 /*
  * Interrupt handler for the E1000 
+ * INPUTS: func: the pci_function struct for this PCI device
+ * OUTPUTS: 0 if this interrupt was for the E1000 and -1 otherwise
  */
 int e1000_irq_handler(pci_function *func) {
-	return -1;
+	volatile uint8_t *eth_mmio_base = (volatile uint8_t*)func->reg_base[0];
+
+	return e1000_rx_irq_handler(eth_mmio_base, GET_32(eth_mmio_base, ETH_INT_CAUSE_REGISTER));
 }
 
 /*

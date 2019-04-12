@@ -21,7 +21,7 @@ void serialize_rx_descriptor(struct rx_descriptor *desc, volatile uint8_t serial
 	GET_16(serialized, 10) = desc->checksum; // Doesn't really make sense to set this but whatever
 	GET_8 (serialized, 12) = desc->status;
 	GET_8 (serialized, 13) = desc->errors;
-	// Bits 14-15 are reserved
+	// Bytes 14-15 are reserved
 }
 
 /*
@@ -57,11 +57,14 @@ int e1000_init_rx(volatile uint8_t *eth_mmio_base) {
 		GET_8(eth_mmio_base, i) = 0;
 	}
 
-	// Set the timer delay which will batch together interrupts that arrive together in rapid succession
-	GET_16(eth_mmio_base, ETH_RX_DELAY_TIMER_REGISTER) = 0; //FIX THIS//ETH_RX_TIMER_DELAY;
+	// Disable absolute timer
+	GET_16(eth_mmio_base, ETH_RX_ABSOLUTE_DELAY_TIMER) = 0;
+
+	// Set the timer delay to 0 to generate an interrupt for each packet (could be changed)
+	GET_16(eth_mmio_base, ETH_RX_DELAY_TIMER_REGISTER) = 0;
 
 	// Give the Ethernet controller the address of the descriptor buffer
-	GET_32(eth_mmio_base, ETH_RX_DESCRIPTOR_BASE_ADDR_L) = (uint32_t)&rx_desc_buf;
+	GET_32(eth_mmio_base, ETH_RX_DESCRIPTOR_BASE_ADDR_L) = (uint32_t)(&rx_desc_buf);
 	GET_32(eth_mmio_base, ETH_RX_DESCRIPTOR_BASE_ADDR_H) = 0; // Obviously 0 on a 32-bit machine
 
 	// Set the length of the buffer IN BYTES
@@ -74,8 +77,6 @@ int e1000_init_rx(volatile uint8_t *eth_mmio_base) {
 		//  in the main kernel page that will be filled up with more kernel code 
 		// Note that these allocations will already take up 3% of the entire 4MB heap
 		desc.buf_addr = kmalloc(RX_DESCRIPTOR_PACKET_BUFFER_SIZE);
-		if (i < 3)
-			printf("Addr %d: %x", i, desc.buf_addr);
 		if (desc.buf_addr == NULL)
 			return -1;
 
@@ -95,3 +96,54 @@ int e1000_init_rx(volatile uint8_t *eth_mmio_base) {
 	return 0;
 }
 
+static int cur_descriptor = 0;
+
+/*
+ * Interrupt handler for packet receive-related interrupts
+ * INPUTS: eth_mmio_base: pointer to the start of memory-mapped I/O for the E1000
+ *         interrupt_cause: the contents of the Interrupt Cause Read register
+ * OUTPUTS: 0 if the interrupt was handled and -1 if not
+ */
+int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause) {
+	// Make sure this interrupt is for ethernet frame reception
+	if (!(interrupt_cause & ETH_IMS_RXT0 || interrupt_cause & ETH_IMS_RXDMT0))
+		return -1;
+
+	struct rx_descriptor cur;
+	while (1) {
+		// Get the rx_descriptor at the current position
+		deserialize_rx_descriptor(rx_desc_buf + RX_DESCRIPTOR_SIZE * cur_descriptor, &cur);
+		
+		// Check if it has been filled out
+		if (cur.status & ETH_STATUS_DESC_DONE) {
+			// Make sure it is one entire packet, we do not support packets split between frames
+			if ((cur.status & ETH_STATUS_END_OF_PACKET) == 0) {
+				ETH_DEBUG("Received incomplete packet split between frames, ignoring...\n");
+				return 0;
+			}
+
+			// For the moment we don't actually do anything with the data, so let's just print it
+			ETH_DEBUG("Received packet stored at 0x%x of length 0x%x\n", (uint32_t)cur.buf_addr, (uint32_t)cur.length);
+			ETH_DEBUG("Contents: ");
+			int i;
+			for (i = 0; i < cur.length; i++) {
+				ETH_DEBUG("%x", cur.buf_addr[i]);
+			}
+			ETH_DEBUG("\n");
+
+			// Write back with desc_done not set
+			cur.status &= ~ETH_STATUS_DESC_DONE;
+			serialize_rx_descriptor(&cur, rx_desc_buf + RX_DESCRIPTOR_SIZE * cur_descriptor);
+
+			// Update cur descriptor index
+			cur_descriptor = (cur_descriptor + 1) % RX_DESCRIPTOR_BUFFER_SIZE;
+		} else {
+			break;
+		}
+	}
+
+	// Write back cur_descriptor - 1 to E1000
+	GET_32(eth_mmio_base, ETH_RX_DESCRIPTOR_TAIL) = (cur_descriptor + RX_DESCRIPTOR_BUFFER_SIZE - 1) % RX_DESCRIPTOR_BUFFER_SIZE;
+
+	return 0;
+}

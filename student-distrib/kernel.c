@@ -153,11 +153,10 @@ void entry(unsigned long magic, unsigned long addr) {
     // init_rtc();
 
     /* Enable interrupts */
-    /* Do not enable the following until after you have set up your
-     * IDT correctly otherwise QEMU will triple fault and simple close
-     * without showing you any output */
-    printf("Enabling Interrupts\n");
     sti();
+
+    // Enable PCI interrupts
+    enable_irq(PCI_IRQ);
 
     /* Enable paging */
     init_paging();
@@ -169,11 +168,11 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Run tests */
     launch_tests();
 #endif
+    /* Execute the first program ("shell") ... */
+    
     // Check for memory leaks
     // list_allocated_blocks();
     // list_free_blocks();
-
-    /* Execute the first program ("shell") ... */
 
     /* Spin (nicely, so we don't chew up cycles) */
     asm volatile (".1: hlt; jmp .1;");

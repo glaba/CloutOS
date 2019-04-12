@@ -15,7 +15,8 @@
 // Register where we set the length of a timer (in increments of 1.024 us) that is reset whenever a packet arrives,
 //  where the interrupt fires only when the timer counts down to zero
 #define ETH_RX_DELAY_TIMER_REGISTER      0x2820
-	#define ETH_RX_TIMER_DELAY 0x100 // This corresponds to a timer length of ~260 microseconds = 0.26 milliseconds
+// Register that serves the same function as the Delay Timer Register, but with an absolute timer
+#define ETH_RX_ABSOLUTE_DELAY_TIMER      0x282C
 // Contains the address and size of the rx_desc buffer
 #define ETH_RX_DESCRIPTOR_BASE_ADDR_L 0x2800 // RDBAL
 #define ETH_RX_DESCRIPTOR_BASE_ADDR_H 0x2804 // RDBAH
@@ -37,6 +38,11 @@
 	#define ETH_RCTL_RECEIVE_BUF_SIZE      (0x01 << 16) // RCTL.BSIZE
 	// Determines whether or not buffer size extension is enabled (larger packet buffer sizes allowed)
 	#define ETH_RCTL_BUF_SIZE_EXT          (0x0 << 25) // RCTL.BSEX
+// Fields of status field of receive descriptor
+	// Whether or not this descriptor is the end of a packet (we expect this to always be there)
+	#define ETH_STATUS_END_OF_PACKET 0x2
+	// Whether or not this descriptor has been filled with data to read 
+	#define ETH_STATUS_DESC_DONE     0x1
 
 // The size of a receive descriptor in bytes
 #define RX_DESCRIPTOR_SIZE 16
@@ -63,5 +69,7 @@ struct rx_descriptor {
 
 // Initializes transmission using the E1000 network card
 int e1000_init_rx(volatile uint8_t *eth_mmio_base);
+// Interrupt handler for reception
+int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause);
 
 #endif
