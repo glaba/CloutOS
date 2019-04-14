@@ -33,9 +33,9 @@
 	#define ETH_RCTL_MIN_THRESHOLD_SIZE    (0x00 << 8)
 	// Accepts broadcast Ethernet packets
 	#define ETH_RCTL_BROADCAST_ACCEPT_MODE (0x1 << 15)
-	// When RCTL.BSEX is set to 0, this value of BSIZE sets receive packet buffer size to 1024 
+	// When RCTL.BSEX is set to 0, this value of BSIZE sets receive packet buffer size to 2048 
 	// Update RX_DESCRIPTOR_PACKET_BUFFER_SIZE and RCTL.BSEX whenever this is updated
-	#define ETH_RCTL_RECEIVE_BUF_SIZE      (0x01 << 16) // RCTL.BSIZE
+	#define ETH_RCTL_RECEIVE_BUF_SIZE      (0x00 << 16) // RCTL.BSIZE
 	// Determines whether or not buffer size extension is enabled (larger packet buffer sizes allowed)
 	#define ETH_RCTL_BUF_SIZE_EXT          (0x0 << 25) // RCTL.BSEX
 // Fields of status field of receive descriptor
@@ -51,7 +51,7 @@
 // The size of the rx_descriptor buffer
 #define RX_DESCRIPTOR_BUFFER_SIZE 128
 // The size of the packet buffer within each descriptor (RCTL.BSIZE and RCTL.BSEX must be updated with this)
-#define RX_DESCRIPTOR_PACKET_BUFFER_SIZE 1024
+#define RX_DESCRIPTOR_PACKET_BUFFER_SIZE 2048
 
 struct rx_descriptor {
 	// Pointer to buffer containing data

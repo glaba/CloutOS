@@ -34,31 +34,31 @@ int e1000_init_device(pci_function *func_) {
 
 	// Check that the status register has the correct expected value
 	if (GET_32(eth_mmio_base, ETH_STATUS_REG) != CORRECT_ETH_STATUS) {
-		ETH_DEBUG("   E1000 status register has incorrect value of 0x%x\n", GET_32(eth_mmio_base, ETH_STATUS_REG));
+		E1000_DEBUG("   E1000 status register has incorrect value of 0x%x\n", GET_32(eth_mmio_base, ETH_STATUS_REG));
 		goto eth_init_failed;
 	}
 
 	// Initialize transmission
 	if (e1000_init_tx(eth_mmio_base) != 0) {
-		ETH_DEBUG("   Initializing transmission failed\n");
+		E1000_DEBUG("   Initializing transmission failed\n");
 		goto eth_init_failed;
 	}
 
 	// Initialize reception
 	if (e1000_init_rx(eth_mmio_base) != 0) {
-		ETH_DEBUG("   Initializing reception failed (likely due to full heap)\n");
+		E1000_DEBUG("   Initializing reception failed (likely due to full heap)\n");
 		goto eth_init_failed;
 	}
 
 	// Enable interrupts for packet reception (and transmission complete later)
 	GET_32(eth_mmio_base, ETH_INTERRUPT_MASK_SET) = ETH_IMS_RXT0 | ETH_IMS_RXDMT0 | ETH_IMS_TXDW;
 
-	ETH_DEBUG("Successfully initialized E1000\n");
+	E1000_DEBUG("Successfully initialized E1000\n");
 
 	return 0;
 
 eth_init_failed:
-	ETH_DEBUG("Failed to initialize E1000\n");
+	E1000_DEBUG("Failed to initialize E1000\n");
 	return -1;
 }
 
@@ -90,8 +90,10 @@ int e1000_transmit(uint8_t* buf, uint16_t size) {
 
 	struct tx_descriptor desc;
 
-	create_tx_descriptor(buf, size, &desc);
-	return add_tx_descriptor((volatile uint8_t*)func->reg_base[0], &desc);
+	if (create_tx_descriptor(buf, size, &desc) == 0)
+		return add_tx_descriptor((volatile uint8_t*)func->reg_base[0], &desc);
+
+	return -1;
 }
 
 

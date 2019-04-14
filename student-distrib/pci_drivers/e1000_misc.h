@@ -1,12 +1,12 @@
 #ifndef _E1000_MISC_H
 #define _E1000_MISC_H
 
-// Uncomment ETH_DEBUG_ENABLE to enable debugging
-#define ETH_DEBUG_ENABLE
-#ifdef ETH_DEBUG_ENABLE
-	#define ETH_DEBUG(f, ...) printf(f, ##__VA_ARGS__)
+// Uncomment E1000_DEBUG_ENABLE to enable debugging
+#define E1000_DEBUG_ENABLE
+#ifdef E1000_DEBUG_ENABLE
+	#define E1000_DEBUG(f, ...) printf(f, ##__VA_ARGS__)
 #else
-	#define ETH_DEBUG(f, ...) // Nothing
+	#define E1000_DEBUG(f, ...) // Nothing
 #endif
 
 // Accesses a 32-bit value in a uint8_t array starting at the given offset
@@ -16,8 +16,8 @@
 // Accesses a 8-bit value in a uint8_t array starting at the given offset
 #define GET_8(arr, offset) (arr)[offset]
 
-// The maximum size of an Ethernet packet, in bytes
-#define ETH_MAX_PACKET_SIZE 1518
+// The maximum size of an Ethernet packet, in bytes (including VLAN tagged frames)
+#define ETH_MAX_PACKET_SIZE 1522
 // Offset registers in MMIO that apply to both tx and rx
 #define ETH_INTERRUPT_MASK_SET 0xD0
 // Bit fields that we will (possibly) enable for the interrupt mask

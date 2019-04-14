@@ -75,7 +75,7 @@ int e1000_init_rx(volatile uint8_t *eth_mmio_base) {
 	for (i = 0; i < RX_DESCRIPTOR_BUFFER_SIZE; i++) {
 		// Allocate memory for the buffer on the heap, since we only have 4MB of static memory
 		//  in the main kernel page that will be filled up with more kernel code 
-		// Note that these allocations will already take up 3% of the entire 4MB heap
+		// Note that these allocations will already take up 5% of the entire 4MB heap
 		desc.buf_addr = kmalloc(RX_DESCRIPTOR_PACKET_BUFFER_SIZE);
 		if (desc.buf_addr == NULL)
 			return -1;
@@ -118,18 +118,18 @@ inline int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interr
 		if (cur.status & ETH_STATUS_DESC_DONE) {
 			// Make sure it is one entire packet, we do not support packets split between frames
 			if ((cur.status & ETH_STATUS_END_OF_PACKET) == 0) {
-				ETH_DEBUG("Received incomplete packet split between frames, ignoring...\n");
+				E1000_DEBUG("Received incomplete packet split between frames, ignoring...\n");
 				return 0;
 			}
 
 			// For the moment we don't actually do anything with the data, so let's just print it
-			ETH_DEBUG("Received packet stored at 0x%x of length 0x%x\n", (uint32_t)cur.buf_addr, (uint32_t)cur.length);
-			ETH_DEBUG("Contents: ");
+			E1000_DEBUG("Received packet stored at 0x%x of length 0x%x\n", (uint32_t)cur.buf_addr, (uint32_t)cur.length);
+			E1000_DEBUG("Contents: ");
 			int i;
 			for (i = 0; i < cur.length; i++) {
-				ETH_DEBUG("%x", cur.buf_addr[i]);
+				E1000_DEBUG("%x", cur.buf_addr[i]);
 			}
-			ETH_DEBUG("\n");
+			E1000_DEBUG("\n");
 
 			// Write back with desc_done not set
 			cur.status &= ~ETH_STATUS_DESC_DONE;

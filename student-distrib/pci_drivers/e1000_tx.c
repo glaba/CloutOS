@@ -108,7 +108,7 @@ int add_tx_descriptor(volatile uint8_t *eth_mmio_base, struct tx_descriptor *des
 	if ((next.cmd & TX_DESC_CMD_REPORT_STATUS) &&
 		!(next.status & TX_DESC_STATUS_DESCRIPTOR_DONE)) {
 
-		ETH_DEBUG("Transmit buffer full, could not send packet\n");
+		E1000_DEBUG("Transmit buffer full, could not send packet\n");
 		spin_unlock(&eth_tx_spinlock);
 		return -1;
 	}
