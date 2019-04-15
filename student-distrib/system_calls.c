@@ -164,8 +164,9 @@ int32_t close(int32_t fd) {
 	if (fd < 0 || fd >= MAX_NUM_FILES)
 		return FAIL;
 
-	// If the current file is NOT in use, then open has not been called
-	//  so it needs to return failed
+	/* If the current file is NOT in use, then open has not been called
+	 *  so it needs to return failed
+	 */
 	if (!cur_pcb->files[fd].in_use)
 		return FAIL;
 
@@ -181,6 +182,13 @@ int32_t close(int32_t fd) {
 	return PASS;
 }
 
+/*
+ * SYSTEM CALL that copies the arguments into the given buf
+ * INPUTS: 	uint8_t* buf = userspace buffer asking for the argument
+ * 			int32_t nbytes = he number of bytes to copy over
+ * OUTPUTS: FAIL, for FAIL. Otherwise, 0 for PASS
+ * SIDE EFFECTS: N/A
+ */
 int32_t getargs(uint8_t* buf, int32_t nbytes) {
 	// Get pcb
 	pcb_t* cur_pcb = get_pcb();
@@ -198,19 +206,27 @@ int32_t getargs(uint8_t* buf, int32_t nbytes) {
 		buf[i] = '\0';
 	}
 
+	//strncpy(buf,(uint8_t *)cur_pcb->args,nbytes);
 	return PASS;
 }
 
+/*
+ * SYSTEM CALL maps video memory for user-level programs
+ * INPUTS: 	uint8_t **screen_start = where to copy video memory into
+ *
+ * OUTPUTS: FAIL, for FAIL. Otherwise, 0 for PASS
+ * SIDE EFFECTS: N/A
+ */
 int32_t vidmap(uint8_t **screen_start) {
 	// Check that the pointer lies within the page allocated to this process
 	// Since all processes have their memory mapped to 128MB, this amounts to a check for
 	//  whether or not the pointer is in the range 128MB - 132MB
-	if ((uint32_t)screen_start < EXECUTABLE_VIRT_PAGE_START || 
+	if ((uint32_t)screen_start < EXECUTABLE_VIRT_PAGE_START ||
 		(uint32_t)screen_start >= EXECUTABLE_VIRT_PAGE_START + LARGE_PAGE_SIZE)
 		return -1;
 
 	int32_t retval = map_video_mem_user((void**)screen_start);
-	
+
 	// Copy the value into the PCB if the mapping succeeded
 	if (retval == 0)
 		get_pcb()->vid_mem = *screen_start;
@@ -219,12 +235,23 @@ int32_t vidmap(uint8_t **screen_start) {
 	return retval;
 }
 
-// Currently unimplemented
+/*
+ * SYSTEM CALL that is currently unimplemented
+ * INPUTS: 	int32_t signum = parameter
+ *			void* handler_address = parameter
+ * OUTPUTS: FAIL, for FAIL. Otherwise, 0 for PASS
+ * SIDE EFFECTS: N/A
+ */
 int32_t set_handler(int32_t signum, void* handler_address) {
 	return FAIL;
 }
 
-// Currently unimplemented
+/*
+ * SYSTEM CALL that is currently unimplemented
+ * INPUTS: 	N/A
+ * OUTPUTS: FAIL, for FAIL. Otherwise, 0 for PASS
+ * SIDE EFFECTS: N/A
+ */
 int32_t sigreturn(void) {
 	return FAIL;
 }
