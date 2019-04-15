@@ -168,34 +168,41 @@ void fs_init(uint32_t fs_start, uint32_t fs_end){
  */
 int32_t read_dentry_by_name(const uint8_t *fname, dentry_t *dentry) {
 	/* Local variables. */
-	int i;
+	int i, j;
 
 	// If it's an empty string, return -1
 	if (strlen((int8_t *)fname) == 0)
 		return -1;
 
 	/* Find the entry in the array. */
+	uint32_t fname_len = strlen((int8_t*)fname); 
 	for (i = 0; i < MAX_NUM_FS_DENTRIES; i++) {
-		if (strlen((int8_t *)fname) == strlen(fs_dentries[i].filename) &&
-			0 == strncmp(fs_dentries[i].filename, (int8_t*)fname, MAX_FILENAME_LENGTH)) {
+		// Get the length of the current filename without exceeding MAX_FILENAME_LENGTH
+		for (j = 0; j < MAX_FILENAME_LENGTH && fs_dentries[i].filename[j] != '\0'; j++);
+		uint32_t cur_fname_len = j;
+
+		// Check if the two strings are equal
+		// First, check if their lengths are equal, and then if they have the same characters
+		uint8_t equal = 0;
+		if (fname_len == cur_fname_len) {
+			equal = 1;
+
+			for (j = 0; j < fname_len; j++) {
+				// If any of the characters are different, they are not equal
+				if (fname[j] != fs_dentries[i].filename[j]) {
+					equal = 0;
+					break;
+				}
+			}
+		}
+
+		// If the requested filename and the current filename are the same
+		if (equal) {
 			strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[i].filename, MAX_FILENAME_LENGTH);
-			dentry->filename[MAX_FILENAME_LENGTH] = '\0';
 			dentry->filetype = fs_dentries[i].filetype;
 			dentry->inode = fs_dentries[i].inode;
 			return 0;
 		}
-		// Only if the requested length is 32 bytes and the requested file is 33 bytes with a terminating \0
-		else if (strlen((int8_t *)fname) == MAX_FILENAME_LENGTH &&
-				strlen(fs_dentries[i].filename) == MAX_FILENAME_LENGTH+1 &&
-				0 == strncmp(fs_dentries[i].filename, (int8_t*)fname, MAX_FILENAME_LENGTH) &&
-				fs_dentries[i].filename[MAX_FILENAME_LENGTH] == '\0') {
-					strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[i].filename, MAX_FILENAME_LENGTH);
-					dentry->filename[MAX_FILENAME_LENGTH] = '\0';
-					dentry->filetype = fs_dentries[i].filetype;
-					dentry->inode = fs_dentries[i].inode;
-					return 0;
-		}
-
 	}
 
 	/* If we did not find the file, return failure. */

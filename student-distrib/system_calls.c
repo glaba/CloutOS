@@ -182,8 +182,7 @@ int32_t getargs(uint8_t* buf, int32_t nbytes) {
 	for(; i < nbytes; i++) {
 		buf[i] = '\0';
 	}
-	
-	//strncpy(buf,(uint8_t *)cur_pcb->args,nbytes);
+
 	return PASS;
 }
 
