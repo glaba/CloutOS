@@ -6,6 +6,9 @@
 #include "file_system.h"
 #include "keyboard.h"
 #include "rtc.h"
+#include "pci.h"
+#include "pci_drivers/e1000.h"
+#include "kheap.h"
 
 #define PASS 1
 #define FAIL 0
@@ -16,7 +19,7 @@
 #define TEST_OUTPUT(name, result)	\
 	printf("[TEST %s] Result = %s\n", name, (result) ? "PASS" : "FAIL");
 
-static inline void assertion_failure(){
+static inline void assertion_failure() {
 	/* Use exception #15 for assertions, otherwise
 	   reserved by Intel */
 	asm volatile("int $15");
@@ -34,14 +37,15 @@ static inline void assertion_failure(){
  * Coverage: Load IDT, IDT definition
  * Files: x86_desc.h/S
  */
-int idt_test(){
+int idt_test() {
 	TEST_HEADER;
 
 	int i;
 	int result = PASS;
 	for (i = 0; i < 10; ++i){
-		if ((idt[i].offset_15_00 == NULL) &&
-			(idt[i].offset_31_16 == NULL)){
+		if ((idt[i].offset_15_00 == NULL) && 
+			(idt[i].offset_31_16 == NULL)) {
+
 			assertion_failure();
 			result = FAIL;
 		}
@@ -497,21 +501,174 @@ int extensive_terminal_read_write() {
 /* Checkpoint 4 tests */
 /* Checkpoint 5 tests */
 
+/* Extra feature tests */
+
+/*
+ * eth_test
+ * A work in progress
+ */
+void eth_test() {	
+	unsigned char buffer[50] = "Hello World!\n";
+	e1000_transmit(buffer, 13);
+	buffer[0] = '1';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '2';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '3';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '4';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '5';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '6';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '7';
+	e1000_transmit(buffer, 13);
+	buffer[0] = '8';
+	e1000_transmit(buffer, 13);
+}
+
+/*
+ * Tests kmalloc and kfree in a variety of scenarios
+ *
+ * INPUTS: none
+ * RETURN VALUE: PASS if the two work as expected and FAIL if they do not
+ * SIDE EFFECTS: completely clears the heap
+ */
+int kheap_test() {
+	init_kheap();
+
+	/***********/
+	/* TEST #1 */
+	/***********/
+	if (1) {
+		// Each memory descriptor is 16 bytes, so if we allocate 1004 byte regions,
+		//  we should be able to allocate 4MiB / 1024 = 4096 times and fill up the heap
+		int i;
+		for (i = 0; i < 4096; i++) {
+			if (kmalloc(1004) == NULL) {
+				printf("Index %d\n", i);
+				printf("TEST #1 FAILED\n");
+				goto kheap_test_fail;
+			}
+		}
+	}
+
+	init_kheap();
+
+	/***********/
+	/* TEST #2 */
+	/***********/
+	if (1) {
+		// Now, we will test that freeing at the beginning, middle, and end all work
+		int i;
+		void *ptr, *beginning, *middle, *end;
+		for (i = 0; i < 4096; i++) {
+			ptr = kmalloc(1004);
+			if (i == 0) beginning = ptr;
+			if (i == 69) middle = ptr;
+			if (i == 4095) end = ptr; 
+		}
+
+		kfree(beginning);
+		kfree(middle);
+		kfree(end);
+
+		// We should now be able to malloc regions of size 1004 three times without error
+		ptr = (void*)(kmalloc(1004) && kmalloc(1004) && kmalloc(1004));
+		if (ptr == NULL) {
+			printf("TEST #2 FAILED\n");
+			goto kheap_test_fail;
+		}
+		// One more malloc should not fit and fail
+		ptr = kmalloc(1);
+		if (ptr != NULL) {
+			printf("TEST #2 FAILED\n");
+			goto kheap_test_fail;
+		}
+	}
+
+	init_kheap();
+	
+	/***********/
+	/* TEST #3 */
+	/***********/
+	if (1) {
+		// Now, we will test coalescing of freed regions 
+		int i;
+		void *ptr, *first, *second;
+		for (i = 0; i < 4096; i++) {
+			ptr = kmalloc(1004);
+			if (i == 690) first = ptr;
+			if (i == 691) second = ptr;
+		}
+
+		kfree(first);
+		// Mallocing 1200 bytes should fail now
+		if (kmalloc(1200) != NULL) {
+			printf("TEST #3 FAILED\n");
+			goto kheap_test_fail;
+		}
+		kfree(second);
+		// Mallocing 1200 bytes should succeed now
+		if (kmalloc(1200) == NULL) {
+			printf("TEST #3 FAILED\n");
+			goto kheap_test_fail;
+		}
+	}
+
+	init_kheap();
+
+	/***********/
+	/* TEST #4 */
+	/***********/
+	if (1) {
+		// Now, we will test filling a freed region with 2 pieces of smaller size
+		int i;
+		void *ptr, *middle;
+		for (i = 0; i < 4096; i++) {
+			ptr = kmalloc(1004);
+			if (i == 50) middle = ptr;
+		}
+
+		kfree(middle);
+
+		// Now, we should be able to allocate 2 regions of size 492 (plus 2 descriptors of size 16 bytes each makes 1024)
+		if (kmalloc(492) && kmalloc(492) == NULL) {
+			printf("TEST #4 FAILED\n");
+			goto kheap_test_fail;
+		}
+		// We should not be able to allocate any more
+		if (kmalloc(1) != NULL) {
+			printf("TEST #4 FAILED\n");
+			goto kheap_test_fail;
+		}
+	}
+
+	init_kheap();
+	return PASS;
+
+kheap_test_fail:
+	init_kheap();
+	return FAIL;
+}
 
 /* Test suite entry point */
-void launch_tests(){
-	/* CHECKPOINT 1 TESTS*/
-	//TEST_OUTPUT("idt_test", idt_test());
-	//TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
-	//TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
+void launch_tests() {
+	/* CHECKPOINT 1 TESTS */
+	// TEST_OUTPUT("idt_test", idt_test());
+	// TEST_OUTPUT("idt_test_extensive", idt_test_extensive());
+	// TEST_OUTPUT("paging_test_valid_regions", paging_test_valid_regions());
 
 	// divide_by_zero_test();
 	// paging_test_invalid_region();
 
-	/*CHECKPOINT 2 TESTS*/
-	//TEST_OUTPUT("testing rtc read/write", rtc_read_write());
-	//TEST_OUTPUT("externsive rtc read/write",negative_null_rtc_read_write());
-	//TEST_OUTPUT("testing terminal read/write",terminal_read_write());
-	//TEST_OUTPUT("extensive testing terminal read/write",extensive_terminal_read_write());
-	//TEST_OUTPUT("file_system_test", test_fs());
+	/* CHECKPOINT 2 TESTS */
+	// TEST_OUTPUT("testing rtc read/write", rtc_read_write());
+	// TEST_OUTPUT("externsive rtc read/write",negative_null_rtc_read_write());
+	// TEST_OUTPUT("testing terminal read/write",terminal_read_write());
+	// TEST_OUTPUT("extensive testing terminal read/write",extensive_terminal_read_write());
+	// TEST_OUTPUT("file_system_test", test_fs());
+
+	eth_test();
 }

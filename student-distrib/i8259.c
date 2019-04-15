@@ -34,7 +34,7 @@ void i8259_init(void) {
 
     /* ICW 3 */
     outb(ICW3_MASTER, MASTER_8259_PORT + 1);
-    outb(ICW2_SLAVE, SLAVE_8259_PORT + 1);
+    outb(ICW3_SLAVE, SLAVE_8259_PORT + 1);
 
     /* ICW 4 */
     outb(ICW4, MASTER_8259_PORT + 1);

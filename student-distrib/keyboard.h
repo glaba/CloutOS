@@ -1,7 +1,8 @@
 #ifndef _KEYBOARD_H
 #define _KEYBOARD_H
+
 #include "types.h"
-#define KEYBOARD_IRQ 1
+#include "irq_defs.h"
 
 /* Port numbers for keyboard controller status and data ports */
 #define KEYBOARD_CONTROLLER_STATUS_PORT 0x64

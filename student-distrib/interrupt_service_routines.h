@@ -7,6 +7,8 @@
 #include "keyboard.h"
 #include "rtc.h"
 #include "system_calls.h"
+#include "pci.h"
+#include "lib.h"
 
 /* Linkage for keyboard interrupt handler */
 extern void keyboard_linkage();
@@ -17,6 +19,8 @@ extern void rtc_linkage();
 /* Linkage for system call handler */
 extern void system_call_linkage();
 
+/* Linkage for all PCI interrupt handlers */
+extern void pci_linkage();
 
 #endif
 #endif

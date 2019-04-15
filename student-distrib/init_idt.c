@@ -4,23 +4,25 @@
 #include "init_idt.h"
 #include "exception_handlers.h"
 #include "interrupt_service_routines.h"
+#include "irq_defs.h"
 
 #define END_OF_EXCEPTIONS 32
 #define SYSTEM_CALL_VECTOR 0x80
-#define KEYBOARD_INTERRUPT 0x21
-#define RTC_INTERRUPT 0x28
+#define KEYBOARD_INTERRUPT (0x20 + KEYBOARD_IRQ)
+#define RTC_INTERRUPT (0x20 + RTC_IRQ)
+#define PCI_INTERRUPT (0x20 + PCI_IRQ)
 
 /*   initialize_idt();
  *   DESCRIPTION: Fills the IDT with entries and sets settings
  *           such as privilege level, and gate type
  *   INPUTS: NONE
  *   RETURN VALUE: NONE
- *   SIDE EFFECTS: Fills the IDT */
-void initialize_idt(){
+ *   SIDE EFFECTS: Fills the IDT */ 
+void initialize_idt() {
 	int idt_idx;
-	/* For the first 32 entries in IDT which are exceptions */
-	for (idt_idx = 0; idt_idx < END_OF_EXCEPTIONS; idt_idx++){
 
+	/* For the first 32 entries in IDT which are exceptions */
+	for (idt_idx = 0; idt_idx < END_OF_EXCEPTIONS; idt_idx++) {
 		/* The following reserved bit settings set first 32 entries as TRAP gates */
 		idt[idt_idx].reserved0 = 0x0;
 		idt[idt_idx].reserved1 = 0x1;
@@ -32,9 +34,9 @@ void initialize_idt(){
 		idt[idt_idx].present = 0x1;
 		idt[idt_idx].dpl = 0x0;
 	}
-	/* For the other entries up to 255 for interrupts */
-	for (idt_idx = END_OF_EXCEPTIONS; idt_idx < NUM_VEC; idt_idx++){
 
+	/* For the other entries up to 255 for interrupts */
+	for (idt_idx = END_OF_EXCEPTIONS; idt_idx < NUM_VEC; idt_idx++) {
 		/* The following reserved bit settings set entries 32 to 255 as interrupt gates */
 		idt[idt_idx].reserved0 = 0x0;
 		idt[idt_idx].reserved1 = 0x1;
@@ -64,11 +66,11 @@ void initialize_idt(){
 		SET_IDT_ENTRY(idt[idt_idx], exception_handlers[idt_idx]);
 	}
 
-	/* IDT entries for keyboard and RTC */
+	/* IDT entries for interrupt handlers */
 	SET_IDT_ENTRY(idt[KEYBOARD_INTERRUPT], keyboard_linkage);
 	SET_IDT_ENTRY(idt[RTC_INTERRUPT], rtc_linkage);
+	SET_IDT_ENTRY(idt[PCI_INTERRUPT], pci_linkage);
 
 	// IDT entry for system calls
 	SET_IDT_ENTRY(idt[SYSTEM_CALL_VECTOR], system_call_linkage);
-	
 }
