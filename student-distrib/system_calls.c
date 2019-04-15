@@ -1,6 +1,7 @@
 #include "system_calls.h"
 #include "processes.h"
 #include "keyboard.h"
+#include "paging.h"
 
 // The total number of file types
 #define MAX_FILE_TYPE 3
@@ -8,6 +9,8 @@
 // Instead of return -1 or 0, used labels/macros
 #define PASS 0
 #define FAIL -1
+#define _128MB 0x08000000
+#define _132MB 0x08400000
 
 /* Jump table for specific read/write/open/close functions */
 static struct fops_t rtc_table = {.open = &rtc_open, .close = &rtc_close, .read = &rtc_read, .write = &rtc_write};
@@ -42,7 +45,7 @@ int32_t read(int32_t fd, void* buf, int32_t nbytes) {
 	// Check if a read function exists for this file, and return 0 if not
 	if (cur_pcb->files[fd].fd_table->read == NULL)
 		return 0;
-	// Return appropriate read function 
+	// Return appropriate read function
 	return ((cur_pcb->files[fd]).fd_table)->read(fd, buf, nbytes);
 }
 
@@ -156,8 +159,19 @@ int32_t getargs(uint8_t* buf, int32_t nbytes) {
 	return FAIL;
 }
 
-int32_t vidmap(uint8_t** screen_start) {
-	return FAIL;
+
+int32_t vidmap(uint8_t** screen_start){
+	if(screen_start == NULL){
+		return FAIL;
+	}
+	if(screen_start < (uint8_t **)_128MB || screen_start >= (uint8_t **)_132MB){
+		return FAIL;
+	}
+
+	remapWithPageTable((uint32_t)_128MB, (uint32_t)VIDEO_START+4096*2*get_pcb()->pid);
+	*screen_start = (uint8_t*)_128MB;
+
+	return _128MB;
 }
 
 int32_t set_handler(int32_t signum, void* handler_address) {

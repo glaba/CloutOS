@@ -49,7 +49,7 @@ static inline void enable_page_size_extension() {
 /*
  * If there is no mapping already existing, maps a region of specified size starting from the
  *  given virtual address to the region of the same size starting from the given physical address
- * 
+ *
  * INPUTS: start_phys_addr: the start of the region in physical memory
  *         start_virt_addr: the start of the region in virtual memory
  *         num_pdes: the size of the region in multiples of 4MB
@@ -137,6 +137,23 @@ int32_t map_containing_region(void *start_phys_addr, void *start_virt_addr, uint
 
 	// Map the given region
 	return map_region(start_phys_addr_aligned, start_virt_addr_aligned, num_pdes, flags);
+}
+
+/*
+ *  This function takes virtutal and physical addresses (virtual must be a multiple of 4MB) and maps the 4MB chunk of memory (a single PDE)
+ *                begining at the given virtual address to the first page of the video page table
+ *   inputs: virtualAddr - multiple of 4MB virtual address to be mapped
+ *           physicalAddr - physical address to be mapped
+ *   outputs: none
+ */
+void remapWithPageTable(uint32_t virtualAddr, uint32_t physicalAddr){
+    uint32_t pde = virtualAddr >> 22;
+    // attributes: user level, read/write, present
+    page_directory[pde] = ((unsigned int)video_page_table) | USER | RW_PRESENT;
+    video_page_table[0] = physicalAddr | USER | RW_PRESENT; // attributes: user, read/write, present
+
+		// Reload the page directory
+		write_cr3(&page_directory);
 }
 
 /*

@@ -12,7 +12,7 @@
 // The number of page directory entries in a page directory (each is 4 bytes)
 #define PAGE_DIRECTORY_SIZE 1024
 // The number of page table entries in a page table (each is 4 bytes)
-#define PAGE_TABLE_SIZE     1024 
+#define PAGE_TABLE_SIZE     1024
 // The alignment of page tables and pages in memory (they must be 4 KiB aligned)
 #define PAGE_ALIGNMENT      4096
 
@@ -21,11 +21,18 @@
 // The size of a 4 MiB page
 #define LARGE_PAGE_SIZE     0x400000
 
+//flag for user, read/write, and present
+#define USER 0x04
+#define RW_PRESENT 0x00000003
+#define MB8 0x800000
+#define VIDEO_START 0xB8000
+#define VID_VIRTUAL	34
+
 // The kernel starts at 4MB in physical memory
 #define KERNEL_START_ADDR        0x400000
 // Userspace programs start at 16MB in physical memory
 #define USER_PROGRAMS_START_ADDR 0x1000000
-// The size of a kernel stack 
+// The size of a kernel stack
 #define KERNEL_STACK_SIZE        0x2000
 // The kernel heap starts at 8MB in physical memory
 #define KERNEL_HEAP_START_ADDR 0x800000
@@ -33,7 +40,7 @@
 /////////////////////////////////////////////////
 // Page table / page directory entry constants //
 /////////////////////////////////////////////////
-// Enabled if the corresponding page is fixed between processes and TLB should not flush 
+// Enabled if the corresponding page is fixed between processes and TLB should not flush
 #define PAGE_GLOBAL             0x100
 // Enabled if the page size is 4 MiB rather than 4 KiB
 #define PAGE_SIZE_IS_4M         0x80
@@ -59,9 +66,12 @@ int32_t map_region(void *start_phys_addr, void *start_virt_addr, uint32_t num_pd
 // Unconditionally unmaps the 4MB aligned region containing the specified region
 void unmap_region(void* start_addr, uint32_t num_pdes);
 
-// If there is no mapping already existing, maps in a 4MB-aligned region made up of large 4MB pages 
+// If there is no mapping already existing, maps in a 4MB-aligned region made up of large 4MB pages
 //  that fully contains the desired region
 int32_t map_containing_region(void *start_phys_addr, void *start_virt_addr, uint32_t size, uint32_t flags);
+
+//This function takes virtutal and physical addresses (virtual must be a multiple of 4MB) and maps the 4MB chunk of memory (a single PDE)begining at the given virtual address to the first page of the user page table
+extern void remapWithPageTable(uint32_t virtualAddr, uint32_t physicalAddr);
 
 // Unconditionally unmaps the smallest 4MB-aligned region made up of large 4MB pages containing the given region
 void unmap_containing_region(void *start_addr, uint32_t size);
