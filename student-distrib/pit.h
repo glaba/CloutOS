@@ -31,4 +31,7 @@ void init_pit();
 // Handler for the timer interrupt
 void timer_handler();
 
+// Global time from startup in seconds
+extern double time;
+
 #endif
