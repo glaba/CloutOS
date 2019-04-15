@@ -12,7 +12,7 @@
 // The number of page directory entries in a page directory (each is 4 bytes)
 #define PAGE_DIRECTORY_SIZE 1024
 // The number of page table entries in a page table (each is 4 bytes)
-#define PAGE_TABLE_SIZE     1024 
+#define PAGE_TABLE_SIZE     1024
 // The alignment of page tables and pages in memory (they must be 4 KiB aligned)
 #define PAGE_ALIGNMENT      4096
 
@@ -25,18 +25,20 @@
 #define KERNEL_START_ADDR        0x400000
 // Userspace programs start at 16MB in physical memory
 #define USER_PROGRAMS_START_ADDR 0x1000000
-// The size of a kernel stack 
+// The size of a kernel stack
 #define KERNEL_STACK_SIZE        0x2000
 // The kernel heap starts at 8MB in physical memory
-#define KERNEL_HEAP_START_ADDR 0x800000
+#define KERNEL_HEAP_START_ADDR   0x800000
+// The virtual address that video memory is mapped to for userspace programs (192MB + 0xB8000)
+#define VIDEO_USER_VIRT_ADDR     (192 * 1024 * 1024 + 0xB8000)
 
 /////////////////////////////////////////////////
 // Page table / page directory entry constants //
 /////////////////////////////////////////////////
-// Enabled if the corresponding page is fixed between processes and TLB should not flush 
-#define PAGE_GLOBAL             0x100
+// Enabled if the corresponding page is fixed between processes and TLB should not flush
+#define PAGE_GLOBAL              0x100
 // Enabled if the page size is 4 MiB rather than 4 KiB
-#define PAGE_SIZE_IS_4M         0x80
+#define PAGE_SIZE_IS_4M          0x80
 // Enabled if the memory should not be cached; program code and data pages should be cached, memory-mapped I/O should not be
 #define PAGE_DISABLE_CACHE       0x10
 // Enabled if the cache should be a write-through cache, otherwise it is write-back
@@ -59,7 +61,7 @@ int32_t map_region(void *start_phys_addr, void *start_virt_addr, uint32_t num_pd
 // Unconditionally unmaps the 4MB aligned region containing the specified region
 void unmap_region(void* start_addr, uint32_t num_pdes);
 
-// If there is no mapping already existing, maps in a 4MB-aligned region made up of large 4MB pages 
+// If there is no mapping already existing, maps in a 4MB-aligned region made up of large 4MB pages
 //  that fully contains the desired region
 int32_t map_containing_region(void *start_phys_addr, void *start_virt_addr, uint32_t size, uint32_t flags);
 
@@ -68,5 +70,11 @@ void unmap_containing_region(void *start_addr, uint32_t size);
 
 // Identity maps the smallest 4MB aligned region containing the provided region with the given PDE flags
 int32_t identity_map_containing_region(void* start_addr, uint32_t size, unsigned int flags);
+
+// Maps an open virtual region into video memory so that a userspace program can access it
+int32_t map_video_mem_user(void **addr);
+
+// Unmaps the video memory paged in for userspace programs 
+void unmap_video_mem_user(void *addr);
 
 #endif /* _PAGING_H */
