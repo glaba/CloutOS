@@ -11,6 +11,7 @@
 .globl rtc_linkage
 .globl system_call_linkage
 .globl pci_linkage
+.globl timer_linkage
 
 .align 4
 
@@ -47,6 +48,20 @@ pci_linkage:
 	pushal                      # Push all general purpose registers in 32 bit form
 	pushfl                      # Push flags
 	call pci_irq_handler
+	popfl                       # Pop flags
+	popal                       # Pop general purpose registers
+	sti                         # Enable interrupts due to interrupt gate
+	iret
+
+# Function: timer_linkage
+# Description: linkage between IDT and timer_handler
+# Inputs   : none
+# Outputs  : none
+# Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
+timer_linkage:
+	pushal                      # Push all general purpose registers in 32 bit form
+	pushfl                      # Push flags
+	call timer_handler
 	popfl                       # Pop flags
 	popal                       # Pop general purpose registers
 	sti                         # Enable interrupts due to interrupt gate
