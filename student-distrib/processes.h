@@ -51,6 +51,8 @@ typedef struct pcb_t {
 	int32_t pid;
 	// The PID of the parent process
 	int32_t parent_pid;
+	// The virtual address of paged in video memory
+	void *vid_mem;
 } pcb_t;
 
 // Starts the process associated with the given shell command

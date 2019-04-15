@@ -66,6 +66,10 @@ int32_t process_halt(uint16_t status) {
 	// Mark the current PID as unused
 	used_pids[pcb->pid] = 0;
 
+	// Unmap video memory if it was mapped in
+	if (pcb->vid_mem != NULL)
+		unmap_video_mem_user(pcb->vid_mem);
+
 	// If the parent PID is -1, that means that this is the parent shell and we should
 	//  simply spawn a new shell
 	if (pcb->parent_pid == -1)
@@ -187,6 +191,7 @@ int32_t process_execute(const char *command, uint8_t has_parent) {
 		pcb->files[i].in_use = 0;
 	pcb->pid = cur_pid;
 	pcb->parent_pid = parent_pid;
+	pcb->vid_mem = NULL;
 	// Set stdin and stdout as files 0 and 1 respectively
 	pcb->files[STDIN].in_use = 1;
 	pcb->files[STDIN].fd_table = &stdin_table;

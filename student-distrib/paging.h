@@ -21,13 +21,6 @@
 // The size of a 4 MiB page
 #define LARGE_PAGE_SIZE     0x400000
 
-//flag for user, read/write, and present
-#define USER 0x04
-#define RW_PRESENT 0x00000003
-#define MB8 0x800000
-#define VIDEO_START 0xB8000
-#define VID_VIRTUAL	34
-
 // The kernel starts at 4MB in physical memory
 #define KERNEL_START_ADDR        0x400000
 // Userspace programs start at 16MB in physical memory
@@ -35,15 +28,17 @@
 // The size of a kernel stack
 #define KERNEL_STACK_SIZE        0x2000
 // The kernel heap starts at 8MB in physical memory
-#define KERNEL_HEAP_START_ADDR 0x800000
+#define KERNEL_HEAP_START_ADDR   0x800000
+// The virtual address that video memory is mapped to for userspace programs (192MB + 0xB8000)
+#define VIDEO_USER_VIRT_ADDR     (192 * 1024 * 1024 + 0xB8000)
 
 /////////////////////////////////////////////////
 // Page table / page directory entry constants //
 /////////////////////////////////////////////////
 // Enabled if the corresponding page is fixed between processes and TLB should not flush
-#define PAGE_GLOBAL             0x100
+#define PAGE_GLOBAL              0x100
 // Enabled if the page size is 4 MiB rather than 4 KiB
-#define PAGE_SIZE_IS_4M         0x80
+#define PAGE_SIZE_IS_4M          0x80
 // Enabled if the memory should not be cached; program code and data pages should be cached, memory-mapped I/O should not be
 #define PAGE_DISABLE_CACHE       0x10
 // Enabled if the cache should be a write-through cache, otherwise it is write-back
@@ -70,13 +65,16 @@ void unmap_region(void* start_addr, uint32_t num_pdes);
 //  that fully contains the desired region
 int32_t map_containing_region(void *start_phys_addr, void *start_virt_addr, uint32_t size, uint32_t flags);
 
-//This function takes virtutal and physical addresses (virtual must be a multiple of 4MB) and maps the 4MB chunk of memory (a single PDE)begining at the given virtual address to the first page of the user page table
-extern void remapWithPageTable(uint32_t virtualAddr, uint32_t physicalAddr);
-
 // Unconditionally unmaps the smallest 4MB-aligned region made up of large 4MB pages containing the given region
 void unmap_containing_region(void *start_addr, uint32_t size);
 
 // Identity maps the smallest 4MB aligned region containing the provided region with the given PDE flags
 int32_t identity_map_containing_region(void* start_addr, uint32_t size, unsigned int flags);
+
+// Maps an open virtual region into video memory so that a userspace program can access it
+int32_t map_video_mem_user(void **addr);
+
+// Unmaps the video memory paged in for userspace programs 
+void unmap_video_mem_user(void *addr);
 
 #endif /* _PAGING_H */

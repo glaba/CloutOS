@@ -3,14 +3,9 @@
 #include "keyboard.h"
 #include "paging.h"
 
-// The total number of file types
-#define MAX_FILE_TYPE 3
-
 // Instead of return -1 or 0, used labels/macros
 #define PASS 0
 #define FAIL -1
-#define _128MB 0x08000000
-#define _132MB 0x08400000
 
 /* Jump table for specific read/write/open/close functions */
 static struct fops_t rtc_table = {.open = &rtc_open, .close = &rtc_close, .read = &rtc_read, .write = &rtc_write};
@@ -37,7 +32,7 @@ int32_t read(int32_t fd, void* buf, int32_t nbytes) {
 	// Get pcb
 	pcb_t* cur_pcb = get_pcb();
 	// Check if fd is within range
-	if (fd < 0 || fd >= MAX_FILE_TYPE)
+	if (fd < 0 || fd >= MAX_NUM_FILES)
 		return FAIL;
 	// Check if cur_pcb is in use
 	if (!cur_pcb->files[fd].in_use)
@@ -61,7 +56,7 @@ int32_t write(int32_t fd, const void* buf, int32_t nbytes) {
 	// Get pcb
 	pcb_t* cur_pcb = get_pcb();
 	// Check if fd is within range
-	if (fd < 0 || fd >= MAX_FILE_TYPE)
+	if (fd < 0 || fd >= MAX_NUM_FILES)
 		return FAIL;
 	// Check if cur_pcb is in use
 	if (!cur_pcb->files[fd].in_use)
@@ -135,19 +130,21 @@ int32_t open(const uint8_t* filename) {
  * SIDE EFFECTS: Occupies a spot in FD table
  */
 int32_t close(int32_t fd) {
-	// ASSUME get_pcb works
 	pcb_t* cur_pcb = get_pcb();
+
 	// Check if fd is within range
-	if (fd < 0 || fd >= MAX_FILE_TYPE)
+	if (fd < 0 || fd >= MAX_NUM_FILES)
 		return FAIL;
+
 	// Check if cur_pcb is in use
 	if (!cur_pcb->files[fd].in_use)
 		return FAIL;
+
 	// Check if a close function exists for this file and use it if so
 	if (cur_pcb->files[fd].fd_table->close != NULL)
 		cur_pcb->files[fd].fd_table->close();
-	/* Clear through everything in the current
-	   file descriptor table */
+
+	// Clear through everything in the current file descriptor table
 	cur_pcb->files[fd].in_use = 0;
 	cur_pcb->files[fd].file_pos = 0;
 	cur_pcb->files[fd].inode = 0;
@@ -159,19 +156,15 @@ int32_t getargs(uint8_t* buf, int32_t nbytes) {
 	return FAIL;
 }
 
+int32_t vidmap(uint8_t **screen_start) {
+	int32_t retval = map_video_mem_user((void**)screen_start);
+	
+	// Copy the value into the PCB if the mapping succeeded
+	if (retval == 0)
+		get_pcb()->vid_mem = *screen_start;
 
-int32_t vidmap(uint8_t** screen_start){
-	if(screen_start == NULL){
-		return FAIL;
-	}
-	if(screen_start < (uint8_t **)_128MB || screen_start >= (uint8_t **)_132MB){
-		return FAIL;
-	}
-
-	remapWithPageTable((uint32_t)_128MB, (uint32_t)VIDEO_START+4096*2*get_pcb()->pid);
-	*screen_start = (uint8_t*)_128MB;
-
-	return _128MB;
+	// Return whether or not it succeeded
+	return retval;
 }
 
 int32_t set_handler(int32_t signum, void* handler_address) {
