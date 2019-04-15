@@ -32,7 +32,8 @@ processes.o: processes.c processes.h types.h system_calls.h lib.h rtc.h \
 rtc.o: rtc.c rtc.h types.h irq_defs.h lib.h i8259.h
 spinlock.o: spinlock.c spinlock.h types.h lib.h
 system_calls.o: system_calls.c system_calls.h lib.h types.h rtc.h \
-  irq_defs.h file_system.h keyboard.h processes.h system_call_linkage.h
+  irq_defs.h file_system.h keyboard.h processes.h system_call_linkage.h \
+  paging.h
 tests.o: tests.c tests.h x86_desc.h types.h lib.h init_idt.h \
   exception_handlers.h file_system.h system_calls.h rtc.h irq_defs.h \
   keyboard.h processes.h system_call_linkage.h pci.h spinlock.h list.h \

@@ -12,4 +12,4 @@ struct mp1_blink_struct {
   unsigned short countdown;
   unsigned short status;
   struct mp1_blink_struct* next;
-} __attribute((packed)); 
+} __attribute__((packed)); 

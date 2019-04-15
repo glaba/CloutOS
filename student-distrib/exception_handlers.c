@@ -141,7 +141,7 @@ GENERATE_EXCEPTION_HANDLER_ERR(page_fault_e, "PAGE FAULT EXCEPTION", {
     asm("movl %%cr2, %0": "=r" (address));
     return printf("Invalid memory access attempt at 0x%#x", address);
 }, {
-	return printf("caused page fault.");
+	return printf("Error code: %x", err_code);
 })
 GENERATE_EXCEPTION_HANDLER(floating_point_error_e, "FLOATING POINT ERROR EXCEPTION", {}, {})
 GENERATE_EXCEPTION_HANDLER_ERR(alignment_check_e, "ALIGNMENT CHE EXCEPTION", {}, {})

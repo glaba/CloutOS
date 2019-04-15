@@ -2,6 +2,7 @@
 
 static unsigned int page_directory[PAGE_DIRECTORY_SIZE];
 static unsigned int video_page_table[PAGE_TABLE_SIZE] __attribute__((aligned (PAGE_ALIGNMENT)));
+static unsigned int user_video_page_table[PAGE_TABLE_SIZE] __attribute__((aligned (PAGE_ALIGNMENT)));
 
 /*
  * Writes a page directory address to the cr3 register
@@ -49,7 +50,7 @@ static inline void enable_page_size_extension() {
 /*
  * If there is no mapping already existing, maps a region of specified size starting from the
  *  given virtual address to the region of the same size starting from the given physical address
- * 
+ *
  * INPUTS: start_phys_addr: the start of the region in physical memory
  *         start_virt_addr: the start of the region in virtual memory
  *         num_pdes: the size of the region in multiples of 4MB
@@ -167,6 +168,39 @@ int32_t identity_map_containing_region(void *start_addr, uint32_t size, unsigned
 }
 
 /*
+ * Maps an open virtual region into video memory so that a userspace program can access it
+ *
+ * OUTPUTS: addr: the virtual address that video memory is mapped to
+ * RETURNS: 0 on success and -1 otherwise
+ */
+int32_t map_video_mem_user(void **addr) {
+	// We will just put this in the 4MB region from 192MB - 196MB for now
+	page_directory[VIDEO_USER_VIRT_ADDR >> 22] = (unsigned long)(&user_video_page_table) |
+		PAGE_READ_WRITE | PAGE_USER_LEVEL | PAGE_PRESENT;
+
+	// Return the address that it was mapped to
+	*addr = (void*)VIDEO_USER_VIRT_ADDR;
+
+	// Reload the page directory
+	write_cr3(&page_directory);
+
+	// We always succeed, for now
+	return 0;
+}
+
+/*
+ * Unmaps the video memory paged in for userspace programs 
+ *
+ * INPUTS: addr: the virtual address that the video memory was paged into
+ */
+void unmap_video_mem_user(void *addr) {
+	page_directory[(uint32_t)addr >> 22] = 0;
+
+	// Reload the page directory
+	write_cr3(&page_directory);
+}
+
+/*
  * Initializes the page directory
  * Sets CR0 and CR4 to correctly support paging
  * Sets Page Directory Base Register (PDBR / CR3) to point to the page directory
@@ -178,15 +212,17 @@ int32_t identity_map_containing_region(void *start_addr, uint32_t size, unsigned
 void init_paging() {
 	int i;
 
-	// Set the entries in video_page_table
+	// Set the entries in video_page_table as well as user_video_page_table
 	for (i = 0; i < PAGE_TABLE_SIZE; i++) {
 		// If the current entry does not correspond to the region in video memory
 		if (i < VIDEO / 4096 || i >= (VIDEO + VIDEO_SIZE) / 4096) {
 			// The page is not present
-			video_page_table[i] = ~PAGE_PRESENT | PAGE_READ_WRITE;
+			video_page_table[i] = ~PAGE_PRESENT;
+			user_video_page_table[i] = ~PAGE_PRESENT;
 		} else {
 			// The page is present
 			video_page_table[i] = (i * 4096) | PAGE_READ_WRITE | PAGE_PRESENT;
+			user_video_page_table[i] = (i * 4096) | PAGE_USER_LEVEL | PAGE_READ_WRITE | PAGE_PRESENT;
 		}
 	}
 
