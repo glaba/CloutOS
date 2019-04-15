@@ -133,8 +133,29 @@ int32_t process_execute(const char *command, uint8_t has_parent) {
 		name[i] = command[i];
 	name[i] = '\0';
 
-	//Save the current position into idx variable
-	int idx = i;
+	/* Check the current position in command is a space, which would mean
+	 * the rest of command would have the arguments
+	 */
+	char arg_buf[TERMINAL_SIZE];
+	int argument_copied = 0;
+	if(command[i] == ' ') {
+		// Increment position to start from the first position of the arguments
+		i++;
+
+
+		// Save where i started to help know where in pcb's arg array to store
+		int start_of_arg = i;
+		// Get the arguments and store it into args array
+		for (; i < TERMINAL_SIZE && command[i] != '\0'; i++) {
+			arg_buf[i-start_of_arg] = command[i];
+		}
+		for(; i < TERMINAL_SIZE; i++) {
+			arg_buf[i-start_of_arg] = '\0';
+		}
+		// Copy the arguments into user buffer WORKS so indicate
+		argument_copied = 1;
+
+	}
 
 	// Get the PID of the current parent process (if it exists)
 	pcb_t *parent_pcb = get_pcb();
@@ -199,17 +220,9 @@ int32_t process_execute(const char *command, uint8_t has_parent) {
 	/* Check the current position in command is a space, which would mean
 	 * the rest of command would have the arguments
 	 */
-	if(command[idx] == ' ') {
-		// Increment position to start from the first position of the arguments
-		idx++;
+	if (argument_copied) {
+		strncpy(pcb->args,arg_buf,TERMINAL_SIZE);
 
-		//Save where i started to help know where in pcb's arg array to store
-		int start_of_arg = idx;
-		// Get the arguments and store it into args array
-		for (; idx < MAX_FILENAME_LENGTH && command[idx] != '\0'; idx++) {
-			pcb->args[idx-start_of_arg] = command[idx];
-		}
-		pcb->args[idx-start_of_arg] = '\0';
 	}
 
 	// Else, there's no arguments

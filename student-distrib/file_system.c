@@ -176,13 +176,26 @@ int32_t read_dentry_by_name(const uint8_t *fname, dentry_t *dentry) {
 
 	/* Find the entry in the array. */
 	for (i = 0; i < MAX_NUM_FS_DENTRIES; i++) {
-		if (strlen((int8_t *)fname) == strlen(fs_dentries[i].filename) && 0 == strncmp(fs_dentries[i].filename, (int8_t*)fname, strlen((int8_t*)fname))) {
+		if (strlen((int8_t *)fname) == strlen(fs_dentries[i].filename) &&
+			0 == strncmp(fs_dentries[i].filename, (int8_t*)fname, MAX_FILENAME_LENGTH)) {
 			strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[i].filename, MAX_FILENAME_LENGTH);
 			dentry->filename[MAX_FILENAME_LENGTH] = '\0';
 			dentry->filetype = fs_dentries[i].filetype;
 			dentry->inode = fs_dentries[i].inode;
 			return 0;
 		}
+		// Only if the requested length is 32 bytes and the requested file is 33 bytes with a terminating \0
+		else if (strlen((int8_t *)fname) == MAX_FILENAME_LENGTH &&
+				strlen(fs_dentries[i].filename) == MAX_FILENAME_LENGTH+1 &&
+				0 == strncmp(fs_dentries[i].filename, (int8_t*)fname, MAX_FILENAME_LENGTH) &&
+				fs_dentries[i].filename[MAX_FILENAME_LENGTH] == '\0') {
+					strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[i].filename, MAX_FILENAME_LENGTH);
+					dentry->filename[MAX_FILENAME_LENGTH] = '\0';
+					dentry->filetype = fs_dentries[i].filetype;
+					dentry->inode = fs_dentries[i].inode;
+					return 0;
+		}
+
 	}
 
 	/* If we did not find the file, return failure. */
@@ -354,9 +367,8 @@ int32_t file_read(int32_t fd, void* buf, int32_t nbytes){
  	pcb_t* pcb;
 
  	pcb = get_pcb();
-	uint32_t manesh = (pcb->files[fd]).inode;
 	// Read the data from current location in file to buffer
- 	bytes_read = read_data(manesh, (pcb->files[fd]).file_pos, buf, nbytes);
+ 	bytes_read = read_data((pcb->files[fd]).inode, (pcb->files[fd]).file_pos, buf, nbytes);
 	// Increment file position
  	(pcb->files[fd]).file_pos += bytes_read;
 
