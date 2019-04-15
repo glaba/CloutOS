@@ -178,18 +178,12 @@ int32_t getargs(uint8_t* buf, int32_t nbytes) {
 		buf[i] = cur_pcb->args[i];
 	}
 
-<<<<<<< HEAD
 	// If there is space in buf, add null
 	for(; i < nbytes; i++) {
 		buf[i] = '\0';
 	}
+	
 	//strncpy(buf,(uint8_t *)cur_pcb->args,nbytes);
-
-
-
-
-=======
->>>>>>> 0a241529683b6dab8fa99447b8f9ddc0103ea705
 	return PASS;
 }
 
