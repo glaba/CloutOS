@@ -12,10 +12,20 @@ static struct fops_t rtc_table = {.open = &rtc_open, .close = &rtc_close, .read 
 static struct fops_t file_table = {.open = &file_open, .close = &file_close, .read = &file_read, .write = &file_write};
 static struct fops_t dir_table = {.open = &dir_open, .close = &dir_close, .read = &dir_read, .write = &dir_write};
 
+/*
+ * SYSTEM CALL that halts the currently running process with the specified status
+ * INPUTS: status: a status code between 0 and 256 that indicates how the program exited
+ * OUTPUTS: FAIL if halting the process failed, and PASS otherwise
+ */
 int32_t halt(uint32_t status) {
 	return process_halt(status & 0xFF);
 }
 
+/*
+ * SYSTEM CALL that executes the given shell command
+ * INPUTS: command: a shell command
+ * OUTPUTS: the status which with the program exits on completion
+ */
 int32_t execute(const char *command) {
 	return process_execute(command, 1);
 }
@@ -86,8 +96,8 @@ int32_t write(int32_t fd, const void* buf, int32_t nbytes) {
  * SIDE EFFECTS: Occupies a spot in FD table
  */
 int32_t open(const uint8_t* filename) {
-	// ASSUME get_pcb works
 	pcb_t* cur_pcb = get_pcb();
+	
 	// Check through fd table to see if it's full
 	uint8_t i = 0;
 	for (i = 0; i < MAX_NUM_FILES; i++) {
@@ -96,38 +106,43 @@ int32_t open(const uint8_t* filename) {
 			break;
 		}
 	}
+	
 	// If fd table has no free position, return FAIL
 	if (i == MAX_NUM_FILES)
 		return FAIL;
+	
 	// Create a new dentry to help access type of file
 	dentry_t dentry;
 	if (read_dentry_by_name(filename, &dentry) == FAIL)
 		return FAIL;
+
 	// Now use a switch case on type of filename
 	switch (dentry.filetype) {
 		case RTC_FILE:
-				cur_pcb->files[i].in_use = 1;
-				cur_pcb->files[i].file_pos = 0;
-				cur_pcb->files[i].inode = 0;
-				cur_pcb->files[i].fd_table = &(rtc_table);
-				break;
+			cur_pcb->files[i].in_use = 1;
+			cur_pcb->files[i].file_pos = 0;
+			cur_pcb->files[i].inode = 0;
+			cur_pcb->files[i].fd_table = &(rtc_table);
+			break;
 		case DIRECTORY:
-				cur_pcb->files[i].in_use = 1;
-				cur_pcb->files[i].file_pos = 0;
-				cur_pcb->files[i].fd_table = &(dir_table);
-				break;
+			cur_pcb->files[i].in_use = 1;
+			cur_pcb->files[i].file_pos = 0;
+			cur_pcb->files[i].fd_table = &(dir_table);
+			break;
 		case REG_FILE:
-				cur_pcb->files[i].in_use = 1;
-				cur_pcb->files[i].file_pos = 0;
-				cur_pcb->files[i].inode = dentry.inode; // Use an inode
-				cur_pcb->files[i].fd_table = &(file_table);
-				break;
+			cur_pcb->files[i].in_use = 1;
+			cur_pcb->files[i].file_pos = 0;
+			cur_pcb->files[i].inode = dentry.inode; // Use an inode
+			cur_pcb->files[i].fd_table = &(file_table);
+			break;
 		default:
-				return FAIL;
+			return FAIL;
 	}
+
 	// Run the appropriate open function, and if it fails, return FAIL
 	if (cur_pcb->files[i].fd_table->open() == FAIL)
 		return FAIL;
+	
 	// Otherwise, return the position used in the fd table
 	return i;
 }
@@ -204,10 +219,12 @@ int32_t vidmap(uint8_t **screen_start) {
 	return retval;
 }
 
+// Currently unimplemented
 int32_t set_handler(int32_t signum, void* handler_address) {
 	return FAIL;
 }
 
+// Currently unimplemented
 int32_t sigreturn(void) {
 	return FAIL;
 }
