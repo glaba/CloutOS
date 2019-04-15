@@ -4,6 +4,7 @@
 #include "types.h"
 #include "system_calls.h"
 #include "system_call_linkage.h"
+#include "keyboard.h"
 
 // Magic number that must appear in the first 4 bytes of all executables
 #define ELF_MAGIC 0x464C457F
@@ -21,6 +22,7 @@
 #define MAX_NUM_PROCESSES 6
 // The maximum number of files that can be open for a process
 #define MAX_NUM_FILES 8
+
 
 // The static file descriptors assigned to stdin and stdout for all programs
 #define STDIN  0
@@ -51,6 +53,8 @@ typedef struct pcb_t {
 	int32_t pid;
 	// The PID of the parent process
 	int32_t parent_pid;
+	// The buffer of arguments
+	int8_t args[TERMINAL_SIZE];
 } pcb_t;
 
 // Starts the process associated with the given shell command

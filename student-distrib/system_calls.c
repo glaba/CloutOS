@@ -34,15 +34,20 @@ int32_t read(int32_t fd, void* buf, int32_t nbytes) {
 	// Get pcb
 	pcb_t* cur_pcb = get_pcb();
 	// Check if fd is within range
-	if (fd < 0 || fd >= MAX_FILE_TYPE)
+	if (fd < 0 || fd >= MAX_NUM_FILES)
 		return FAIL;
-	// Check if cur_pcb is in use
+	// Check if it's writing to stdin
+	if (fd == 1)
+		return FAIL;
+	/* If the current file is NOT in use, then open has not been called
+	 * and HENCE it needs to return failed
+	 */
 	if (!cur_pcb->files[fd].in_use)
 		return FAIL;
 	// Check if a read function exists for this file, and return 0 if not
 	if (cur_pcb->files[fd].fd_table->read == NULL)
 		return 0;
-	// Return appropriate read function 
+	// Return appropriate read function
 	return ((cur_pcb->files[fd]).fd_table)->read(fd, buf, nbytes);
 }
 
@@ -58,9 +63,14 @@ int32_t write(int32_t fd, const void* buf, int32_t nbytes) {
 	// Get pcb
 	pcb_t* cur_pcb = get_pcb();
 	// Check if fd is within range
-	if (fd < 0 || fd >= MAX_FILE_TYPE)
+	if (fd < 0 || fd >= MAX_NUM_FILES)
 		return FAIL;
-	// Check if cur_pcb is in use
+	// Check if it's writing to stdin
+	if (fd == 0)
+		return FAIL;
+	/* If the current file is NOT in use, then open has not been called
+	 * and HENCE it needs to return failed
+	 */
 	if (!cur_pcb->files[fd].in_use)
 		return FAIL;
 	// Check if a write function exists for this file, and return 0 if not
@@ -134,26 +144,45 @@ int32_t open(const uint8_t* filename) {
 int32_t close(int32_t fd) {
 	// ASSUME get_pcb works
 	pcb_t* cur_pcb = get_pcb();
-	// Check if fd is within range
-	if (fd < 0 || fd >= MAX_FILE_TYPE)
+	// If it is trying to close stdin/stdout, FAIL
+	if(fd == 0 || fd == 1)
 		return FAIL;
-	// Check if cur_pcb is in use
+	// Check if fd is within range
+	if (fd < 0 || fd >= MAX_NUM_FILES)
+		return FAIL;
+	/* If the current file is NOT in use, then open has not been called
+	 * and HENCE it needs to return failed
+	 */
 	if (!cur_pcb->files[fd].in_use)
 		return FAIL;
 	// Check if a close function exists for this file and use it if so
 	if (cur_pcb->files[fd].fd_table->close != NULL)
 		cur_pcb->files[fd].fd_table->close();
 	/* Clear through everything in the current
-	   file descriptor table */
+	 * file descriptor table
+	 */
 	cur_pcb->files[fd].in_use = 0;
 	cur_pcb->files[fd].file_pos = 0;
 	cur_pcb->files[fd].inode = 0;
 	cur_pcb->files[fd].fd_table = NULL;
-	return 0;
+	return PASS;
 }
 
 int32_t getargs(uint8_t* buf, int32_t nbytes) {
-	return FAIL;
+	// Get pcb
+	pcb_t* cur_pcb = get_pcb();
+	// Needed for loop
+	int i;
+
+	// Copy into buf with the number of bytes requested
+	for (i = 0; i < nbytes && cur_pcb->args[i] != '\0'; i++) {
+		buf[i] = cur_pcb->args[i];
+	}
+
+
+
+
+	return PASS;
 }
 
 int32_t vidmap(uint8_t** screen_start) {

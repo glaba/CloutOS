@@ -7,11 +7,11 @@
 // An array indicating which PIDs are currently in use by running programs
 static uint8_t used_pids[MAX_NUM_PROCESSES];
 
-static struct fops_t stdin_table  = {.open = NULL, .close = NULL, 
-	                                 .read = (int32_t (*)(int32_t, void*, int32_t))&terminal_read, 
+static struct fops_t stdin_table  = {.open = NULL, .close = NULL,
+	                                 .read = (int32_t (*)(int32_t, void*, int32_t))&terminal_read,
 	                                 .write = NULL};
-static struct fops_t stdout_table = {.open = NULL, .close = NULL, 
-	                                 .read = NULL, 
+static struct fops_t stdout_table = {.open = NULL, .close = NULL,
+	                                 .read = NULL,
 	                                 .write = (int32_t (*)(int32_t, const void*, int32_t))&terminal_write};
 
 /*
@@ -133,6 +133,9 @@ int32_t process_execute(const char *command, uint8_t has_parent) {
 		name[i] = command[i];
 	name[i] = '\0';
 
+	//Save the current position into idx variable
+	int idx = i;
+
 	// Get the PID of the current parent process (if it exists)
 	pcb_t *parent_pcb = get_pcb();
 	int32_t parent_pid = has_parent ? parent_pcb->pid : -1;
@@ -192,6 +195,24 @@ int32_t process_execute(const char *command, uint8_t has_parent) {
 	pcb->files[STDIN].fd_table = &stdin_table;
 	pcb->files[STDOUT].in_use = 1;
 	pcb->files[STDOUT].fd_table = &stdout_table;
+
+	/* Check the current position in command is a space, which would mean
+	 * the rest of command would have the arguments
+	 */
+	if(command[idx] == ' ') {
+		// Increment position to start from the first position of the arguments
+		idx++;
+
+		//Save where i started to help know where in pcb's arg array to store
+		int start_of_arg = idx;
+		// Get the arguments and store it into args array
+		for (; idx < MAX_FILENAME_LENGTH && command[idx] != '\0'; idx++) {
+			pcb->args[idx-start_of_arg] = command[idx];
+		}
+		pcb->args[idx-start_of_arg] = '\0';
+	}
+
+	// Else, there's no arguments
 
 	// We are switching to userspace
 	in_userspace = 1;

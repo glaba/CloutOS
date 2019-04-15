@@ -170,9 +170,13 @@ int32_t read_dentry_by_name(const uint8_t *fname, dentry_t *dentry) {
 	/* Local variables. */
 	int i;
 
+	// If it's an empty string, return -1
+	if (strlen((int8_t *)fname) == 0)
+		return -1;
+
 	/* Find the entry in the array. */
 	for (i = 0; i < MAX_NUM_FS_DENTRIES; i++) {
-		if (0 == strncmp(fs_dentries[i].filename, (int8_t*)fname, strlen((int8_t*)fname))) {
+		if (strlen((int8_t *)fname) == strlen(fs_dentries[i].filename) && 0 == strncmp(fs_dentries[i].filename, (int8_t*)fname, strlen((int8_t*)fname))) {
 			strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[i].filename, MAX_FILENAME_LENGTH);
 			dentry->filename[MAX_FILENAME_LENGTH] = '\0';
 			dentry->filetype = fs_dentries[i].filetype;
