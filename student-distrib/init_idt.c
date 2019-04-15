@@ -11,6 +11,7 @@
 #define KEYBOARD_INTERRUPT (0x20 + KEYBOARD_IRQ)
 #define RTC_INTERRUPT (0x20 + RTC_IRQ)
 #define PCI_INTERRUPT (0x20 + PCI_IRQ)
+#define TIMER_INTERRUPT (0x20 + TIMER_IRQ)
 
 /*   initialize_idt();
  *   DESCRIPTION: Fills the IDT with entries and sets settings
@@ -70,6 +71,7 @@ void initialize_idt() {
 	SET_IDT_ENTRY(idt[KEYBOARD_INTERRUPT], keyboard_linkage);
 	SET_IDT_ENTRY(idt[RTC_INTERRUPT], rtc_linkage);
 	SET_IDT_ENTRY(idt[PCI_INTERRUPT], pci_linkage);
+	SET_IDT_ENTRY(idt[TIMER_INTERRUPT], timer_linkage);
 
 	// IDT entry for system calls
 	SET_IDT_ENTRY(idt[SYSTEM_CALL_VECTOR], system_call_linkage);

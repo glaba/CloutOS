@@ -8,6 +8,7 @@
 #include "rtc.h"
 #include "system_calls.h"
 #include "pci.h"
+#include "pit.h"
 #include "lib.h"
 
 /* Linkage for keyboard interrupt handler */
@@ -21,6 +22,9 @@ extern void system_call_linkage();
 
 /* Linkage for all PCI interrupt handlers */
 extern void pci_linkage();
+
+/* Linkage for the timer interrupt */
+extern void timer_linkage();
 
 #endif
 #endif

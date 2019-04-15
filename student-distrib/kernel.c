@@ -16,6 +16,7 @@
 #include "kheap.h"
 #include "pci.h"
 #include "pci_drivers/e1000.h"
+#include "pit.h"
 
 #define RUN_TESTS
 
@@ -170,6 +171,9 @@ void entry(unsigned long magic, unsigned long addr) {
 
 	/* Initialize the heap */
 	init_kheap();
+
+	/* Initialize the PIT */
+	init_pit();
 
 	/* Initialize PCI drivers and PCI devices */
 	register_pci_driver(e1000_driver);
