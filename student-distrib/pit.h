@@ -42,6 +42,6 @@ uint32_t register_periodic_callback(int interval, void (*callback)(double));
 void unregister_periodic_callback(uint32_t id);
 
 // Global time from startup in seconds
-extern double time;
+extern double sys_time;
 
 #endif

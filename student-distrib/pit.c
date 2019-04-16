@@ -25,7 +25,7 @@ callback_list_item *callback_list_head;
 static double interval;
 
 // Time elapsed from system startup
-double time = 0.0;
+double sys_time = 0.0;
 
 /*
  * Initializes the Programmable Interval Timer to generate interrupts at a frequency of very close to 69 Hz
@@ -143,7 +143,7 @@ void unregister_periodic_callback(uint32_t id) {
 void timer_handler() {
 	send_eoi(TIMER_IRQ);
 
-	time += interval;
+	sys_time += interval;
 
 	// Go through all the handlers
 	callback_list_item *cur;
@@ -154,7 +154,7 @@ void timer_handler() {
 		// Once the counter has reached zero, reset the counter and fire the callback
 		if (cur->data.counter == 0) {
 			cur->data.counter = cur->data.interval;
-			cur->data.callback(time);
+			cur->data.callback(sys_time);
 		}
 	}
 }
