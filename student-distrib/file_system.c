@@ -347,18 +347,18 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
 /**** Regular file operations. ****/
 
 /*
- * Inputs: none
+ * Inputs: filename: not used
  *
- * Returns: 0- always
+ * Returns: 0 always
  */
-int32_t file_open(void){
+int32_t file_open(const uint8_t *filename) {
 	return 0;
 }
 
 /*
  * Returns: 0- always
  */
-int32_t file_close(void){
+int32_t file_close(int32_t fd) {
 	return 0;
 }
 
@@ -402,7 +402,7 @@ int32_t file_write(int32_t fd, const void* buf, int32_t bytes){
  *
  * Returns: 0- always
  */
-int32_t dir_open(void){
+int32_t dir_open(const uint8_t *filename){
 	return 0;
 }
 
@@ -411,7 +411,7 @@ int32_t dir_open(void){
  *
  * Returns: 0- always
  */
-int32_t dir_close(void){
+int32_t dir_close(int32_t fd){
 	return 0;
 }
 

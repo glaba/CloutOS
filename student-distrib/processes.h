@@ -28,8 +28,8 @@
 #define STDOUT 1
 
 typedef struct fops_t {
-	int32_t (*open )(void);
-	int32_t (*close)(void);
+	int32_t (*open )(const uint8_t*);
+	int32_t (*close)(int32_t);
 	int32_t (*read )(int32_t fd, void *buf, int32_t bytes);
 	int32_t (*write)(int32_t fd, const void *buf, int32_t bytes);
 } fops_t;
@@ -62,7 +62,10 @@ typedef struct pcb_t {
 int32_t process_execute(const char *command, uint8_t has_parent);
 // Halts the current process and returns the provided status code to the parent process
 int32_t process_halt(uint16_t status);
-
+// Checks if the given region lies within the memory assigned to the process with the given PID
+int8_t is_userspace_region_valid(void *ptr, uint32_t size, int32_t pid);
+// Checks if the given string lies within the memory assigned to the process with the given PID
+int8_t is_userspace_string_valid(void *ptr, int32_t pid);
 // Gets the current pcb from the stack
 pcb_t* get_pcb();
 

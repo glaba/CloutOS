@@ -315,7 +315,7 @@ int rtc_read_write() {
 	int32_t freq,i,response;
 	response = 0;
 	terminal_open();
-	rtc_open();
+	rtc_open(NULL);
 	for(freq = 2; freq <= 1024; freq*=2) {
 		//set freq of rtc to 4
 
@@ -339,7 +339,7 @@ int rtc_read_write() {
 		}
 	}
 	terminal_close();
-	rtc_close();
+	rtc_close(0);
 	putc('\n');
 	if (response == -1)
 		return FAIL;
@@ -356,7 +356,7 @@ int negative_null_rtc_read_write() {
 	//call rtc_write with 4 bytes but buf of 8/16/64 bytes
 	int response;
 	printf("calling rtc_write with negative number of bytes\n");
-	rtc_open();
+	rtc_open(NULL);
 	terminal_open();
 	//check if negative bytes does something
 	int32_t FOUR_BYTES = 64;
@@ -381,7 +381,7 @@ int negative_null_rtc_read_write() {
 
 
 	//close rtc and terminal
-	rtc_close();
+	rtc_close(0);
 	terminal_close();
 
 	return PASS;

@@ -41,8 +41,8 @@ void NMI_disable();
 int32_t set_freq(int32_t f);
 
 /*open,close,read,write*/
-extern int32_t rtc_open();
-extern int32_t rtc_close();
+extern int32_t rtc_open(const uint8_t *filename);
+extern int32_t rtc_close(int32_t fd);
 extern int32_t rtc_read(int32_t fd, void* buf, int32_t bytes);
 extern int32_t rtc_write(int32_t fd, const void* buf, int32_t bytes);
 

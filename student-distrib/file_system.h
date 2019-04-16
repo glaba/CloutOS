@@ -54,9 +54,10 @@ typedef struct{
 } inode_t;
 
 /* Returns 0 */
-extern int32_t file_open(void);
+extern int32_t file_open(const uint8_t* filename);
+
 /* Returns 0 */
-extern int32_t file_close(void);
+extern int32_t file_close(int32_t fd);
 
 /* Performs a fs_read. */
 extern int32_t file_read(int32_t fd, void* buf, int32_t nbytes);
@@ -65,10 +66,10 @@ extern int32_t file_read(int32_t fd, void* buf, int32_t nbytes);
 extern int32_t file_write(int32_t fd, const void* buf, int32_t bytes);
 
 /* Returns 0 */
-extern int32_t dir_open(void);
+extern int32_t dir_open(const uint8_t *filename);
 
 /* Returns 0 */
-extern int32_t dir_close(void);
+extern int32_t dir_close(int32_t fd);
 
 /* Implements ls. */
 extern int32_t dir_read(int32_t fd, void* buf, int32_t nbytes);

@@ -130,12 +130,12 @@ void rtc_handler() {
  * rtc_open()
  * Does necessary stuff to initialize/start rtc
  *
- * INPUTS: none
+ * INPUTS: filename: unused
  * OUTPUTS: 0 for pass
  * SIDE EFFECTS: Initializes RTC if not initialized
  *               and sets freq to 2 HZ
  */
-int32_t rtc_open() {
+int32_t rtc_open(const uint8_t *filename) {
 	/* Call init_rtc if not yet initialized */
 	if (!init)
 		init_rtc();
@@ -154,11 +154,11 @@ int32_t rtc_open() {
  * rtc_close()
  * Does necessary stuff to close rtc
  *
- * INPUTS: none
+ * INPUTS: fd: unused
  * OUTPUTS: 0 for pass
  * SIDE EFFECTS: N/A
  */
-int32_t rtc_close() {
+int32_t rtc_close(int32_t fd) {
 	/* Nothing to do, so return 0 */
 	return 0;
 }
