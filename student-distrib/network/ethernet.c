@@ -1,6 +1,7 @@
 #include "ethernet.h"
 #include "arp.h"
 #include "../endian.h"
+#include "../kheap.h"
 
 /*
  * Receives an Ethernet packet, performs appropriate actions, and replies if necessary
@@ -43,7 +44,7 @@ int receive_eth_packet(uint8_t *buffer, uint32_t length) {
 	int32_t vlan = -1;
 
 	// Check the EtherType field to see whether or not it is a VLAN tagged packet
-	if (ether_type[0] == ET_VLAN_0 && ether_type[1] == ET_VLAN_1) {
+	if (ether_type[1] == (ET_VLAN & 0xFF) && ether_type[0] == ((ET_VLAN >> 8) & 0xFF)) {
 		// Change the payload address and size if it is a VLAN packet
 		payload = buffer + VLAN_PAYLOAD_OFFSET;
 		payload_size = length - VLAN_PAYLOAD_OFFSET - CRC_SIZE;
@@ -59,13 +60,13 @@ int receive_eth_packet(uint8_t *buffer, uint32_t length) {
 		}
 	}
 
-	if (ether_type[0] == ET_ARP_0 && ether_type[1] == ET_ARP_1) {
+	if (ether_type[1] == (ET_ARP & 0xFF) && ether_type[0] == ((ET_ARP >> 8) & 0xFF)) {
 		// Forward this to receive_arp_packet
 		if (receive_arp_packet(payload, payload_size, vlan) != 0)
 			goto malformed_packet;
 	}
 
-	if (ether_type[0] == ET_IPV4_0 && ether_type[1] == ET_IPV4_1) {
+	if (ether_type[1] == (ET_IPV4 & 0xFF) && ether_type[0] == ((ET_IPV4 >> 8) & 0xFF)) {
 		// Nothing for now
 		return -1;
 	}
@@ -75,4 +76,33 @@ int receive_eth_packet(uint8_t *buffer, uint32_t length) {
 malformed_packet:
 	ETH_DEBUG("Malformed packet!");
 	return -1;
+}
+
+/*
+ * Generates an Ethernet packet with the specified fields and transmits it
+ *
+ * INPUTS: dest_mac_addr: the destination MAC address of the packet
+ *         ether_type: the EtherType value of the packet (corresponding to ARP, IPv4, etc)
+ *         payload: a pointer to a buffer containing the payload of the packet
+ *         payload_size: the size of the payload buffer
+ * SIDE EFFECTS: transmits an Ethernet packet
+ */
+void send_eth_packet(uint8_t dest_mac_addr[MAC_ADDR_SIZE], uint16_t ether_type, void *payload, uint32_t payload_size) {
+	uint8_t *packet = kmalloc(2 * MAC_ADDR_SIZE + ETHER_TYPE_SIZE + payload_size);
+	int i;
+
+	// Copy in the destination MAC address
+	for (i = 0; i < MAC_ADDR_SIZE; i++)
+		packet[i] = dest_mac_addr[i];
+
+	// Copy in the EtherType
+	packet[ETHER_TYPE_OFFSET] = (ether_type >> 8) & 0xFF;
+	packet[ETHER_TYPE_OFFSET + 1] = ether_type & 0xFF;
+
+	// Copy in the payload
+	for (i = PAYLOAD_OFFSET; i < PAYLOAD_OFFSET + payload_size; i++) {
+		packet[i] = ((uint8_t*)payload)[i - PAYLOAD_OFFSET];
+	}
+
+	// Transmit the packet
 }

@@ -15,9 +15,10 @@
 #include "processes.h"
 #include "kheap.h"
 #include "pci.h"
-#include "pci_drivers/e1000.h"
+#include "e1000_driver/e1000.h"
 #include "pit.h"
 #include "network/arp.h"
+#include "network/eth_device.h"
 
 #define RUN_TESTS
 
@@ -179,7 +180,8 @@ void entry(unsigned long magic, unsigned long addr) {
 	/* Initialize ARP */
 	init_arp();
 
-	/* Initialize PCI drivers and PCI devices */
+	/* Initialize E1000 PCI driver and Ethernet device */
+	uint32_t e1000_eth_dev_id = (uint32_t)register_eth_dev(&e1000_eth_device);
 	register_pci_driver(e1000_driver);
 	enumerate_pci_devices();
 
@@ -191,6 +193,9 @@ void entry(unsigned long magic, unsigned long addr) {
 	/* Execute the first program ("shell") ... */
 	process_execute("shell", 0);
 	
+	/* Unregister the E1000 Ethernet device */
+	unregister_eth_dev(e1000_eth_dev_id);
+
 	/* Spin (nicely, so we don't chew up cycles) */
 	asm volatile (".1: hlt; jmp .1;");
 }

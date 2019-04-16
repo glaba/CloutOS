@@ -7,7 +7,7 @@
 #include "keyboard.h"
 #include "rtc.h"
 #include "pci.h"
-#include "pci_drivers/e1000.h"
+#include "e1000_driver/e1000.h"
 #include "kheap.h"
 #include "pit.h"
 
@@ -563,7 +563,7 @@ void eth_test() {
 	packet[i++] = 0x02;
 	packet[i++] = 0x02;
 
-	e1000_transmit(packet, 42);
+	eth_transmit(packet, 42, 1);
 }
 
 /*

@@ -31,14 +31,11 @@
 
 // Various EtherType values
 // EtherType for VLAN
-#define ET_VLAN_0 0x81
-#define ET_VLAN_1 0x00
+#define ET_VLAN 0x8100
 // EtherType for IPv4
-#define ET_IPV4_0 0x08
-#define ET_IPV4_1 0x00
+#define ET_IPV4 0x0800
 // EtherType for Address Resolution Protocol (ARP)
-#define ET_ARP_0 0x08
-#define ET_ARP_1 0x06
+#define ET_ARP 0x0806
 
 // Receives an Ethernet packet, performs appropriate actions, and replies if necessary
 int receive_eth_packet(uint8_t *buffer, uint32_t length);

@@ -11,12 +11,11 @@ static struct spinlock_t pit_spin_lock = SPIN_LOCK_UNLOCKED;
 // Structure that stores a callback and associated information
 typedef struct callback_t {
 	void (*callback)(double);
-	uint32_t id;
 	int interval;
 	int counter;
 } callback_t;
 
-typedef LIST_ITEM(callback_t) callback_list_item;
+typedef LIST_ITEM_ID(callback_t, callback_list_item) callback_list_item;
 
 callback_list_item *callback_list_head;
 
@@ -78,31 +77,12 @@ uint32_t register_periodic_callback(int interval, void (*callback_fn)(double)) {
 	// Acquire the lock for modifying the linked list
 	spin_lock(&pit_spin_lock);
 
-	// Find an id for it that is not already present in the linked list
-	// The linked list will be sorted by ID, so we can exploit this to find an ID in linear time
-	uint32_t id;
-	callback_list_item *cur, *prev;
-	for (prev = NULL, cur = callback_list_head, id = 1; 
-		 cur != NULL; 
-		 prev = cur, cur = cur->next, id++) {
-
-		if (cur->data.id != id)
-			break;
-	}
-
-	// Set the ID and insert the callback into the linked list
-	callback->data.id = id;
-	if (prev == NULL) {
-		callback->next = callback_list_head;
-		callback_list_head = callback;
-	} else {
-		callback->next = cur;
-		prev->next = callback;
-	}
+	// Find an id for it that is not already present in the linked list, and insert into the list
+	INSERT_WITH_UNIQUE_ID(callback_list_item, callback_list_head, callback);
 
 	spin_unlock(&pit_spin_lock);
 
-	return callback->data.id;
+	return callback->id;
 }
 
 /*
@@ -121,7 +101,7 @@ void unregister_periodic_callback(uint32_t id) {
 		 prev = cur, cur = cur->next) {
 
 		// If this element has the correct ID, remove it from the linked list
-		if (cur->data.id == id) {
+		if (cur->id == id) {
 			// Check if it is the head or not
 			if (prev == NULL)
 				callback_list_head = cur->next;
