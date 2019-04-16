@@ -4,7 +4,7 @@
 #include "../lib.h"
 
 // Uncomment ARP_DEBUG_ENABLE to enable debugging
-// #define ARP_DEBUG_ENABLE
+#define ARP_DEBUG_ENABLE
 #ifdef ARP_DEBUG_ENABLE
 	#define ARP_DEBUG(f, ...) printf(f, ##__VA_ARGS__)
 #else
@@ -12,7 +12,9 @@
 #endif
 
 // The number of entries in the ARP table
-#define ARP_TABLE_SIZE 2048
+#define ARP_TABLE_SIZE 64
+// The amount of time an entry in the ARP table stays valid in seconds
+#define ARP_TIMEOUT 10.0
 
 // The size of an ARP packet in bytes
 #define ARP_PACKET_SIZE 28
@@ -27,7 +29,7 @@
 
 // The expected values for Ethernet and IPv4 in the hardware and protocol type fields
 #define ETHERNET_HARDWARE_TYPE 0x1
-#define IPV4_PROTOCOL_TYPE 0x4
+#define IPV4_PROTOCOL_TYPE 0x800
 
 // A struct representing an ARP packet (which we can do since each packet is a fixed size)
 // Notice that all fields greater than 1 byte in size need to converted from big endian to little endian
@@ -59,7 +61,7 @@ typedef struct arp_table_entry {
 	// Whether or not the entry is present
 	uint8_t present;
 	// The time at which the entry was added
-	uint32_t time_added;
+	double time_added;
 	// The IP and MAC addresses that are paired together
 	uint8_t ip_addr[IPV4_ADDR_SIZE];
 	uint8_t mac_addr[MAC_ADDR_SIZE];
@@ -69,5 +71,7 @@ typedef struct arp_table_entry {
 
 // Receives an ARP packet, performs appropriate actions, and replies if necessary
 int receive_arp_packet(uint8_t *buffer, uint32_t length, int32_t vlan);
+// Initialize the ARP table to be empty and setup periodic calls to flush_arp_entries
+void init_arp();
 
 #endif

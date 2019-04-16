@@ -509,24 +509,61 @@ int extensive_terminal_read_write() {
  * A work in progress
  */
 void eth_test() {	
-	unsigned char buffer[50] = "Hello World!\n";
-	e1000_transmit(buffer, 13);
-	buffer[0] = '1';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '2';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '3';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '4';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '5';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '6';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '7';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '8';
-	e1000_transmit(buffer, 13);
+	// Send an ARP request packet for IP 10.0.2.2, which is the gateway
+	uint8_t packet[42];
+	int i = 0;
+
+	// Destination MAC address
+	packet[i++] = 0xFF;
+	packet[i++] = 0xFF;
+	packet[i++] = 0xFF;
+	packet[i++] = 0xFF;
+	packet[i++] = 0xFF;
+	packet[i++] = 0xFF;
+
+	// Source MAC address
+	packet[i++] = 0x52;
+	packet[i++] = 0x54;
+	packet[i++] = 0x00;
+	packet[i++] = 0x12;
+	packet[i++] = 0x34;
+	packet[i++] = 0x56;
+
+	// EtherType for ARP
+	packet[i++] = 0x08;
+	packet[i++] = 0x06;
+
+	// ARP packet
+	packet[i++] = 0x00;
+	packet[i++] = 0x01;
+	packet[i++] = 0x08;
+	packet[i++] = 0x00;
+	packet[i++] = 0x06;
+	packet[i++] = 0x04;
+	packet[i++] = 0x00;
+	packet[i++] = 0x01;
+	packet[i++] = 0x52;
+	packet[i++] = 0x54;
+	packet[i++] = 0x00;
+	packet[i++] = 0x12;
+	packet[i++] = 0x34;
+	packet[i++] = 0x56;
+	packet[i++] = 0x0A;
+	packet[i++] = 0x00;
+	packet[i++] = 0x02;
+	packet[i++] = 0x0F;
+	packet[i++] = 0xFF;
+	packet[i++] = 0xFF;
+	packet[i++] = 0xFF;
+	packet[i++] = 0xFF;
+	packet[i++] = 0xFF;
+	packet[i++] = 0xFF;
+	packet[i++] = 0x0A;
+	packet[i++] = 0x00;
+	packet[i++] = 0x02;
+	packet[i++] = 0x02;
+
+	e1000_transmit(packet, 42);
 }
 
 /*

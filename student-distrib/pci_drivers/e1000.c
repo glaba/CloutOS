@@ -84,7 +84,7 @@ inline int e1000_irq_handler(pci_function *func) {
  * INPUTS: buf, size: the data to send and the size of the buffer in bytes
  * OUTPUTS: 0 on success and -1 on failure (transmit buffer full or buffer too large)
  */
-int e1000_transmit(uint8_t* buf, uint16_t size) {
+int e1000_transmit(uint8_t *buf, uint16_t size) {
 	if (size > ETH_MAX_PACKET_SIZE)
 		return -1;
 

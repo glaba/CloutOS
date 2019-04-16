@@ -17,6 +17,7 @@
 #include "pci.h"
 #include "pci_drivers/e1000.h"
 #include "pit.h"
+#include "network/arp.h"
 
 #define RUN_TESTS
 
@@ -174,6 +175,9 @@ void entry(unsigned long magic, unsigned long addr) {
 
 	/* Initialize the PIT */
 	init_pit();
+
+	/* Initialize ARP */
+	init_arp();
 
 	/* Initialize PCI drivers and PCI devices */
 	register_pci_driver(e1000_driver);

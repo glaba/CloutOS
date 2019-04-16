@@ -2,6 +2,7 @@
 #include "e1000_misc.h"
 #include "../pci.h"
 #include "../kheap.h"
+#include "../network/ethernet.h"
 
 // The descriptor buffer that will be shared between the ethernet controller and the kernel
 static volatile uint8_t rx_desc_buf[RX_DESCRIPTOR_BUFFER_SIZE * RX_DESCRIPTOR_SIZE] __attribute__((aligned (RX_DESCRIPTOR_BUFFER_ALIGNMENT)));
@@ -122,14 +123,8 @@ inline int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interr
 				return 0;
 			}
 
-			// For the moment we don't actually do anything with the data, so let's just print it
-			E1000_DEBUG("Received packet stored at 0x%x of length 0x%x\n", (uint32_t)cur.buf_addr, (uint32_t)cur.length);
-			E1000_DEBUG("Contents: ");
-			int i;
-			for (i = 0; i < cur.length; i++) {
-				E1000_DEBUG("%x", cur.buf_addr[i]);
-			}
-			E1000_DEBUG("\n");
+			// Process the packet as a full Ethernet packet
+			receive_eth_packet(cur.buf_addr, cur.length);
 
 			// Write back with desc_done not set
 			cur.status &= ~ETH_STATUS_DESC_DONE;
