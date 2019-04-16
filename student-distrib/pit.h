@@ -1,6 +1,8 @@
 #ifndef _PIT_H
 #define _PIT_H
 
+#include "types.h"
+
 // I/O ports for the Programmable Interval Timer
 //  The data ports are used to read/write the current value of the countdown for each channel
 //  The command register is used to set the mode of each channel
@@ -30,6 +32,14 @@ void init_pit();
 
 // Handler for the timer interrupt
 void timer_handler();
+
+// Adds a callback to the list of callbacks that will be called at a periodic interval, returning
+//  an ID that will be used to deregister the callback
+// Callbacks must run quickly!
+uint32_t register_periodic_callback(int interval, void (*callback)(double));
+
+// Unregisters a previously registered callback
+void unregister_periodic_callback(uint32_t id);
 
 // Global time from startup in seconds
 extern double time;

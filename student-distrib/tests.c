@@ -9,6 +9,7 @@
 #include "pci.h"
 #include "pci_drivers/e1000.h"
 #include "kheap.h"
+#include "pit.h"
 
 #define PASS 1
 #define FAIL 0
