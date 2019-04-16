@@ -701,6 +701,8 @@ void launch_tests() {
 	// divide_by_zero_test();
 	// paging_test_invalid_region();
 
+	// TEST_OUTPUT("kheap_test", kheap_test());
+
 	/* CHECKPOINT 2 TESTS */
 	// TEST_OUTPUT("testing rtc read/write", rtc_read_write());
 	// TEST_OUTPUT("externsive rtc read/write",negative_null_rtc_read_write());

@@ -187,6 +187,7 @@ void entry(unsigned long magic, unsigned long addr) {
 	/* Run tests */
 	launch_tests();
 #endif
+	
 	/* Execute the first program ("shell") ... */
 	process_execute("shell", 0);
 	

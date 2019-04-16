@@ -181,6 +181,8 @@ inline int e1000_tx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interr
 		// If this descriptor has been pushed out by the ethernet controller
 		//  free the associated buffer and update the counter
 		if ((cur_buf.cmd & TX_DESC_CMD_REPORT_STATUS) && (cur_buf.status & TX_DESC_STATUS_DESCRIPTOR_DONE)) {
+			E1000_DEBUG("Free descriptor at address 0x%x\n", (uint32_t)cur_buf.buf_addr);
+
 			kfree(cur_buf.buf_addr);
 			first_unfreed_block = (first_unfreed_block + 1) % TX_DESCRIPTOR_BUFFER_SIZE;
 		} else {

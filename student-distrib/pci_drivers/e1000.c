@@ -50,7 +50,7 @@ int e1000_init_device(pci_function *func_) {
 		goto eth_init_failed;
 	}
 
-	// Enable interrupts for packet reception (and transmission complete later)
+	// Enable interrupts for packet reception and transmission
 	GET_32(eth_mmio_base, ETH_INTERRUPT_MASK_SET) = ETH_IMS_RXT0 | ETH_IMS_RXDMT0 | ETH_IMS_TXDW;
 
 	E1000_DEBUG("Successfully initialized E1000\n");
@@ -72,9 +72,8 @@ inline int e1000_irq_handler(pci_function *func) {
 
 	uint32_t interrupt_cause = GET_32(eth_mmio_base, ETH_INT_CAUSE_REGISTER);
 
-	// Will return 0 if either is 0, and by short circuit evaluation, tx_handler will only be called if
-	//  rx_handler returned -1
-	return e1000_rx_irq_handler(eth_mmio_base, interrupt_cause) &&
+	// The interrupt could be for both rx and tx, so OR the result of the two
+	return e1000_rx_irq_handler(eth_mmio_base, interrupt_cause) ||
 	       e1000_tx_irq_handler(eth_mmio_base, interrupt_cause);
 }
 

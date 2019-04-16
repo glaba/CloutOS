@@ -2,7 +2,7 @@
 #define _E1000_MISC_H
 
 // Uncomment E1000_DEBUG_ENABLE to enable debugging
-// #define E1000_DEBUG_ENABLE
+#define E1000_DEBUG_ENABLE
 #ifdef E1000_DEBUG_ENABLE
 	#define E1000_DEBUG(f, ...) printf(f, ##__VA_ARGS__)
 #else
