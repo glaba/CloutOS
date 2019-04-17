@@ -175,7 +175,7 @@ int32_t read_dentry_by_name(const uint8_t *fname, dentry_t *dentry) {
 		return -1;
 
 	/* Find the entry in the array. */
-	uint32_t fname_len = strlen((int8_t*)fname); 
+	uint32_t fname_len = strlen((int8_t*)fname);
 	for (i = 0; i < MAX_NUM_FS_DENTRIES; i++) {
 		// Get the length of the current filename without exceeding MAX_FILENAME_LENGTH
 		for (j = 0; j < MAX_FILENAME_LENGTH && fs_dentries[i].filename[j] != '\0'; j++);
@@ -224,7 +224,7 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t *dentry){
 		return -1;
 
 	strncpy((int8_t*)dentry->filename, (int8_t*)fs_dentries[index].filename, MAX_FILENAME_LENGTH);
-	dentry->filename[MAX_FILENAME_LENGTH] = '\0';
+	//dentry->filename[MAX_FILENAME_LENGTH] = '\0';
 	dentry->filetype = fs_dentries[index].filetype;
 	dentry->inode = fs_dentries[index].inode;
 
