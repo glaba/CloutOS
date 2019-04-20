@@ -27,5 +27,8 @@
 #define ETH_DEVICE_STATUS_REG  0x8
 // Register that contains the cause of the interrupt with the same fields as IMS
 #define ETH_INT_CAUSE_REGISTER 0xC0
+// Register that contains the MAC address we will filter by
+#define ETH_RX_RECEIVE_ADDR_LO    0x5400
+#define ETH_RX_RECEIVE_ADDR_HI    0x5404
 
 #endif

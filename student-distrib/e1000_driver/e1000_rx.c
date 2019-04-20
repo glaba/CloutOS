@@ -103,10 +103,10 @@ static int cur_descriptor = 0;
  * Interrupt handler for packet receive-related interrupts
  * INPUTS: eth_mmio_base: pointer to the start of memory-mapped I/O for the E1000
  *         interrupt_cause: the contents of the Interrupt Cause Read register
- *         receive: a callback function that processes the received packet
+ *         device: a pointer to the eth_device 
  * OUTPUTS: 0 if the interrupt was handled and -1 if not
  */
-inline int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause, int (*receive)(uint8_t*, uint32_t)) {
+inline int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause, eth_device *device) {
 	// Make sure this interrupt is for ethernet frame reception
 	if (!(interrupt_cause & ETH_IMS_RXT0 || interrupt_cause & ETH_IMS_RXDMT0))
 		return -1;
@@ -125,8 +125,8 @@ inline int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interr
 			}
 
 			// Process the packet as a full Ethernet packet
-			if (receive != NULL)
-				receive(cur.buf_addr, cur.length);
+			if (device != NULL && device->receive != NULL)
+				device->receive(cur.buf_addr, cur.length, device->id);
 
 			// Write back with desc_done not set
 			cur.status &= ~ETH_STATUS_DESC_DONE;

@@ -180,10 +180,10 @@ void entry(unsigned long magic, unsigned long addr) {
 	/* Initialize ARP */
 	init_arp();
 
-	/* Initialize E1000 PCI driver and Ethernet device */
-	uint32_t e1000_eth_dev_id = (uint32_t)register_eth_dev(&e1000_eth_device);
+	/* Initialize E1000 PCI driver and Ethernet device in the correct order */
 	register_pci_driver(e1000_driver);
 	enumerate_pci_devices();
+	uint32_t e1000_eth_dev_id = (uint32_t)register_eth_dev(&e1000_eth_device);
 
 #ifdef RUN_TESTS
 	/* Run tests */

@@ -10,6 +10,9 @@
 #include "e1000_driver/e1000.h"
 #include "kheap.h"
 #include "pit.h"
+#include "network/ethernet.h"
+#include "network/arp.h"
+#include "network/udp.h"
 
 #define PASS 1
 #define FAIL 0
@@ -505,68 +508,6 @@ int extensive_terminal_read_write() {
 /* Extra feature tests */
 
 /*
- * eth_test
- * A work in progress
- */
-void eth_test() {	
-	// Send an ARP request packet for IP 10.0.2.2, which is the gateway
-	uint8_t packet[42];
-	int i = 0;
-
-	// Destination MAC address
-	packet[i++] = 0xFF;
-	packet[i++] = 0xFF;
-	packet[i++] = 0xFF;
-	packet[i++] = 0xFF;
-	packet[i++] = 0xFF;
-	packet[i++] = 0xFF;
-
-	// Source MAC address
-	packet[i++] = 0x52;
-	packet[i++] = 0x54;
-	packet[i++] = 0x00;
-	packet[i++] = 0x12;
-	packet[i++] = 0x34;
-	packet[i++] = 0x56;
-
-	// EtherType for ARP
-	packet[i++] = 0x08;
-	packet[i++] = 0x06;
-
-	// ARP packet
-	packet[i++] = 0x00;
-	packet[i++] = 0x01;
-	packet[i++] = 0x08;
-	packet[i++] = 0x00;
-	packet[i++] = 0x06;
-	packet[i++] = 0x04;
-	packet[i++] = 0x00;
-	packet[i++] = 0x01;
-	packet[i++] = 0x52;
-	packet[i++] = 0x54;
-	packet[i++] = 0x00;
-	packet[i++] = 0x12;
-	packet[i++] = 0x34;
-	packet[i++] = 0x56;
-	packet[i++] = 0x0A;
-	packet[i++] = 0x00;
-	packet[i++] = 0x02;
-	packet[i++] = 0x0F;
-	packet[i++] = 0xFF;
-	packet[i++] = 0xFF;
-	packet[i++] = 0xFF;
-	packet[i++] = 0xFF;
-	packet[i++] = 0xFF;
-	packet[i++] = 0xFF;
-	packet[i++] = 0x0A;
-	packet[i++] = 0x00;
-	packet[i++] = 0x02;
-	packet[i++] = 0x02;
-
-	eth_transmit(packet, 42, 1);
-}
-
-/*
  * Tests kmalloc and kfree in a variety of scenarios
  *
  * INPUTS: none
@@ -689,6 +630,23 @@ int kheap_test() {
 kheap_test_fail:
 	init_kheap();
 	return FAIL;
+}
+
+/*
+ * eth_test
+ * A work in progress
+ */
+void eth_test() {
+	char packet[13] = "Hello world!";
+	uint8_t dest_ip[4] = {10, 0, 2, 2};
+
+	send_udp_packet((void*)packet, 12, 42, dest_ip, 89, 1);
+	send_udp_packet((void*)packet, 12, 42, dest_ip, 89, 1);
+	send_udp_packet((void*)packet, 12, 42, dest_ip, 89, 1);
+	send_udp_packet((void*)packet, 12, 42, dest_ip, 89, 1);
+
+	// uint8_t target_ip[4] = {10, 0, 2, 2};
+	// send_arp_request(target_ip, 1);
 }
 
 /* Test suite entry point */

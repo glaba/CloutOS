@@ -19,11 +19,48 @@ pci_driver e1000_driver = {
 
 eth_device e1000_eth_device = {
 	.name = "E1000 Ethernet controller",
+	.init = e1000_init_eth,
+	.mac_addr = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 	.transmit = e1000_transmit,
 	.receive = NULL
 };
 
 static pci_function *func;
+
+/*
+ * Initializes the interface the driver exposes to the OS
+ * The PCI driver should be initialized first
+ *
+ * OUTPUTS: 0 on success (always)
+ */
+int e1000_init_eth(eth_device *device) {
+	// Pointer into memory mapped I/O for E1000
+	volatile uint8_t *eth_mmio_base = (volatile uint8_t*)func->reg_base[0];
+
+	// Store the MAC address from RAH and RAL
+	uint32_t rah = GET_32(eth_mmio_base, ETH_RX_RECEIVE_ADDR_HI);
+	uint32_t ral = GET_32(eth_mmio_base, ETH_RX_RECEIVE_ADDR_LO);
+
+	// Copy the MAC address into e1000_eth_device
+	e1000_eth_device.mac_addr[5] = (rah >> 8) & 0xFF;
+	e1000_eth_device.mac_addr[4] = rah & 0xFF;
+	e1000_eth_device.mac_addr[3] = (ral >> 24) & 0xFF;
+	e1000_eth_device.mac_addr[2] = (ral >> 16) & 0xFF;
+	e1000_eth_device.mac_addr[1] = (ral >> 8) & 0xFF;
+	e1000_eth_device.mac_addr[0] = ral & 0xFF;
+
+	E1000_DEBUG("Copied MAC address of %x:%x:%x:%x:%x:%x into eth_device struct\n",
+		e1000_eth_device.mac_addr[0], e1000_eth_device.mac_addr[1], e1000_eth_device.mac_addr[2]
+		e1000_eth_device.mac_addr[3], e1000_eth_device.mac_addr[4], e1000_eth_device.mac_addr[5]);
+
+	// Fill out the IP address to a default value
+	e1000_eth_device.ip_addr[0] = 0;
+	e1000_eth_device.ip_addr[1] = 0;
+	e1000_eth_device.ip_addr[2] = 0;
+	e1000_eth_device.ip_addr[3] = 0;
+
+	return 0;
+}
 
 /*
  * Initializes the E1000
@@ -79,7 +116,7 @@ inline int e1000_irq_handler(pci_function *func) {
 	uint32_t interrupt_cause = GET_32(eth_mmio_base, ETH_INT_CAUSE_REGISTER);
 
 	// The interrupt could be for both rx and tx, so OR the result of the two
-	return e1000_rx_irq_handler(eth_mmio_base, interrupt_cause, e1000_eth_device.receive) ||
+	return e1000_rx_irq_handler(eth_mmio_base, interrupt_cause, &e1000_eth_device) ||
 	       e1000_tx_irq_handler(eth_mmio_base, interrupt_cause);
 }
 

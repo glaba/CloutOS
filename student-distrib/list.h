@@ -32,7 +32,7 @@
  *         new_item: a pointer to the new item to be added to the list
  * SIDE EFFECTS: the ID field of the new item is set to its new ID
  */
-#define INSERT_WITH_UNIQUE_ID(TYPE_NAME, list_head, new_item) do { \
+#define INSERT_WITH_UNIQUE_ID(TYPE_NAME, list_head, new_item) ({   \
 	/* Find an ID that is not used in the list */                  \
 	unsigned int id;                                               \
 	TYPE_NAME *cur, *prev;                                         \
@@ -54,6 +54,7 @@
 		new_item->next = cur;                                      \
 		prev->next = new_item;                                     \
 	}                                                              \
-} while (0)
+	id;                                                            \
+})
 
 #endif

@@ -4,6 +4,8 @@
 #include "../pci.h"
 #include "../network/eth_device.h"
 
+// Initializes the interface the driver exposes to the OS
+int e1000_init_eth(eth_device *device);
 // Initializes the registers of the E1000 and sets up transmit / receive buffers
 int e1000_init_device(pci_function *func);
 // The interrupt handler for the E1000

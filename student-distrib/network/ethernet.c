@@ -1,5 +1,6 @@
 #include "ethernet.h"
 #include "arp.h"
+#include "eth_device.h"
 #include "../endian.h"
 #include "../kheap.h"
 
@@ -8,9 +9,10 @@
  * Currently it implements the IPv4 and ARP protocols, and UDP on top of that
  * INPUTS: buffer: a buffer containing the packet data
  *         length: the length of the buffer (actual length could be <= 64 if length = 64)
+ *         id: the ID of the Ethernet device that received this packet
  * OUTPUTS: 0 if successfully processed and -1 if the packet could not be handled
  */
-int receive_eth_packet(uint8_t *buffer, uint32_t length) {
+int receive_eth_packet(uint8_t *buffer, uint32_t length, uint32_t id) {
 	uint8_t dst_mac_addr[MAC_ADDR_SIZE];
 	uint8_t src_mac_addr[MAC_ADDR_SIZE];
 	uint8_t ether_type[ETHER_TYPE_SIZE];
@@ -51,7 +53,7 @@ int receive_eth_packet(uint8_t *buffer, uint32_t length) {
 		if (payload_size < 0) goto malformed_packet;
 
 		// Store the VLAN ID in vlan, which is the bottom 12 bits of bytes 14 and 15 (in big endian order)
-		vlan = (int32_t)(b_to_l_endian16(*(uint16_t*)(buffer + PCP_DEI_VID_OFFSET)) & 0xFFF);
+		vlan = (int32_t)(flip_endian16(*(uint16_t*)(buffer + PCP_DEI_VID_OFFSET)) & 0xFFF);
 
 		// Store the actual ether_type in ether_type
 		for (i = VLAN_ETHER_TYPE_OFFSET; i < VLAN_ETHER_TYPE_OFFSET + ETHER_TYPE_SIZE; i++) {
@@ -62,7 +64,7 @@ int receive_eth_packet(uint8_t *buffer, uint32_t length) {
 
 	if (ether_type[1] == (ET_ARP & 0xFF) && ether_type[0] == ((ET_ARP >> 8) & 0xFF)) {
 		// Forward this to receive_arp_packet
-		if (receive_arp_packet(payload, payload_size, vlan) != 0)
+		if (receive_arp_packet(payload, payload_size, vlan, id) != 0)
 			goto malformed_packet;
 	}
 
@@ -85,15 +87,26 @@ malformed_packet:
  *         ether_type: the EtherType value of the packet (corresponding to ARP, IPv4, etc)
  *         payload: a pointer to a buffer containing the payload of the packet
  *         payload_size: the size of the payload buffer
+ *         id: the ID of the Ethernet device to use
+ * OUTPUTS: -1 on failure and 0 on success
  * SIDE EFFECTS: transmits an Ethernet packet
  */
-void send_eth_packet(uint8_t dest_mac_addr[MAC_ADDR_SIZE], uint16_t ether_type, void *payload, uint32_t payload_size) {
+int send_eth_packet(uint8_t dest_mac_addr[MAC_ADDR_SIZE], uint16_t ether_type, void *payload, uint32_t payload_size, uint32_t id) {
 	uint8_t *packet = kmalloc(2 * MAC_ADDR_SIZE + ETHER_TYPE_SIZE + payload_size);
 	int i;
 
+	if (packet == NULL)
+		return -1;
+
 	// Copy in the destination MAC address
-	for (i = 0; i < MAC_ADDR_SIZE; i++)
-		packet[i] = dest_mac_addr[i];
+	for (i = DST_MAC_ADDR_OFFSET; i < DST_MAC_ADDR_OFFSET + MAC_ADDR_SIZE; i++)
+		packet[i] = dest_mac_addr[i - DST_MAC_ADDR_OFFSET];
+
+	// Copy in the source MAC address
+	if (get_mac_addr(id, packet + SRC_MAC_ADDR_OFFSET) != 0) {
+		kfree(packet);
+		return -1;
+	}
 
 	// Copy in the EtherType
 	packet[ETHER_TYPE_OFFSET] = (ether_type >> 8) & 0xFF;
@@ -105,4 +118,10 @@ void send_eth_packet(uint8_t dest_mac_addr[MAC_ADDR_SIZE], uint16_t ether_type, 
 	}
 
 	// Transmit the packet
+	eth_transmit(packet, 2 * MAC_ADDR_SIZE + ETHER_TYPE_SIZE + payload_size, id);
+
+	// Free the memory allocated for the packet
+	kfree(packet);
+
+	return 0;
 }

@@ -2,10 +2,8 @@
 #define _E1000_RX_H
 
 #include "../types.h"
+#include "../network/eth_device.h"
 
-// Receive-related register offsets
-#define ETH_RX_RECEIVE_ADDR_LO    0x5400
-#define ETH_RX_RECEIVE_ADDR_HI    0x5404
 // Fields of ETH_RX_RECEIVE_ADDR_HI
 	// Set this bit for the Ethernet controller to receive packets for the MAC address in RECEIVE_ADDR
 	#define ETH_RX_RECEIVE_ADDR_VALID 0x80000000
@@ -70,6 +68,6 @@ struct rx_descriptor {
 // Initializes transmission using the E1000 network card
 int e1000_init_rx(volatile uint8_t *eth_mmio_base);
 // Interrupt handler for reception
-inline int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause, int (*receive)(uint8_t*, uint32_t));
+inline int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interrupt_cause, eth_device *device);
 
 #endif
