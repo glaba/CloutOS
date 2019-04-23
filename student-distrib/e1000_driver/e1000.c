@@ -19,8 +19,13 @@ pci_driver e1000_driver = {
 
 eth_device e1000_eth_device = {
 	.name = "E1000 Ethernet controller",
-	.init = e1000_init_eth,
+	.id = 0,
 	.mac_addr = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	.dhcp_state = 0,
+	.ip_addr = {0, 0, 0, 0},
+	.subnet_mask = {0, 0, 0, 0},
+	.router_ip_addr = {0, 0, 0, 0},
+	.init = e1000_init_eth,
 	.transmit = e1000_transmit,
 	.receive = NULL
 };

@@ -185,6 +185,8 @@ void entry(unsigned long magic, unsigned long addr) {
 	enumerate_pci_devices();
 	uint32_t e1000_eth_dev_id = (uint32_t)register_eth_dev(&e1000_eth_device);
 
+	/* Get our IP address from the DHCP server */
+
 #ifdef RUN_TESTS
 	/* Run tests */
 	launch_tests();

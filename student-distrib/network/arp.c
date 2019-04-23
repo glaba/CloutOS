@@ -276,6 +276,20 @@ int send_arp_request(uint8_t target_ip_addr[IPV4_ADDR_SIZE], uint32_t id) {
  */
 int get_arp_entry(uint8_t ip_addr[IPV4_ADDR_SIZE], uint8_t mac_addr[MAC_ADDR_SIZE], uint32_t id) {
 	int i, j;
+	
+	// Check if it is the broadcast IP, return FF:FF:FF:FF:FF:FF if so
+	int is_broadcast = 1;
+	for (i = 0; i < IPV4_ADDR_SIZE; i++) {
+		if (ip_addr[i] != 0xFF)
+			is_broadcast = 0;
+	}
+
+	if (is_broadcast) {
+		for (i = 0; i < MAC_ADDR_SIZE; i++)
+			mac_addr[i] = 0xFF;
+		return ARP_TABLE_ENTRY_PRESENT;
+	}
+
 	// Look through the entire table for the entry
 	for (i = 0; i < ARP_TABLE_SIZE; i++) {
 		if (arp_table[i].state != ARP_TABLE_ENTRY_EMPTY && arp_table[i].id == id) {

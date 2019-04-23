@@ -1,4 +1,5 @@
 #include "eth_device.h"
+#include "dhcp.h"
 #include "../list.h"
 #include "../spinlock.h"
 #include "../kheap.h"
@@ -26,6 +27,9 @@ int register_eth_dev(eth_device *dev) {
 	if (new_item == NULL)
 		return -1;
 
+	// Set the dhcp_state to uninitialized
+	dev->dhcp_state = DHCP_STATE_UNINITIALIZED;
+
 	// Call the init function and return -1 on failure
 	if (dev->init(dev) != 0) 
 		return -1;
@@ -44,6 +48,9 @@ int register_eth_dev(eth_device *dev) {
 
 	// Set the receive function pointer
 	dev->receive = receive_eth_packet;
+
+	// Get an IP assigned to it by sending a DHCPDISCOVER packet
+	send_dhcp_discover_packet(new_item->id);
 
 	return new_item->id;
 }
@@ -120,20 +127,17 @@ int eth_transmit(uint8_t *buffer, uint16_t size, uint32_t id) {
  *          Puts the MAC address into the provided array
  */
 int get_mac_addr(uint32_t id, uint8_t mac_addr[MAC_ADDR_SIZE]) {
-	// Iterate through the linked list looking for the desired Ethernet device
-	eth_device_list_item *cur;
-	for (cur = eth_device_list_head; cur != NULL; cur = cur->next) {
-		if (cur->id == id) {
-			// Copy the MAC address
-			int i;
-			for (i = 0; i < MAC_ADDR_SIZE; i++) {
-				mac_addr[i] = cur->data->mac_addr[i];
-			}
-			return 0;
-		}
-	}
+	// Get the eth_device struct for this ID
+	eth_device *device = get_eth_device(id);
+	if (device == NULL)
+		return -1;
 
-	return -1;
+	// Copy the MAC address
+	int i;
+	for (i = 0; i < MAC_ADDR_SIZE; i++) {
+		mac_addr[i] = device->mac_addr[i];
+	}
+	return 0;
 }
 
 /*
@@ -144,18 +148,34 @@ int get_mac_addr(uint32_t id, uint8_t mac_addr[MAC_ADDR_SIZE]) {
  *          Puts the IP address into the provided array
  */
 int get_ip_addr(uint32_t id, uint8_t ip_addr[IPV4_ADDR_SIZE]) {
+	// Get the eth_device struct for this ID
+	eth_device *device = get_eth_device(id);
+	if (device == NULL)
+		return -1;
+
+	// Copy the IP address
+	int i;
+	for (i = 0; i < IPV4_ADDR_SIZE; i++) {
+		ip_addr[i] = device->ip_addr[i];
+	}
+	return 0;
+}
+
+/* 
+ * Gets a pointer to the eth_device structure for modification from the ID
+ *
+ * INPUTS: id: the ID corresponding to the Ethernet device
+ * OUTPUTS: a pointer to the eth_device struct for the same Ethernet device
+ */
+eth_device *get_eth_device(uint32_t id) {
 	// Iterate through the linked list looking for the desired Ethernet device
 	eth_device_list_item *cur;
 	for (cur = eth_device_list_head; cur != NULL; cur = cur->next) {
 		if (cur->id == id) {
-			// Copy the IP address
-			int i;
-			for (i = 0; i < IPV4_ADDR_SIZE; i++) {
-				ip_addr[i] = cur->data->ip_addr[i];
-			}
-			return 0;
+			return cur->data;
 		}
 	}
 
-	return -1;
+	return NULL;
 }
+

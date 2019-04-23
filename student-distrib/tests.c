@@ -13,6 +13,7 @@
 #include "network/ethernet.h"
 #include "network/arp.h"
 #include "network/udp.h"
+#include "network/dhcp.h"
 
 #define PASS 1
 #define FAIL 0
@@ -637,16 +638,6 @@ kheap_test_fail:
  * A work in progress
  */
 void eth_test() {
-	char packet[13] = "Hello world!";
-	uint8_t dest_ip[4] = {10, 0, 2, 2};
-
-	send_udp_packet((void*)packet, 12, 42, dest_ip, 89, 1);
-	send_udp_packet((void*)packet, 12, 42, dest_ip, 89, 1);
-	send_udp_packet((void*)packet, 12, 42, dest_ip, 89, 1);
-	send_udp_packet((void*)packet, 12, 42, dest_ip, 89, 1);
-
-	// uint8_t target_ip[4] = {10, 0, 2, 2};
-	// send_arp_request(target_ip, 1);
 }
 
 /* Test suite entry point */

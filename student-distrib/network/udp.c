@@ -2,6 +2,7 @@
 #include "ethernet.h"
 #include "eth_device.h"
 #include "arp.h"
+#include "dhcp.h"
 #include "../endian.h"
 #include "../kheap.h"
 
@@ -38,6 +39,9 @@
 #define FLAGS_OFFSET 6
 #define FLAGS_SHIFT  5
 #define FLAGS_MASK   0xE0
+	// Flag fields
+	#define FLAG_DONT_FRAGMENT  0x2
+	#define FLAG_MORE_FRAGMENTS 0x1 
 // The 13-bit fragment offset is split into a high 5-bit portion and a low 8-bit portion
 #define FRAGMENT_OFFSET_HI_OFFSET 6
 #define FRAGMENT_OFFSET_HI_SHIFT  0
@@ -174,6 +178,8 @@ int send_udp_packet(void *data, uint16_t length, uint16_t src_port, uint8_t dest
 	// Check that the ARP entry is present -- if it is not, this means that we did not get an ARP response
 	//  so we should fail
 	if (get_arp_entry(dest_ip, dest_mac_addr, id) != ARP_TABLE_ENTRY_PRESENT) {
+		printf("Did not receive ARP response, UDP packet cannot be sent\n");
+
 		kfree(packet);
 		return -1;
 	}
@@ -186,3 +192,54 @@ int send_udp_packet(void *data, uint16_t length, uint16_t src_port, uint8_t dest
 	return retval;
 }
 
+/*
+ * Receives a UDP packet and forwards it to the appropriate location
+ * INPUTS: buffer: a buffer containing the packet data
+ *         length: the length of the data (just for validation)
+ *         vlan: the VLAN number if this was received from a VLAN packet, or -1 otherwise
+ *         id: the ID of the Ethernet device this packet originated from
+ * OUTPUTS: -1 if the packet was malformed / could not be understood and 0 otherwise
+ */
+int receive_udp_packet(uint8_t *buffer, uint32_t length, int32_t vlan, uint32_t id) {
+	// Extract the fields we care about from the IP header
+	// Make sure that the protocol is UDP
+	if (buffer[PROTOCOL_OFFSET] != IP_HEADER_UDP_PROTOCOL)
+		return -1;
+
+	// We don't support fragmented packets, which is indicated in a flag
+	uint8_t flags = (buffer[FLAGS_OFFSET] & FLAGS_MASK) >> FLAGS_SHIFT;
+	if (flags & FLAG_MORE_FRAGMENTS)
+		return -1;
+
+	// Copy over the source IP address
+	uint8_t src_ip_addr[IPV4_ADDR_SIZE];
+	int i;
+	for (i = 0; i < IPV4_ADDR_SIZE; i++)
+		src_ip_addr[i] = buffer[SOURCE_IP_OFFSET + i];
+
+	// Check if the length is large enough to at least contain the UDP header + IP header
+	if (length < IP_HEADER_SIZE + UDP_HEADER_SIZE)
+		return -1;
+
+	uint16_t *udp_header = (uint16_t*)(buffer + IP_HEADER_SIZE);
+
+	// Extract the fields from the UDP header
+	uint16_t dest_port = flip_endian16(udp_header[DEST_PORT_OFFSET]);
+	// Subtract the header size since the length field includes the size of the header
+	uint16_t udp_data_length = flip_endian16(udp_header[UDP_LENGTH_OFFSET]) - UDP_HEADER_SIZE;
+
+	// Make sure the udp_data_length is valid
+	// We don't check for strict equality since packets can be padded
+	if (udp_data_length + UDP_HEADER_SIZE > length)
+		return -1;
+
+	// Check if any of the ports are special purpose ports
+	switch (dest_port) {
+		case DHCP_CLIENT_UDP_PORT:
+			// Forward the packet to DHCP processing code
+			return receive_dhcp_packet(buffer + IP_HEADER_SIZE + UDP_HEADER_SIZE, udp_data_length, id);
+		default:
+			// We have nothing to do with this packet
+			return 0;
+	}
+}

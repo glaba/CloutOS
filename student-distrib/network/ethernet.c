@@ -1,5 +1,6 @@
 #include "ethernet.h"
 #include "arp.h"
+#include "udp.h"
 #include "eth_device.h"
 #include "../endian.h"
 #include "../kheap.h"
@@ -69,8 +70,10 @@ int receive_eth_packet(uint8_t *buffer, uint32_t length, uint32_t id) {
 	}
 
 	if (ether_type[1] == (ET_IPV4 & 0xFF) && ether_type[0] == ((ET_IPV4 >> 8) & 0xFF)) {
-		// Nothing for now
-		return -1;
+		// If it is an IP packet, we will assume that it is UDP, since we don't implement any other
+		//  protocol on top of IPv4
+		if (receive_udp_packet(payload, payload_size, vlan, id) != 0)
+			goto malformed_packet;
 	}
 
 	return 0;

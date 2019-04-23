@@ -47,7 +47,7 @@ tests.o: tests.c tests.h x86_desc.h types.h lib.h init_idt.h \
   e1000_driver/../network/ethernet.h e1000_driver/../network/../lib.h \
   e1000_driver/../network/network_misc.h kheap.h pit.h network/ethernet.h \
   network/arp.h network/../lib.h network/network_misc.h network/udp.h \
-  network/../types.h
+  network/../types.h network/dhcp.h network/../list.h
 e1000.o: e1000_driver/e1000.c e1000_driver/e1000.h e1000_driver/../pci.h \
   e1000_driver/../lib.h e1000_driver/../types.h \
   e1000_driver/../spinlock.h e1000_driver/../irq_defs.h \
@@ -75,15 +75,19 @@ arp.o: network/arp.c network/arp.h network/../lib.h network/../types.h \
   network/network_misc.h network/ethernet.h network/eth_device.h \
   network/../types.h network/../endian.h network/../list.h \
   network/../pit.h
+dhcp.o: network/dhcp.c network/dhcp.h network/network_misc.h \
+  network/../types.h network/../list.h network/eth_device.h \
+  network/ethernet.h network/../lib.h network/../types.h network/udp.h \
+  network/../endian.h network/../kheap.h
 eth_device.o: network/eth_device.c network/eth_device.h \
   network/../types.h network/ethernet.h network/../lib.h \
-  network/../types.h network/network_misc.h network/../list.h \
-  network/../spinlock.h network/../kheap.h
+  network/../types.h network/network_misc.h network/dhcp.h \
+  network/../list.h network/../spinlock.h network/../kheap.h
 ethernet.o: network/ethernet.c network/ethernet.h network/../lib.h \
-  network/../types.h network/network_misc.h network/arp.h \
-  network/eth_device.h network/../types.h network/../endian.h \
+  network/../types.h network/network_misc.h network/arp.h network/udp.h \
+  network/../types.h network/eth_device.h network/../endian.h \
   network/../kheap.h
 udp.o: network/udp.c network/udp.h network/network_misc.h \
   network/../types.h network/ethernet.h network/../lib.h \
-  network/../types.h network/eth_device.h network/arp.h \
-  network/../endian.h network/../kheap.h
+  network/../types.h network/eth_device.h network/arp.h network/dhcp.h \
+  network/../list.h network/../endian.h network/../kheap.h
