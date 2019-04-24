@@ -41,7 +41,7 @@ int register_eth_dev(eth_device *dev) {
 	new_item->data = dev;
 
 	// Insert the list item into the linked list with a unique ID and return it
-	dev->id = INSERT_WITH_UNIQUE_ID(eth_device_list_item, eth_device_list_head, new_item);
+	dev->id = LIST_INSERT_WITH_UNIQUE_ID(eth_device_list_item, eth_device_list_head, new_item);
 
 	// Unlock the spinlock since we are done modifying the linked list
 	spin_unlock(&eth_device_spin_lock);

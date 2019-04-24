@@ -5,6 +5,15 @@
 #include "system_calls.h"
 #include "system_call_linkage.h"
 #include "keyboard.h"
+#include "dynamic_array.h"
+
+// Uncomment PROC_DEBUG_ENABLE to enable debugging
+#define PROC_DEBUG_ENABLE
+#ifdef PROC_DEBUG_ENABLE
+	#define PROC_DEBUG(f, ...) printf(f, ##__VA_ARGS__)
+#else
+	#define PROC_DEBUG(f, ...) // Nothing
+#endif
 
 // Magic number that must appear in the first 4 bytes of all executables
 #define ELF_MAGIC 0x464C457F
@@ -15,12 +24,13 @@
 // The offset in the executable where the entrypoint of the program is stored
 #define ENTRYPOINT_OFFSET 24
 
-// Bitmask for ESP that will yield the base of the kernel stack
+// Bitmask for ESP that will yield the top of the kernel stack
 #define KERNEL_STACK_BASE_BITMASK 0xFFFFE000
 
 // The maximum number of processes that can be running at the same time
 #define MAX_NUM_PROCESSES 6
 // The maximum number of files that can be open for a process
+// This limit only exists to prevent userspace programs from using up too much kernel memory
 #define MAX_NUM_FILES 8
 
 // The static file descriptors assigned to stdin and stdout for all programs
@@ -45,9 +55,12 @@ typedef struct file_t {
 	uint32_t in_use;
 } file_t;
 
+// A dynamic array containing file_t elements
+typedef DYNAMIC_ARRAY(file_t, file_dyn_arr) file_dyn_arr;
+
 typedef struct pcb_t {
-	// An array of the files that are being used by the process
-	file_t files[MAX_NUM_FILES];
+	// A dynamic array of the files that are being used by the process
+	file_dyn_arr files;
 	// The PID of the process
 	int32_t pid;
 	// The PID of the parent process

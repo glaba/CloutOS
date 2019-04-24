@@ -1,6 +1,14 @@
 #ifndef _SYSTEM_CALLS_H
 #define _SYSTEM_CALLS_H
 
+// Uncomment SYSCALL_DEBUG_ENABLE to enable debugging
+// #define SYSCALL_DEBUG_ENABLE
+#ifdef SYSCALL_DEBUG_ENABLE
+	#define SYSCALL_DEBUG(f, ...) printf(f, ##__VA_ARGS__)
+#else
+	#define SYSCALL_DEBUG(f, ...) // Nothing
+#endif
+
 #include "lib.h"
 #include "rtc.h"
 #include "file_system.h"

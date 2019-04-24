@@ -3,6 +3,7 @@
 #include "file_system.h"
 #include "paging.h"
 #include "x86_desc.h"
+#include "kheap.h"
 
 // An array indicating which PIDs are currently in use by running programs
 static uint8_t used_pids[MAX_NUM_PROCESSES];
@@ -105,6 +106,14 @@ int32_t process_halt(uint16_t status) {
 	// Unmap video memory if it was mapped in
 	if (pcb->vid_mem != NULL)
 		unmap_video_mem_user(pcb->vid_mem);
+
+	// Close all files and delete the files table
+	int i;
+	for (i = 0; i < pcb->files.length; i++) {
+		if (pcb->files.data[i].fd_table->close != NULL)
+			pcb->files.data[i].fd_table->close(i);
+	}
+	DYN_ARR_DELETE(pcb->files);
 
 	// If the parent PID is -1, that means that this is the parent shell and we should
 	//  simply spawn a new shell
@@ -245,18 +254,22 @@ int32_t process_execute(const char *command, uint8_t has_parent) {
 	pcb_t *pcb = (pcb_t*)tss.esp0;
 
 	// Initialize the fields of the PCB
-	for (i = 0; i < MAX_NUM_FILES; i++)
-		pcb->files[i].in_use = 0;
 	pcb->pid = cur_pid;
 	pcb->parent_pid = parent_pid;
 	pcb->vid_mem = NULL;
 
-	// Set stdin and stdout as files 0 and 1 respectively
-	pcb->files[STDIN].in_use = 1;
-	pcb->files[STDIN].fd_table = &stdin_table;
-	pcb->files[STDOUT].in_use = 1;
-	pcb->files[STDOUT].fd_table = &stdout_table;
+	// Create file_t objects for stdin and stdout
+	file_t stdin_file, stdout_file;
+	stdin_file.in_use = 1;
+	stdin_file.fd_table = &stdin_table;
+	stdout_file.in_use = 1;
+	stdout_file.fd_table = &stdout_table;
 
+	// Then, initialize the files dynamic array and add the two elements
+	DYN_ARR_INIT(file_t, pcb->files);
+	DYN_ARR_PUSH(file_t, pcb->files, stdin_file);
+	DYN_ARR_PUSH(file_t, pcb->files, stdout_file);
+	
 	// Copy the arguments into the PCB
 	if (has_arguments) {
 		for (i = 0; i < TERMINAL_SIZE && arg_buf[i] != '\0'; i++)

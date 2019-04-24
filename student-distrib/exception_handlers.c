@@ -4,6 +4,9 @@
 #include "exception_handlers.h"
 #include "processes.h"
 
+// Uncomment to show the error screen (useful to disable for debugging)
+#define SHOW_ERROR_SCREEN
+
 /*
  * This macro generates an exception handler
  *
@@ -82,6 +85,7 @@ void check_userspace_exception() {
  * SIDE EFFECTS: fills the screen with a "red screen of clout" (our error screen)
  */
 void print_error(const char* err, int (*line1)(uint32_t), int (*line2)(uint32_t), uint32_t err_code) {
+#ifdef SHOW_ERROR_SCREEN
 	unsigned int y = 7;
 
 	set_color(V_RED, V_CYAN);
@@ -118,6 +122,9 @@ void print_error(const char* err, int (*line1)(uint32_t), int (*line2)(uint32_t)
 
 	set_cursor_location(17, y + 3);
 	printf("Flex Master Susan");
+#else
+	printf("EXCEPTION: %s", err);
+#endif
 }
 
 GENERATE_EXCEPTION_HANDLER(divide_zero_e, "DIVIDE BY ZERO EXCEPTION", {}, {})

@@ -78,7 +78,7 @@ uint32_t register_periodic_callback(int interval, void (*callback_fn)(double)) {
 	spin_lock(&pit_spin_lock);
 
 	// Find an id for it that is not already present in the linked list, and insert into the list
-	INSERT_WITH_UNIQUE_ID(callback_list_item, callback_list_head, callback);
+	LIST_INSERT_WITH_UNIQUE_ID(callback_list_item, callback_list_head, callback);
 
 	spin_unlock(&pit_spin_lock);
 
