@@ -7,9 +7,13 @@
 #include "keyboard.h"
 #include "rtc.h"
 #include "pci.h"
-#include "pci_drivers/e1000.h"
+#include "e1000_driver/e1000.h"
 #include "kheap.h"
 #include "pit.h"
+#include "network/ethernet.h"
+#include "network/arp.h"
+#include "network/udp.h"
+#include "network/dhcp.h"
 
 #define PASS 1
 #define FAIL 0
@@ -505,31 +509,6 @@ int extensive_terminal_read_write() {
 /* Extra feature tests */
 
 /*
- * eth_test
- * A work in progress
- */
-void eth_test() {	
-	unsigned char buffer[50] = "Hello World!\n";
-	e1000_transmit(buffer, 13);
-	buffer[0] = '1';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '2';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '3';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '4';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '5';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '6';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '7';
-	e1000_transmit(buffer, 13);
-	buffer[0] = '8';
-	e1000_transmit(buffer, 13);
-}
-
-/*
  * Tests kmalloc and kfree in a variety of scenarios
  *
  * INPUTS: none
@@ -654,6 +633,13 @@ kheap_test_fail:
 	return FAIL;
 }
 
+/*
+ * eth_test
+ * A work in progress
+ */
+void eth_test() {
+}
+
 /* Test suite entry point */
 void launch_tests() {
 	/* CHECKPOINT 1 TESTS */
@@ -663,6 +649,8 @@ void launch_tests() {
 
 	// divide_by_zero_test();
 	// paging_test_invalid_region();
+
+	// TEST_OUTPUT("kheap_test", kheap_test());
 
 	/* CHECKPOINT 2 TESTS */
 	// TEST_OUTPUT("testing rtc read/write", rtc_read_write());

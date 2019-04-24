@@ -48,8 +48,8 @@ typedef struct pci_driver {
 	int (*irq_handler)(pci_function*);
 } pci_driver;
 
-typedef LIST_ITEM(pci_driver) pci_driver_list_item;
-typedef LIST_ITEM(pci_function) pci_function_list_item;
+typedef LIST_ITEM(pci_driver, pci_driver_list_item) pci_driver_list_item;
+typedef LIST_ITEM(pci_function, pci_function_list_item) pci_function_list_item;
 
 // Registers a PCI driver for some PCI device
 // Should be called before enumerate_pci_devices
@@ -65,6 +65,5 @@ uint32_t pci_config_read(pci_function *func, uint8_t offset, uint8_t size);
 void pci_config_write(pci_function *func, uint8_t offset, uint8_t size, uint32_t data);
 // Interrupt handler for all PCI interrupts
 void pci_irq_handler();
-
 
 #endif /* _PCI_H */

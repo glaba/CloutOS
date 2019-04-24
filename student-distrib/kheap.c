@@ -187,10 +187,7 @@ void kfree(void* ptr) {
 		first_free_block->next = free_block->next;
 		if (free_block->next != NULL)
 			free_block->next->prev = first_free_block;
-		// Update next_free and next_free->prev_free if it exists
-		first_free_block->next_free = free_block->next_free;
-		if (free_block->next_free != NULL)
-			free_block->next_free->prev_free = first_free_block;
+
 		// Update the size of the block to have the combined size of both
 		first_free_block->block_data.size += free_block->block_data.size;
 

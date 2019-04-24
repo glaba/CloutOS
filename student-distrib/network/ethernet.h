@@ -2,6 +2,7 @@
 #define _ETHERNET_H
 
 #include "../lib.h"
+#include "network_misc.h"
 
 // Uncomment ETH_DEBUG_ENABLE to enable debugging
 // #define ETH_DEBUG_ENABLE
@@ -11,8 +12,7 @@
 	#define ETH_DEBUG(f, ...) // Nothing
 #endif
 
-// The size and offsets of a MAC address
-#define MAC_ADDR_SIZE   6
+// The offsets of a MAC address
 #define DST_MAC_ADDR_OFFSET 0
 #define SRC_MAC_ADDR_OFFSET 6
 // The size and offset of the EtherType field
@@ -31,16 +31,16 @@
 
 // Various EtherType values
 // EtherType for VLAN
-#define ET_VLAN_0 0x81
-#define ET_VLAN_1 0x00
+#define ET_VLAN 0x8100
 // EtherType for IPv4
-#define ET_IPV4_0 0x08
-#define ET_IPV4_1 0x00
+#define ET_IPV4 0x0800
 // EtherType for Address Resolution Protocol (ARP)
-#define ET_ARP_0 0x08
-#define ET_ARP_1 0x06
+#define ET_ARP 0x0806
 
 // Receives an Ethernet packet, performs appropriate actions, and replies if necessary
-int receive_eth_packet(uint8_t *buffer, uint32_t length);
+// To be called by interrupt handlers
+int receive_eth_packet(uint8_t *buffer, uint32_t length, uint32_t id);
+// Generates an Ethernet packet with the specified fields and transmits it
+int send_eth_packet(uint8_t dest_mac_addr[MAC_ADDR_SIZE], uint16_t ether_type, void *payload, uint32_t payload_size, uint32_t id);
 
 #endif

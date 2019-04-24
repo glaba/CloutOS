@@ -15,8 +15,10 @@
 #include "processes.h"
 #include "kheap.h"
 #include "pci.h"
-#include "pci_drivers/e1000.h"
+#include "e1000_driver/e1000.h"
 #include "pit.h"
+#include "network/arp.h"
+#include "network/eth_device.h"
 
 #define RUN_TESTS
 
@@ -175,17 +177,27 @@ void entry(unsigned long magic, unsigned long addr) {
 	/* Initialize the PIT */
 	init_pit();
 
-	/* Initialize PCI drivers and PCI devices */
+	/* Initialize ARP */
+	init_arp();
+
+	/* Initialize E1000 PCI driver and Ethernet device in the correct order */
 	register_pci_driver(e1000_driver);
 	enumerate_pci_devices();
+	uint32_t e1000_eth_dev_id = (uint32_t)register_eth_dev(&e1000_eth_device);
+
+	/* Get our IP address from the DHCP server */
 
 #ifdef RUN_TESTS
 	/* Run tests */
 	launch_tests();
 #endif
+	
 	/* Execute the first program ("shell") ... */
 	process_execute("shell", 0);
 	
+	/* Unregister the E1000 Ethernet device */
+	unregister_eth_dev(e1000_eth_dev_id);
+
 	/* Spin (nicely, so we don't chew up cycles) */
 	asm volatile (".1: hlt; jmp .1;");
 }
