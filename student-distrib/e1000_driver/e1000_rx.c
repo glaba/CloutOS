@@ -81,6 +81,10 @@ int e1000_init_rx(volatile uint8_t *eth_mmio_base) {
 		if (desc.buf_addr == NULL)
 			return -1;
 
+		// Set the descriptor's status to NOT DONE by default, since we will be using that as an indicator
+		//  of our position in the circular buffer and NOT the head and tail pointers (which are unreliable)
+		desc.status &= ~ETH_STATUS_DESC_DONE;
+
 		// Write the descriptor to rx_desc_buf
 		serialize_rx_descriptor(&desc, rx_desc_buf + i * RX_DESCRIPTOR_SIZE);
 	}
@@ -118,6 +122,8 @@ inline int e1000_rx_irq_handler(volatile uint8_t *eth_mmio_base, uint32_t interr
 		
 		// Check if it has been filled out
 		if (cur.status & ETH_STATUS_DESC_DONE) {
+			E1000_DEBUG("Receive Ethernet packet #%d with length %d\n", cur_descriptor, cur.length);
+			
 			// Make sure it is one entire packet, we do not support packets split between frames
 			if ((cur.status & ETH_STATUS_END_OF_PACKET) == 0) {
 				E1000_DEBUG("Received incomplete packet split between frames, ignoring...\n");

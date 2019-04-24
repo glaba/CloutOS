@@ -5,7 +5,7 @@
 #include "network_misc.h"
 
 // Uncomment ETH_DEBUG_ENABLE to enable debugging
-#define ETH_DEBUG_ENABLE
+// #define ETH_DEBUG_ENABLE
 #ifdef ETH_DEBUG_ENABLE
 	#define ETH_DEBUG(f, ...) printf(f, ##__VA_ARGS__)
 #else

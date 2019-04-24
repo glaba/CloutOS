@@ -240,6 +240,13 @@ int receive_udp_packet(uint8_t *buffer, uint32_t length, int32_t vlan, uint32_t 
 			return receive_dhcp_packet(buffer + IP_HEADER_SIZE + UDP_HEADER_SIZE, udp_data_length, id);
 		default:
 			// We have nothing to do with this packet
+			// Let's just print it
+			UDP_DEBUG("Received on UDP port %d from %d.%d.%d.%d: ", dest_port,
+				src_ip_addr[0], src_ip_addr[1], src_ip_addr[2], src_ip_addr[3]);
+			for (i = 0; i < udp_data_length; i++) {
+				UDP_DEBUG("%c", buffer[IP_HEADER_SIZE + UDP_HEADER_SIZE + i]);
+			}
+			UDP_DEBUG("\n");
 			return 0;
 	}
 }

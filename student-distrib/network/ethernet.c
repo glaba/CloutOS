@@ -79,7 +79,7 @@ int receive_eth_packet(uint8_t *buffer, uint32_t length, uint32_t id) {
 	return 0;
 
 malformed_packet:
-	ETH_DEBUG("Malformed packet!");
+	ETH_DEBUG("Malformed packet!\n");
 	return -1;
 }
 

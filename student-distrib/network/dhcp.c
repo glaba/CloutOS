@@ -5,7 +5,7 @@
 #include "../kheap.h"
 
 // Uncomment DHCP_DEBUG_ENABLE to enable debugging
-#define DHCP_DEBUG_ENABLE
+// #define DHCP_DEBUG_ENABLE
 #ifdef DHCP_DEBUG_ENABLE
 	#define DHCP_DEBUG(f, ...) printf(f, ##__VA_ARGS__)
 #else
@@ -100,8 +100,12 @@ int send_dhcp_discover_packet(uint32_t id) {
 		DHCP_CLIENT_UDP_PORT, broadcast_ip, DHCP_SERVER_UDP_PORT, id);
 
 	// Transition to the next state if it succeeded
-	if (retval == 0)
+	if (retval == 0) {
+		DHCP_DEBUG("Successfully sent discover packet, transitioning to state SELECTING\n");
 		device->dhcp_state = DHCP_STATE_SELECTING;
+	} else {
+		DHCP_DEBUG("Failed to send discover packet\n");
+	}
 
 	// Free the allocated memory
 	kfree(data);
@@ -158,11 +162,13 @@ int receive_dhcp_ack(dhcp_packet *packet, dhcp_option_list_item *head, uint32_t 
 
 	// If we didn't get one of the two, there is something wrong with the DHCP server and we give up
 	if (!router_set || !subnet_mask_set) {
+		DHCP_DEBUG("Received malformed ACK, transitioning back to UNINITIALIZED state\n");
 		device->dhcp_state = DHCP_STATE_UNINITIALIZED;
 		return -1;
 	}
 
 	// Advance to the bound state
+	DHCP_DEBUG("Received valid ACK, transitioning to BOUND state\n");
 	device->dhcp_state = DHCP_STATE_BOUND;
 
 	return 0;
@@ -185,6 +191,8 @@ int receive_dhcp_offer(dhcp_packet *packet, dhcp_option_list_item *head, uint32_
 		DHCP_DEBUG("Cannot respond to DHCP offer due to being in the wrong state\n");
 		return -1;
 	}
+
+	DHCP_DEBUG("Received valid DHCP offer, sending DHCP request\n");
 
 	// Accept the offer immediately
 	// Allocate space for the DHCPREQUEST packet we will send to respond to this offer
@@ -223,10 +231,13 @@ int receive_dhcp_offer(dhcp_packet *packet, dhcp_option_list_item *head, uint32_
 		DHCP_CLIENT_UDP_PORT, broadcast_ip, DHCP_SERVER_UDP_PORT, id);
 
 	// Transition to the next state if we succeeded (and transition back to uninit if we failed)
-	if (retval == 0)
+	if (retval == 0) {
+		DHCP_DEBUG("Successfully sent request packet, transitioning to REQUESTING state\n");
 		device->dhcp_state = DHCP_STATE_REQUESTING;
-	else
+	} else {
+		DHCP_DEBUG("Failed to send request packet, transitioning to UNINITIALIZED state\n");
 		device->dhcp_state = DHCP_STATE_UNINITIALIZED;
+	}
 
 	// Free the allocated memory
 	kfree(data);

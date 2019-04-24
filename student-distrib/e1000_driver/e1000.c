@@ -55,7 +55,7 @@ int e1000_init_eth(eth_device *device) {
 	e1000_eth_device.mac_addr[0] = ral & 0xFF;
 
 	E1000_DEBUG("Copied MAC address of %x:%x:%x:%x:%x:%x into eth_device struct\n",
-		e1000_eth_device.mac_addr[0], e1000_eth_device.mac_addr[1], e1000_eth_device.mac_addr[2]
+		e1000_eth_device.mac_addr[0], e1000_eth_device.mac_addr[1], e1000_eth_device.mac_addr[2],
 		e1000_eth_device.mac_addr[3], e1000_eth_device.mac_addr[4], e1000_eth_device.mac_addr[5]);
 
 	// Fill out the IP address to a default value

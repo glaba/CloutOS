@@ -1,6 +1,14 @@
 #ifndef _UDP_H
 #define _UDP_H
 
+// Uncomment UDP_DEBUG_ENABLE to enable debugging
+#define UDP_DEBUG_ENABLE
+#ifdef UDP_DEBUG_ENABLE
+	#define UDP_DEBUG(f, ...) printf(f, ##__VA_ARGS__)
+#else
+	#define UDP_DEBUG(f, ...) // Nothing
+#endif
+
 #include "network_misc.h"
 #include "../types.h"
 
