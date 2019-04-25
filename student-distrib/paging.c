@@ -4,6 +4,23 @@ static unsigned int page_directory[PAGE_DIRECTORY_SIZE];
 static unsigned int video_page_table[PAGE_TABLE_SIZE] __attribute__((aligned (PAGE_ALIGNMENT)));
 static unsigned int user_video_page_table[PAGE_TABLE_SIZE] __attribute__((aligned (PAGE_ALIGNMENT)));
 
+// A struct which represents a large 4MB page in physical memory, and keeps track of other pages near it
+typedef struct large_page {
+	// Whether or not the page is in use
+	uint8_t used;
+	// If this page is not in use, the index of another page that is not in use,
+	//  which should form a linked list of unused pages. The last item in the list points to -1
+	// If this page IS in use, this value is a don't care
+	int32_t next_free;
+} large_page;
+
+// An array of large_page structures, in order of position in physical memory
+// So, the first item corresponds to the page from 0MB-4MB, the second corresponds to 4MB-8MB, etc
+large_page large_pages[LAST_ACCESSIBLE_ADDR / LARGE_PAGE_SIZE];
+
+// The index of the head of the linked list of unused pages
+int32_t unused_page_head_index;
+
 /*
  * Writes a page directory address to the cr3 register
  *
@@ -201,6 +218,44 @@ void unmap_video_mem_user(void *addr) {
 }
 
 /*
+ * Returns the index of an unused 4MB page in physical memory and marks it used
+ *
+ * OUTPUTS: -1 if no page could be found, and the index of the page otherwise
+ */
+int32_t get_open_page() {
+	// Simply pick the head of the unused page linked list
+	int32_t page = unused_page_head_index;
+	if (page < 0)
+		return -1;
+
+	// Mark the page as used
+	large_pages[page].used = 1;
+
+	// Update the head of the linked list to be the next free page
+	unused_page_head_index = large_pages[page].next_free;
+
+	// Return the index we found
+	return page;
+}
+
+/*
+ * Marks the page at the provided index as unused
+ *
+ * INPUTS: index: the index of the large page to mark as unused, in increments of 4MB (ex. 2 corresponds to 8MB)
+ */
+void free_page(int32_t index) {
+	// Validate that the index is valid
+	if (index < 0 || index >= LAST_ACCESSIBLE_ADDR / LARGE_PAGE_SIZE)
+		return;
+
+	large_pages[index].used = 0;
+
+	// Set this to point to the old head, and let this be the new head of the unused page linked list
+	large_pages[index].next_free = unused_page_head_index;
+	unused_page_head_index = index;
+}
+
+/*
  * Initializes the page directory
  * Sets CR0 and CR4 to correctly support paging
  * Sets Page Directory Base Register (PDBR / CR3) to point to the page directory
@@ -215,31 +270,51 @@ void init_paging() {
 	// Set the entries in video_page_table as well as user_video_page_table
 	for (i = 0; i < PAGE_TABLE_SIZE; i++) {
 		// If the current entry does not correspond to the region in video memory
-		if (i < VIDEO / 4096 || i >= (VIDEO + VIDEO_SIZE) / 4096) {
+		if (i < VIDEO / NORMAL_PAGE_SIZE || i >= (VIDEO + VIDEO_SIZE) / NORMAL_PAGE_SIZE) {
 			// The page is not present
 			video_page_table[i] = ~PAGE_PRESENT;
 			user_video_page_table[i] = ~PAGE_PRESENT;
 		} else {
 			// The page is present
-			video_page_table[i] = (i * 4096) | PAGE_READ_WRITE | PAGE_PRESENT;
-			user_video_page_table[i] = (i * 4096) | PAGE_USER_LEVEL | PAGE_READ_WRITE | PAGE_PRESENT;
+			video_page_table[i] = (i * NORMAL_PAGE_SIZE) | PAGE_READ_WRITE | PAGE_PRESENT;
+			user_video_page_table[i] = (i * NORMAL_PAGE_SIZE) | PAGE_USER_LEVEL | PAGE_READ_WRITE | PAGE_PRESENT;
 		}
 	}
 
-	// Set page_directory[0] to point to the video page table
+	// Set page_directory[0] to point to the video page table and mark large page #0 as used
 	page_directory[0] = (unsigned long)(&video_page_table) | PAGE_DISABLE_CACHE | PAGE_READ_WRITE | PAGE_PRESENT;
+	large_pages[0].used = 1;
 
-	// Map kernel memory starting at 4MB to a 4MB page
+	// Map kernel memory starting at 4MB to a 4MB page and mark large page #1 as used
 	page_directory[1] = KERNEL_START_ADDR | PAGE_GLOBAL | PAGE_SIZE_IS_4M | PAGE_READ_WRITE | PAGE_PRESENT;
+	large_pages[1].used = 1;
 
-	// Map kernel heap memory starting at 8MB to a 4MB page
-	page_directory[2] = KERNEL_HEAP_START_ADDR | PAGE_GLOBAL | PAGE_SIZE_IS_4M | PAGE_READ_WRITE | PAGE_PRESENT;
+	// Map in kernel heap memory
+	identity_map_containing_region((void*)KERNEL_HEAP_START_ADDR, HEAP_SIZE,
+		KERNEL_HEAP_START_ADDR | PAGE_GLOBAL | PAGE_SIZE_IS_4M | PAGE_READ_WRITE | PAGE_PRESENT);
+	// Mark the kernel heap memory as used
+	for (i = KERNEL_HEAP_START_ADDR / LARGE_PAGE_SIZE; i < KERNEL_HEAP_END_ADDR / LARGE_PAGE_SIZE; i++)
+		large_pages[i].used = 1;
 
 	// Set all other page directory entries to not present
-	for (i = 3; i < PAGE_DIRECTORY_SIZE; i++) {
-		// Set bit 0 to zero, which means that the page table is not present
+	for (i = KERNEL_HEAP_END_ADDR / LARGE_PAGE_SIZE; i < PAGE_DIRECTORY_SIZE; i++) {
+		// Set bit 0 to zero, which means that the page is not present
 		page_directory[i] &= ~PAGE_PRESENT;
+
+		// Mark the page as unused as well, if it exists in physical memory
+		if (i < LAST_ACCESSIBLE_ADDR / LARGE_PAGE_SIZE) {
+			large_pages[i].used = 0;
+
+			// Connect all the unused pages with linked list connections
+			if (i == LAST_ACCESSIBLE_ADDR / LARGE_PAGE_SIZE - 1)
+				large_pages[i].next_free = -1;
+			else
+				large_pages[i].next_free = i + 1;
+		}
 	}
+
+	// Mark the head of the linked list of unused page to the end of the heap
+	unused_page_head_index = KERNEL_HEAP_END_ADDR / LARGE_PAGE_SIZE;
 
 	// Write the page directory to the page directory register
 	write_cr3(&page_directory);

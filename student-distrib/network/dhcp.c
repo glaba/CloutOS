@@ -63,6 +63,10 @@ int send_dhcp_discover_packet(uint32_t id) {
 
 	// Allocate space for the packet
 	uint8_t *data = kmalloc(sizeof(dhcp_packet) + DHCP_DISCOVER_OPTIONS_SIZE);
+	if (data == NULL) {
+		DHCP_DEBUG("Could not allocate space for DHCP packet\n");
+		return -1;
+	}
 	dhcp_packet *packet = (dhcp_packet*)data;
 
 	fill_default_dhcp_fields(packet, id);
@@ -180,7 +184,7 @@ int receive_dhcp_ack(dhcp_packet *packet, dhcp_option_list_item *head, uint32_t 
  * INPUTS: packet: a struct containing the DHCP packet data
  *         head: a linked list of options that were attached to the DHCP packet
  *         id: the ID of the Ethernet interface that this came on
- * OUTPUTS: -1 on failure and 0 on success
+ * OUTPUTS: -1 on failure (may reset DHCP state back to uninitialized) and 0 on success
  */
 int receive_dhcp_offer(dhcp_packet *packet, dhcp_option_list_item *head, uint32_t id) {
 	// Get the eth_device for this ID
@@ -197,6 +201,12 @@ int receive_dhcp_offer(dhcp_packet *packet, dhcp_option_list_item *head, uint32_
 	// Accept the offer immediately
 	// Allocate space for the DHCPREQUEST packet we will send to respond to this offer
 	uint8_t *data = kmalloc(sizeof(dhcp_packet) + DHCP_REQUEST_OPTIONS_SIZE);
+	if (data == NULL) {
+		DHCP_DEBUG("Could not allocate space for DHCP packet\n");
+		// Go back to an uninitialized state
+		device->dhcp_state = DHCP_STATE_UNINITIALIZED;
+		return -1;
+	}
 	dhcp_packet *resp_packet = (dhcp_packet*)data;
 
 	fill_default_dhcp_fields(resp_packet, id);
@@ -250,7 +260,8 @@ int receive_dhcp_offer(dhcp_packet *packet, dhcp_option_list_item *head, uint32_
  * INPUTS: buffer: the buffer containing the contents of the purported DHCP packet
  *         length: the length of the DHCP packet
  *         id: the ID of the Ethernet device this came from
- * OUTPUTS: -1 if the packet was malformed / unexpected and 0 otherwise
+ * OUTPUTS: -1 if the packet was malformed / unexpected OR if memory allocation failed and 0 otherwise
+ * SIDE EFFECTS: may reset back to uninitialized state if processing the packet failed due to bad malloc
  */
 int receive_dhcp_packet(uint8_t *buffer, uint32_t length, uint32_t id) {
 	// Get the eth_device for this ID
@@ -283,6 +294,12 @@ int receive_dhcp_packet(uint8_t *buffer, uint32_t length, uint32_t id) {
 	int i = 0;
 	// Initialize the head as the END option
 	dhcp_option_list_item *head = kmalloc(sizeof(dhcp_option_list_item));
+	if (head == NULL) {
+		DHCP_DEBUG("Could not allocate space for DHCP options linked list\n");
+		// Switch back to uninitialized state
+		device->dhcp_state = DHCP_STATE_UNINITIALIZED;
+		return -1;
+	}
 	head->data.tag = DHCP_OPT_END;
 	head->data.length = 0;
 	head->data.data = NULL;
@@ -295,17 +312,20 @@ int receive_dhcp_packet(uint8_t *buffer, uint32_t length, uint32_t id) {
 		// First, check that the fields are valid 
 		// Check that the length byte exists, and if a buffer of that length fits in the total size
 		if (i + 1 >= options_length || i + 1 + options[i + 1] >= options_length) {
-			// Free the entire linked list
-			dhcp_option_list_item *cur;
-			for (cur = head; cur != NULL; cur = cur->next)
-				kfree(cur);
 			// Return -1 because the packet was malformed
 			DHCP_DEBUG("DHCP option fields go beyond length of packet\n");
+			FREE_LIST(dhcp_option_list_item, head);
 			return -1;
 		}
 
 		// If the fields are valid, create a new linked list node and add it to the list
 		dhcp_option_list_item *cur = kmalloc(sizeof(dhcp_option_list_item));
+		// If the allocation failed, free the list and return -1
+		if (cur == NULL) {
+			FREE_LIST(dhcp_option_list_item, head);
+			return -1;
+		}
+		// Otherwise, fill in the fields of the dhcp_option
 		cur->data.tag = options[i];
 		cur->data.length = options[i + 1];
 		cur->data.data = options + i + 2;
@@ -331,12 +351,13 @@ int receive_dhcp_packet(uint8_t *buffer, uint32_t length, uint32_t id) {
 	// Check if there was a message type field
 	if (message_type == -1) {
 		DHCP_DEBUG("No message type field attached to DHCP packet\n");
+		FREE_LIST(dhcp_option_list_item, head);
 		return -1;
 	}
 
-	// Finally, invoke specific behavior depending on the message type
 	int retval;
 
+	// Finally, invoke specific behavior depending on the message type
 	if (message_type == DHCP_OFFER)
 		retval = receive_dhcp_offer(packet, head, id);
 
@@ -350,11 +371,7 @@ int receive_dhcp_packet(uint8_t *buffer, uint32_t length, uint32_t id) {
 	}
 
 	// Free the linked list
-	dhcp_option_list_item *next;
-	for (cur = head; cur != NULL; cur = next) {
-		next = cur->next;
-		kfree(cur);
-	}
+	FREE_LIST(dhcp_option_list_item, head);
 
 	return retval;
 }

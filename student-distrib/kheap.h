@@ -2,11 +2,7 @@
 #define _KHEAP_H
 
 #include "types.h"
-
-// The kernel heap starts at 8MB in physical memory
-#define KERNEL_HEAP_START_ADDR 0x800000
-// The size of the heap is one large page (4 MiB)
-#define HEAP_SIZE 0x400000
+#include "paging.h"
 
 // Clears the entire heap and fills it with zeroes
 void init_kheap();

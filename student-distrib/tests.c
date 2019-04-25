@@ -523,9 +523,9 @@ int kheap_test() {
 	/***********/
 	if (1) {
 		// Each memory descriptor is 16 bytes, so if we allocate 1004 byte regions,
-		//  we should be able to allocate 4MiB / 1024 = 4096 times and fill up the heap
+		//  we should be able to allocate 12MiB / 1024 = 12288 times and fill up the heap
 		int i;
-		for (i = 0; i < 4096; i++) {
+		for (i = 0; i < 12288; i++) {
 			if (kmalloc(1004) == NULL) {
 				printf("Index %d\n", i);
 				printf("TEST #1 FAILED\n");
@@ -543,11 +543,11 @@ int kheap_test() {
 		// Now, we will test that freeing at the beginning, middle, and end all work
 		int i;
 		void *ptr, *beginning, *middle, *end;
-		for (i = 0; i < 4096; i++) {
+		for (i = 0; i < 12288; i++) {
 			ptr = kmalloc(1004);
 			if (i == 0) beginning = ptr;
 			if (i == 69) middle = ptr;
-			if (i == 4095) end = ptr; 
+			if (i == 12287) end = ptr; 
 		}
 
 		kfree(beginning);
@@ -577,7 +577,7 @@ int kheap_test() {
 		// Now, we will test coalescing of freed regions 
 		int i;
 		void *ptr, *first, *second;
-		for (i = 0; i < 4096; i++) {
+		for (i = 0; i < 12288; i++) {
 			ptr = kmalloc(1004);
 			if (i == 690) first = ptr;
 			if (i == 691) second = ptr;
@@ -606,7 +606,7 @@ int kheap_test() {
 		// Now, we will test filling a freed region with 2 pieces of smaller size
 		int i;
 		void *ptr, *middle;
-		for (i = 0; i < 4096; i++) {
+		for (i = 0; i < 12288; i++) {
 			ptr = kmalloc(1004);
 			if (i == 50) middle = ptr;
 		}

@@ -150,6 +150,9 @@ int32_t open(const uint8_t* filename) {
 	
 	// Add the file to the list of files, and store its index
 	int i = DYN_ARR_PUSH(file_t, cur_pcb->files, new_file);
+	// If we couldn't add the file to the table, return failure
+	if (i < 0)
+		return FAIL;
 
 	// Implement different behavior depending on the file type
 	switch (dentry.filetype) {

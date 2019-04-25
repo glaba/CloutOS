@@ -57,4 +57,12 @@
 	id;                                                               \
 })
 
+#define FREE_LIST(TYPE_NAME, list_head) ({ \
+	TYPE_NAME *cur, *next; \
+	for (cur = list_head; cur != NULL; cur = next) { \
+		next = cur->next; \
+		kfree(cur); \
+	} \
+})
+
 #endif

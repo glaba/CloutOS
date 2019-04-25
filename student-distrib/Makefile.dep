@@ -7,49 +7,49 @@ endian.o: endian.c endian.h types.h
 exception_handlers.o: exception_handlers.c x86_desc.h types.h lib.h \
   i8259.h exception_handlers.h processes.h system_calls.h rtc.h \
   irq_defs.h file_system.h keyboard.h system_call_linkage.h \
-  dynamic_array.h
+  dynamic_array.h list.h
 file_system.o: file_system.c file_system.h types.h system_calls.h lib.h \
   rtc.h irq_defs.h keyboard.h processes.h system_call_linkage.h \
-  dynamic_array.h x86_desc.h
+  dynamic_array.h list.h x86_desc.h
 i8259.o: i8259.c i8259.h types.h lib.h
 init_idt.o: init_idt.c x86_desc.h types.h lib.h i8259.h init_idt.h \
   exception_handlers.h interrupt_service_routines.h keyboard.h irq_defs.h \
   rtc.h system_calls.h file_system.h processes.h system_call_linkage.h \
-  dynamic_array.h pci.h spinlock.h list.h pit.h
+  dynamic_array.h list.h pci.h spinlock.h pit.h
 kernel.o: kernel.c multiboot.h types.h x86_desc.h lib.h i8259.h debug.h \
   tests.h keyboard.h irq_defs.h paging.h rtc.h file_system.h \
-  system_calls.h processes.h system_call_linkage.h dynamic_array.h \
-  kheap.h pci.h spinlock.h list.h e1000_driver/e1000.h \
-  e1000_driver/../pci.h e1000_driver/../network/eth_device.h \
-  e1000_driver/../network/../types.h e1000_driver/../network/ethernet.h \
-  e1000_driver/../network/../lib.h e1000_driver/../network/network_misc.h \
-  pit.h network/arp.h network/../lib.h network/network_misc.h \
-  network/eth_device.h
+  system_calls.h processes.h system_call_linkage.h dynamic_array.h list.h \
+  kheap.h pci.h spinlock.h e1000_driver/e1000.h e1000_driver/../pci.h \
+  e1000_driver/../network/eth_device.h e1000_driver/../network/../types.h \
+  e1000_driver/../network/ethernet.h e1000_driver/../network/../lib.h \
+  e1000_driver/../network/network_misc.h pit.h network/arp.h \
+  network/../lib.h network/network_misc.h network/eth_device.h
 keyboard.o: keyboard.c lib.h types.h i8259.h keyboard.h irq_defs.h
-kheap.o: kheap.c kheap.h types.h spinlock.h lib.h
+kheap.o: kheap.c kheap.h types.h paging.h lib.h spinlock.h
 lib.o: lib.c lib.h types.h
 paging.o: paging.c paging.h lib.h types.h
 pci.o: pci.c pci.h lib.h types.h spinlock.h irq_defs.h list.h paging.h \
   i8259.h kheap.h
 pit.o: pit.c pit.h types.h lib.h i8259.h irq_defs.h list.h kheap.h \
-  spinlock.h
+  paging.h spinlock.h
 processes.o: processes.c processes.h types.h system_calls.h lib.h rtc.h \
   irq_defs.h file_system.h keyboard.h system_call_linkage.h \
-  dynamic_array.h paging.h x86_desc.h kheap.h
+  dynamic_array.h list.h paging.h x86_desc.h kheap.h
 rtc.o: rtc.c rtc.h types.h irq_defs.h lib.h i8259.h
 spinlock.o: spinlock.c spinlock.h types.h lib.h
 system_calls.o: system_calls.c system_calls.h lib.h types.h rtc.h \
   irq_defs.h file_system.h keyboard.h processes.h system_call_linkage.h \
-  dynamic_array.h paging.h kheap.h
+  dynamic_array.h list.h paging.h kheap.h
 tests.o: tests.c tests.h x86_desc.h types.h lib.h init_idt.h \
   exception_handlers.h file_system.h system_calls.h rtc.h irq_defs.h \
-  keyboard.h processes.h system_call_linkage.h dynamic_array.h pci.h \
-  spinlock.h list.h e1000_driver/e1000.h e1000_driver/../pci.h \
+  keyboard.h processes.h system_call_linkage.h dynamic_array.h list.h \
+  pci.h spinlock.h e1000_driver/e1000.h e1000_driver/../pci.h \
   e1000_driver/../network/eth_device.h e1000_driver/../network/../types.h \
   e1000_driver/../network/ethernet.h e1000_driver/../network/../lib.h \
-  e1000_driver/../network/network_misc.h kheap.h pit.h network/ethernet.h \
-  network/arp.h network/../lib.h network/network_misc.h network/udp.h \
-  network/../types.h network/dhcp.h network/../list.h
+  e1000_driver/../network/network_misc.h kheap.h paging.h pit.h \
+  network/ethernet.h network/arp.h network/../lib.h \
+  network/network_misc.h network/udp.h network/../types.h network/dhcp.h \
+  network/../list.h
 e1000.o: e1000_driver/e1000.c e1000_driver/e1000.h e1000_driver/../pci.h \
   e1000_driver/../lib.h e1000_driver/../types.h \
   e1000_driver/../spinlock.h e1000_driver/../irq_defs.h \
@@ -65,13 +65,13 @@ e1000_rx.o: e1000_driver/e1000_rx.c e1000_driver/e1000_rx.h \
   e1000_driver/../network/network_misc.h e1000_driver/e1000_misc.h \
   e1000_driver/../pci.h e1000_driver/../lib.h e1000_driver/../spinlock.h \
   e1000_driver/../types.h e1000_driver/../irq_defs.h \
-  e1000_driver/../list.h e1000_driver/../kheap.h \
+  e1000_driver/../list.h e1000_driver/../kheap.h e1000_driver/../paging.h \
   e1000_driver/../network/ethernet.h
 e1000_tx.o: e1000_driver/e1000_tx.c e1000_driver/e1000_tx.h \
   e1000_driver/../types.h e1000_driver/e1000_misc.h e1000_driver/../pci.h \
   e1000_driver/../lib.h e1000_driver/../types.h \
   e1000_driver/../spinlock.h e1000_driver/../irq_defs.h \
-  e1000_driver/../list.h e1000_driver/../kheap.h \
+  e1000_driver/../list.h e1000_driver/../kheap.h e1000_driver/../paging.h \
   e1000_driver/../spinlock.h
 arp.o: network/arp.c network/arp.h network/../lib.h network/../types.h \
   network/network_misc.h network/ethernet.h network/eth_device.h \
@@ -80,16 +80,19 @@ arp.o: network/arp.c network/arp.h network/../lib.h network/../types.h \
 dhcp.o: network/dhcp.c network/dhcp.h network/network_misc.h \
   network/../types.h network/../list.h network/eth_device.h \
   network/ethernet.h network/../lib.h network/../types.h network/udp.h \
-  network/../endian.h network/../kheap.h
+  network/../endian.h network/../kheap.h network/../paging.h \
+  network/../lib.h
 eth_device.o: network/eth_device.c network/eth_device.h \
   network/../types.h network/ethernet.h network/../lib.h \
   network/../types.h network/network_misc.h network/dhcp.h \
-  network/../list.h network/../spinlock.h network/../kheap.h
+  network/../list.h network/../spinlock.h network/../kheap.h \
+  network/../paging.h network/../lib.h
 ethernet.o: network/ethernet.c network/ethernet.h network/../lib.h \
   network/../types.h network/network_misc.h network/arp.h network/udp.h \
   network/../types.h network/eth_device.h network/../endian.h \
-  network/../kheap.h
+  network/../kheap.h network/../paging.h network/../lib.h
 udp.o: network/udp.c network/udp.h network/network_misc.h \
   network/../types.h network/ethernet.h network/../lib.h \
   network/../types.h network/eth_device.h network/arp.h network/dhcp.h \
-  network/../list.h network/../endian.h network/../kheap.h
+  network/../list.h network/../endian.h network/../kheap.h \
+  network/../paging.h network/../lib.h

@@ -20,6 +20,7 @@
 
 /*
  * Initializes the provided dynamic array
+ * The caller should check if the data is NULL
  *
  * INPUTS: TYPE: the type of the data that this dynamic array contains
  *         dyn_arr: a dynamic array to initialize
@@ -43,11 +44,13 @@
  * INPUTS: TYPE: the type of the data that this dynamic array contains
  *         dyn_arr: the dynamic array to add a piece of data to
  *         new_element: the data to add to the end of the given dynamic array
- * OUTPUTS: the index of the newly added data
+ * OUTPUTS: the index of the newly added data, or -1 if it failed
  */
 #define DYN_ARR_PUSH(TYPE, dyn_arr, new_element) ({ \
-	if ((dyn_arr).length == (dyn_arr).capacity) { \
-		TYPE *new_data = kmalloc((DYN_ARR_RESIZE_FACTOR * (dyn_arr).capacity) * sizeof(TYPE)); \
+	TYPE *new_data = NULL; \
+	if ((dyn_arr).length == (dyn_arr).capacity) \
+		new_data = kmalloc((DYN_ARR_RESIZE_FACTOR * (dyn_arr).capacity) * sizeof(TYPE)); \
+	if (new_data != NULL) { \
 		/* Copy over the old data */ \
 		int i; \
 		for (i = 0; i < (dyn_arr).length; i++) \
@@ -58,10 +61,14 @@
 		/* Update the capacity */ \
 		(dyn_arr).capacity = DYN_ARR_RESIZE_FACTOR * (dyn_arr).capacity; \
 	} \
-	/* Insert the new element at the end of the data */ \
-	(dyn_arr).data[(dyn_arr).length] = (new_element); \
-	/* Return the index where the new element was added while also incrementing it */ \
-	(dyn_arr).length++; \
+	int retval = -1; /* -1 indicates that the malloc failed */ \
+	if ((dyn_arr).length != (dyn_arr).capacity) { \
+		/* Insert the new element at the end of the data */ \
+		(dyn_arr).data[(dyn_arr).length] = (new_element); \
+		/* Return the index where the new element was added while also incrementing it */ \
+		retval = (dyn_arr).length++; \
+	} \
+	retval; /* Return the value from the statement expression */ \
 })
 
 /*
@@ -77,13 +84,15 @@
 		/* Resize the array to have a capacity of dyn_arr.length + 1 */ \
 		(dyn_arr).capacity = (dyn_arr).length + 1; \
 		TYPE *new_data = kmalloc((dyn_arr).capacity * sizeof(TYPE)); \
-		/* Copy over the old data */ \
-		int i; \
-		for (i = 0; i < (dyn_arr).length; i++) \
-			new_data[i] = (dyn_arr).data[i]; \
-		/* Free the old data and set data to new_data */ \
-		kfree((dyn_arr).data); \
-		(dyn_arr).data = new_data; \
+		/* Copy over the old data if the allocation succeeded */ \
+		if (new_data != NULL) { \
+			int i; \
+			for (i = 0; i < (dyn_arr).length; i++) \
+				new_data[i] = (dyn_arr).data[i]; \
+			/* Free the old data and set data to new_data */ \
+			kfree((dyn_arr).data); \
+			(dyn_arr).data = new_data; \
+		} \
 	} \
 })
 

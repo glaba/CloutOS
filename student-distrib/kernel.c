@@ -147,6 +147,9 @@ void entry(unsigned long magic, unsigned long addr) {
 		ltr(KERNEL_TSS);
 	}
 
+	// Variable which indicates whether or not all critical OS functions are ready
+	int os_ready = 1;
+
 	clear();
 	/* Init the PIC */
 	i8259_init();
@@ -181,20 +184,24 @@ void entry(unsigned long magic, unsigned long addr) {
 	init_arp();
 
 	/* Initialize E1000 PCI driver and Ethernet device in the correct order */
-	register_pci_driver(e1000_driver);
+	os_ready &= (register_pci_driver(e1000_driver) == 0);
 	enumerate_pci_devices();
 	uint32_t e1000_eth_dev_id = (uint32_t)register_eth_dev(&e1000_eth_device);
+	os_ready &= (e1000_eth_dev_id > 0);
 
-	/* Get our IP address from the DHCP server */
+	/* Initialize user level processes */
+	os_ready &= (init_processes() == 0);
 
+	if (os_ready) {
 #ifdef RUN_TESTS
-	/* Run tests */
-	launch_tests();
+		/* Run tests */
+		launch_tests();
 #endif
 	
-	/* Execute the first program ("shell") ... */
-	process_execute("shell", 0);
-	
+		/* Execute the first program ("shell") ... */
+		process_execute("shell", 0);
+	}
+
 	/* Unregister the E1000 Ethernet device */
 	unregister_eth_dev(e1000_eth_dev_id);
 

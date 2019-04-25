@@ -6,6 +6,7 @@
 #include "system_call_linkage.h"
 #include "keyboard.h"
 #include "dynamic_array.h"
+#include "list.h"
 
 // Uncomment PROC_DEBUG_ENABLE to enable debugging
 #define PROC_DEBUG_ENABLE
@@ -58,10 +59,22 @@ typedef struct file_t {
 // A dynamic array containing file_t elements
 typedef DYNAMIC_ARRAY(file_t, file_dyn_arr) file_dyn_arr;
 
+typedef struct large_page_mapping {
+	// The index of the virtual address of the page (corresponding to 4MB jumps per index)
+	int virt_index;
+	// The index of the physical address of the page (corresponding to 4MB jumps per index)
+	int phys_index;
+} large_page_mapping;
+
+// A linked list of ints where each item represents an index of a 4MB page used by a process
+typedef LIST_ITEM(large_page_mapping, large_page_mapping_list_item) large_page_mapping_list_item;
+
 typedef struct pcb_t {
 	// A dynamic array of the files that are being used by the process
 	file_dyn_arr files;
-	// The PID of the process
+	// A linked list of the indices of the 4MB pages allocated to this process
+	large_page_mapping_list_item *page_mappings_head;
+	// The PID of the process; a negative value indicates that this PCB does not represent a valid process
 	int32_t pid;
 	// The PID of the parent process
 	int32_t parent_pid;
@@ -71,6 +84,8 @@ typedef struct pcb_t {
 	void *vid_mem;
 } pcb_t;
 
+// Initializes any supporting data structures for managing user level processes
+int init_processes();
 // Starts the process associated with the given shell command
 int32_t process_execute(const char *command, uint8_t has_parent);
 // Halts the current process and returns the provided status code to the parent process

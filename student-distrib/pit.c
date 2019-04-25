@@ -69,6 +69,8 @@ uint32_t register_periodic_callback(int interval, void (*callback_fn)(double)) {
 		return 0;
 
 	callback_list_item *callback = kmalloc(sizeof(callback_list_item));
+	if (callback == NULL)
+		return 0;
 
 	callback->data.callback = callback_fn;
 	callback->data.interval = interval;

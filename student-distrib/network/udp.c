@@ -135,12 +135,14 @@ int fill_ip_header(uint16_t data_length, uint16_t fragment_id, uint16_t fragment
  *         length: the length of the data
  *         src_port, dest_port: the ports to use for the UDP transmission
  *         id: the ID of the Ethernet interface to use
- * RETURNS: -1 if the parameters are invalid and 0 otherwise
+ * RETURNS: -1 if the parameters are invalid / sending otherwise failed and 0 otherwise
  */
 int send_udp_packet(void *data, uint16_t length, uint16_t src_port, uint8_t dest_ip[IPV4_ADDR_SIZE], 
                     uint16_t dest_port, uint32_t id) {
 
 	void *packet = kmalloc(length + IP_HEADER_SIZE + UDP_HEADER_SIZE);
+	if (packet == NULL)
+		return -1;
 
 	// Get our IP address
 	uint8_t src_ip[IPV4_ADDR_SIZE];

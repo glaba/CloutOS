@@ -4,6 +4,11 @@
 #include "lib.h"
 #include "types.h"
 
+// The last address we will deem as accessible in the system 
+// This is hardcoded to 224MB, which is a conservative estimate, since accessing the real value
+//  is a fairly non trivial task that involves messing around with the BIOS
+#define LAST_ACCESSIBLE_ADDR 0xE000000
+
 // The size of a large 4MB page (4MB)
 #define LARGE_PAGE_SIZE 0x400000
 // The size of a normal 4KB page (4KB)
@@ -23,14 +28,18 @@
 
 // The kernel starts at 4MB in physical memory
 #define KERNEL_START_ADDR        0x400000
-// Userspace programs start at 16MB in physical memory
-#define USER_PROGRAMS_START_ADDR 0x1000000
 // The size of a kernel stack
 #define KERNEL_STACK_SIZE        0x2000
 // The kernel heap starts at 8MB in physical memory
 #define KERNEL_HEAP_START_ADDR   0x800000
+// The kernel heap ends at 20MB in physical memory
+#define KERNEL_HEAP_END_ADDR     0x1400000
+// The size of the kernel heap (12MB)
+#define HEAP_SIZE (KERNEL_HEAP_END_ADDR - KERNEL_HEAP_START_ADDR)
+// The kernel ends with the kernel heap at 20MB
+#define KERNEL_END_ADDR KERNEL_HEAP_END_ADDR
 // The virtual address that video memory is mapped to for userspace programs (192MB + 0xB8000)
-#define VIDEO_USER_VIRT_ADDR     (192 * 1024 * 1024 + 0xB8000)
+#define VIDEO_USER_VIRT_ADDR (192 * 1024 * 1024 + 0xB8000)
 
 /////////////////////////////////////////////////
 // Page table / page directory entry constants //
@@ -76,5 +85,10 @@ int32_t map_video_mem_user(void **addr);
 
 // Unmaps the video memory paged in for userspace programs 
 void unmap_video_mem_user(void *addr);
+
+// Returns the index of an unused 4MB page in physical memory and marks it used
+int32_t get_open_page();
+// Marks the page at the provided index as unused
+void free_page(int32_t index);
 
 #endif /* _PAGING_H */
