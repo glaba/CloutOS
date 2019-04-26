@@ -114,7 +114,7 @@ int32_t write(int32_t fd, const void *buf, int32_t nbytes) {
 		return 0;
 
 	// Call the appropriate write function
-	return ((cur_pcb->files.data[fd]).fd_table)->write(fd, buf, nbytes);
+	return cur_pcb->files.data[fd].fd_table->write(fd, buf, nbytes);
 }
 
 /*

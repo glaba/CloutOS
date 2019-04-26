@@ -74,6 +74,8 @@ typedef struct pcb_t {
 	file_dyn_arr files;
 	// A linked list of the indices of the 4MB pages allocated to this process
 	large_page_mapping_list_item *page_mappings_head;
+	// The address of the base of the kernel stack
+	void *kernel_stack_base;
 	// The PID of the process; a negative value indicates that this PCB does not represent a valid process
 	int32_t pid;
 	// The PID of the parent process

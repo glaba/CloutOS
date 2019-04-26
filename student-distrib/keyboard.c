@@ -270,15 +270,8 @@ void keyboard_handler() {
 			linepos--;
 		}
 	}
-	// If linepos is at 0 clear it in memory
-	else if (is_backspace && key_down && linepos == 0) {
-		// Clear keyboard buffer at 0
-		linebuffer[linepos] = '\0';
-	}
-
 
 	if (key_down) {
-
 		// Use the shifted set if it's alphabetical and uppercase
 		//   OR if it's non alphabetical but the shift key is down
 		if ((is_alphabetical && uppercase) || (!is_alphabetical && use_shift))
@@ -308,11 +301,13 @@ void keyboard_handler() {
 		else if (character == '\n' && key_down) {
 			putc('\n');
 		}
-		/* If buffer is full, then put \n as last character*/
+		/* If buffer is full, then put \n as last character and print a newline */
 		else if (linepos == TERMINAL_SIZE - 1) {
+			putc('\n');
 			character = '\n';
 			linebuffer[linepos] = character;
 			enter_flag = 0;
+			linepos = 0;
 		}
 	}
 }

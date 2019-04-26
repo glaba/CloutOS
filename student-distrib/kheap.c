@@ -24,16 +24,22 @@
 /*                                                                                     */
 /***************************************************************************************/
 
+// The threshold between what we will call a "small" block and a "big" block
+// Small blocks are placed in the beginning of the free linked list when they are freed
+//  and big blocks are placed at the end, which encourages small blocks to be allocated
+//  before fragmenting bigger ones
+#define BIG_BLOCK_THRESHOLD 2000
+
 // Memory descriptor
 // Struct which will be stored along with allocated memory that keeps track of heap structure
 typedef struct mem_desc {
 	// Bit field to save memory
 	struct {
-		// The size of the block in bytes (23 bits because 2^22 = 4MB, the size of the heap, and the largest block is 4MB)
-		//  including the descriptor
-		unsigned int size: 23;
+		// The size of the block in bytes (31 bits since we are not covering over half the entire RAM with a heap)
+		//  *including the descriptor*
+		unsigned int size: 31;
 		// Whether or not this block is being used, boolean field
-		unsigned int is_free: 9; 
+		unsigned int is_free: 1; 
 	} block_data;
 	// Pointer to the next memory descriptor 
 	struct mem_desc *next, *prev;
@@ -66,7 +72,7 @@ void init_kheap() {
 	free_tail = (mem_desc*)KERNEL_HEAP_START_ADDR;
 
 	// Set the single block to be free and contain the whole heap
-	head->block_data.size = HEAP_SIZE & ((1 << 23) - 1);
+	head->block_data.size = HEAP_SIZE & 0x7FFFFFFF;
 	head->block_data.is_free = 1;
 	head->next = NULL;
 	head->prev = NULL;
@@ -77,7 +83,164 @@ void init_kheap() {
 }
 
 /*
- * Allocates a buffer of the specified size in the 4MiB kernel heap page and returns a pointer to it
+ * Removes the provided mem_desc from the free linked list
+ */
+void remove_free_element(mem_desc *cur) {
+	// Set prev->next and next->prev pointers to remove cur from the free list
+	if (free_head == cur)
+		free_head = cur->next_free;
+	else
+		cur->prev_free->next_free = cur->next_free;
+
+	if (free_tail == cur)
+		free_tail = cur->prev_free;
+	else
+		cur->next_free->prev_free = cur->prev_free;
+}
+
+/*
+ * Splits the provided free block into two blocks, where the first block has provided size 
+ *
+ * INPUTS: cur: the block to split
+ *         size: the size of the first block in the resulting split (excluding descriptor)
+ * OUTPUTS: NULL if the block is not free or if the size is invalid, address of second block in split otherwise
+ */
+mem_desc* split_free_block(mem_desc *cur, uint32_t size) {
+	// Check that the size is valid
+	if (size + 2 * sizeof(mem_desc) > cur->block_data.size)
+		return NULL;
+
+	// Check that the block is free
+	if (!cur->block_data.is_free)
+		return NULL;
+
+	uint32_t total_size = cur->block_data.size;
+
+	// Update the size of the first block
+	cur->block_data.size = size + sizeof(mem_desc); 
+
+	// Get a pointer to the address of the new block
+	mem_desc *new_block = (mem_desc*)((void*)cur + size + sizeof(mem_desc));
+	// Mark it free
+	new_block->block_data.is_free = 1;
+	// Set the size of the second block to be 
+	//  total original size - size of first block's data - size of first block's descriptor
+	new_block->block_data.size = total_size - size - sizeof(mem_desc);
+
+	// Update all pointers in the regular blocks array, inserting new_block in correct memory order
+	new_block->next = cur->next;
+	new_block->prev = cur;
+	cur->next = new_block;
+	(new_block->next == NULL) ? (0) : (new_block->next->prev = new_block);
+
+	// Update all pointers in the free blocks array, inserting new_block at the tail of the free array
+	// Insert the new block at the head if it is small and at the tail if it is big
+	// The intent of this is to prevent fragmentation by trying to use small blocks before big ones
+	if (new_block->block_data.size > BIG_BLOCK_THRESHOLD) {
+		// Put the block at the end of the linked list
+		new_block->next_free = NULL;
+		new_block->prev_free = free_tail;
+		(free_tail == NULL) ? (free_head = new_block) : (free_tail->next_free = new_block);
+		free_tail = new_block;
+	} else {
+		// Put the block at the beginning of the linked list
+		new_block->prev_free = NULL;
+		new_block->next_free = free_head;
+		(free_head == NULL) ? (free_tail = new_block) : (free_head->prev_free = new_block);
+		free_head = new_block;
+	}
+
+	return new_block;
+}
+
+/*
+ * Allocates a buffer of the specified size that is aligned to a multiple of the parameter alignment
+ *
+ * INPUTS: size: the size of the buffer to allocate
+ *         alignment: the returned pointer will be a multiple of this value
+ * OUTPUTS: a pointer to an aligned buffer of the specified size
+ */
+void* kmalloc_aligned(uint32_t size, uint32_t alignment) {
+	spin_lock(&heap_lock);
+
+	// Look through all the free blocks
+	mem_desc *cur;
+	for (cur = free_head; cur != NULL; cur = cur->next_free) {
+		// [start, end): bounds on the actual region of allocatable memory given by this block
+		uint32_t start = (uint32_t)cur + sizeof(mem_desc);
+		uint32_t end = (uint32_t)cur + cur->block_data.size;
+
+		// The block contains an aligned address if
+		//   start = alignment * m OR
+		//   start = alignment * m + j and end = alignment * n + k for n > m, k < alignment, j < alignment
+		// The two following if statements check for these two cases, respectively
+		if (start % alignment == 0) {
+			// In this case, we either have exactly the right size, 
+			//  or we can split into two blocks and reserve the first
+			if (cur->block_data.size == size + sizeof(mem_desc) ||
+				split_free_block(cur, size) != NULL) {
+				
+				// Then, simply mark the block as not free and remove it from the free list
+				cur->block_data.is_free = 0;
+				remove_free_element(cur);
+
+				// Return the corresponding pointer
+				spin_unlock(&heap_lock);
+				return (void*)cur + sizeof(mem_desc);
+			}
+		} else if (start / alignment != end / alignment) {
+			// In this case, the buffer should start from alignment * (start / alignment + 1)
+			//  which is basically start rounded up to the closest multiple of alignment
+			uint32_t actual_start = alignment * (start / alignment + 1);
+
+			// Currently, we have
+			//  [ mem_desc | (...) ]
+			//             ^
+			//             start
+			// where ... indicates some unknown number of bytes and () means optional. We want 
+			//  [ mem_desc | (...) | mem_desc | size bytes | (mem_desc) | (...) ]
+			//             ^                  ^
+			//             start              actual_start
+
+			// Let's check if we have enough room to fit all these things
+			// First check: the space between start and actual_start can fit a mem_desc
+			if (actual_start - start < sizeof(mem_desc))
+				continue;
+			// Second check: either the first and second block fully fill the entire area
+			//               or the third block does exist, and there is enough room for its mem_desc
+			int enough_room = (sizeof(mem_desc) + (actual_start - start) + size == cur->block_data.size) ||
+			                  (2 * sizeof(mem_desc) + (actual_start - start) + size <= cur->block_data.size);
+			if (!enough_room)
+				continue;
+
+			// Note down whether or not we will have to create a third block (ie, the first and second DON'T
+			//  fully fill the original block)
+			int third_block = !(sizeof(mem_desc) + (actual_start - start) + size == cur->block_data.size);
+
+			// Perform the first split, such that the first piece has data size indicated in the diagram
+			mem_desc *second_block = split_free_block(cur, actual_start - start - sizeof(mem_desc));
+		
+			// Then, perform an additional split if a third block needs to be created
+			if (third_block)
+				split_free_block(second_block, size);
+		
+			// Mark the second block (the aligned one with the desired size) as not free and remove it
+			//  from the free blocks list
+			second_block->block_data.is_free = 0;
+			remove_free_element(second_block);
+
+			// Return the corresponding pointer
+			spin_unlock(&heap_lock);
+			return (void*)second_block + sizeof(mem_desc);
+		}
+	}
+
+	spin_unlock(&heap_lock);
+	return NULL;
+}
+
+/*
+ * Allocates a buffer of the specified size in the kernel heap area and returns a pointer to it
  *
  * INPUTS: size: the size of the buffer to allocate
  * OUTPUTS: a pointer to a buffer of specified size
@@ -86,52 +249,22 @@ void* kmalloc(uint32_t size) {
 	spin_lock(&heap_lock);
 
 	// Look for a free block in the linked list of free blocks
-	mem_desc *cur, *prev;
-	prev = NULL;
+	mem_desc *cur;
 	for (cur = free_head; cur != NULL; cur = cur->next_free) {
 		// Check if the block is exactly the right size
-		if (cur->block_data.size == size + sizeof(mem_desc)) {
-			// Then, simply mark the block as not free
+		//  or if we can try splitting the current block into two pieces, 
+		//  where the first piece is of the desired size
+		if (cur->block_data.size == size + sizeof(mem_desc) ||
+			split_free_block(cur, size) != NULL) {
+
+			// Then, simply mark the block as not free and remove it from the free list
 			cur->block_data.is_free = 0;
-			// Set prev->next and next->prev pointers to remove cur from the free list
-			(cur->prev_free == NULL) ? (free_head = cur->next_free) : (cur->prev_free->next_free = cur->next_free);
-			(cur->next_free == NULL) ? (free_tail = cur->prev_free) : (cur->next_free->prev_free = cur->prev_free);
+			remove_free_element(cur);
 
 			// Return the corresponding pointer
 			spin_unlock(&heap_lock);
 			return (void*)cur + sizeof(mem_desc);
-
-		// We need space for one more block descriptor if the size desired is less
-		//  than the size available, since we will have to break the block into 2
-		} else if (cur->block_data.size >= size + 2 * sizeof(mem_desc)) {
-			uint32_t new_size = size + sizeof(mem_desc);
-
-			// Create the new block at the end
-			mem_desc *new_block = (mem_desc*)((void*)cur + new_size);
-			// Update next / prev pointers in the regular blocks array
-			new_block->next = cur->next;
-			new_block->prev = cur; 
-			cur->next = new_block;
-			// Mark the new block as free and set its size correctly
-			new_block->block_data.is_free = 1;
-			new_block->block_data.size = cur->block_data.size - new_size;
-
-			// Swap the current block with the new block in the free blocks linked list
-			new_block->next_free = cur->next_free;
-			new_block->prev_free = cur->prev_free;
-			// Update prev->next and next->prev to new_block instead of cur
-			(cur->prev_free == NULL) ? (free_head = new_block) : (cur->prev_free->next_free = new_block);
-			(cur->next_free == NULL) ? (free_tail = new_block) : (cur->next_free->prev_free = new_block);
-
-			// Set the current block to have the correct values and return it
-			cur->block_data.size = new_size;
-			cur->block_data.is_free = 0;
-
-			spin_unlock(&heap_lock);
-			return (void*)cur + sizeof(mem_desc);
 		}
-
-		prev = cur;
 	}
 
 	// If no free block was found, since we have a fixed size heap, return NULL
@@ -224,5 +357,21 @@ void list_free_blocks() {
 	mem_desc *cur;
 	for (cur = free_head; cur != NULL; cur = cur->next_free) {
 		printf("   ADDR: 0x%x   SIZE: 0x%x\n", cur, cur->block_data.size);
+	}
+}
+
+/*
+ * Verifies that none of the blocks in the linked list overlap
+ */
+void verify_no_overlaps() {
+	void *cur_addr = (void*)KERNEL_HEAP_START_ADDR;
+	mem_desc *cur;
+	for (cur = head; cur != NULL; cur = cur->next) {
+		if (cur_addr != (void*)cur) {
+			printf("OVERLAP FOUND!\n");
+			return;
+		}
+
+		cur_addr += cur->block_data.size;
 	}
 }

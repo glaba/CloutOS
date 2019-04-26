@@ -180,6 +180,9 @@ int32_t process_halt(uint16_t status) {
 	// Get the PCB corresponding to this kernel stack
 	pcb_t *pcb = get_pcb();
 
+	// Store the top of the kernel stack
+	void *kernel_stack_top = pcb->kernel_stack_base - KERNEL_STACK_SIZE;
+
 	// Unmap video memory if it was mapped in
 	if (pcb->vid_mem != NULL)
 		unmap_video_mem_user(pcb->vid_mem);
@@ -195,8 +198,16 @@ int32_t process_halt(uint16_t status) {
 	// Unmap the pages for this process
 	unmap_process(pcb->pid);
 
+	// Free all the pages for this process
+	large_page_mapping_list_item *cur;
+	for (cur = pcb->page_mappings_head; cur != NULL; cur = cur->next)
+		free_page(cur->data.phys_index);
+
 	// Free the page mapping linked list
 	FREE_LIST(large_page_mapping_list_item, pcb->page_mappings_head);
+
+	// Store the parent PID from the PCB before deleting it
+	int32_t parent_pid = pcb->parent_pid;
 
 	// Mark the current PID as unused and attempt to remove items from the end of the pcbs array
 	pcb->pid = -1;
@@ -207,15 +218,15 @@ int32_t process_halt(uint16_t status) {
 
 	// If the parent PID is -1, that means that this is the parent shell and we should
 	//  simply spawn a new shell
-	if (pcb->parent_pid == -1)
+	if (parent_pid == -1)
 		process_execute("shell", 0);
 
 	// Otherwise, we have a normal process that has a parent
 	// Map the parent process in
-	map_process(pcb->parent_pid);
+	map_process(parent_pid);
 
-	// Compute the address of the top of the parent's kernel stack
-	uint32_t esp = KERNEL_START_ADDR + LARGE_PAGE_SIZE - KERNEL_STACK_SIZE * (1 + pcb->parent_pid);
+	// Get the address of the top of the parent process' kernel stack
+	uint32_t esp = (uint32_t)pcbs.data[parent_pid].kernel_stack_base;
 
 	// Set TSS.ESP0 to point to where the top of the stack will be, containing only the PID
 	tss.esp0 = esp - sizeof(int32_t);
@@ -237,15 +248,23 @@ int32_t process_halt(uint16_t status) {
 	// We are switching back to userspace
 	in_userspace = 1;
 
+	// Lastly, we need to free the current kernel stack
+	// We will block interrupts for the time being to prevent the freed stack from being allocated
+	//  during an interrupt and used (potentially messing up the execution of this function)
+	cli();
+	kfree(kernel_stack_top);
+
 	// Set eax to the desired return value, set esp to the the esp of the parent process
 	//  and return back to the assembly linkage
+	// Re-enable interrupts now that we have switched stacks entirely
 	asm volatile ("      \n\
 		movl %k0, %%eax  \n\
 		movl %k1, %%esp  \n\
+		sti              \n\
 		ret"
 		:
 		: "r"(((uint32_t)status)), "r"((esp))
-		: "eax", "esp" // An entirely unsufficient and pointless list
+		: "eax", "esp" // An entirely insufficient and pointless list
 	);
 
 	// Placeholder to get gcc to shut up
@@ -335,9 +354,14 @@ int32_t process_execute(const char *command, uint8_t has_parent) {
 	// Set the TSS's SS0 and ESP0 fields
 	// SS0 should point to the kernel's stack segment
 	tss.ss0 = KERNEL_DS;
-	// ESP0 should point to the 8KB kernel stack for this process, which collectively all begin
-	//  below the bottom of the kernel stack (which ranges from 8MB-8KB to 8MB)
-	tss.esp0 = KERNEL_START_ADDR + LARGE_PAGE_SIZE - KERNEL_STACK_SIZE * (1 + cur_pid);
+	// ESP0 should point to the 8KB kernel stack for this process
+	//  which we will allocate now (must be 8KB aligned as well)
+	void *kernel_stack_base = kmalloc_aligned(KERNEL_STACK_SIZE, KERNEL_STACK_SIZE) + KERNEL_STACK_SIZE;
+	tss.esp0 = (uint32_t)kernel_stack_base;
+	// Check for null as with any dynamic allocation
+	if (tss.esp0 == NULL) {
+		goto process_execute_fail;
+	}
 
 	// Decrement esp0 to store the PID at the base of the stack, and store the PID there
 	tss.esp0 -= sizeof(int32_t);
@@ -350,6 +374,7 @@ int32_t process_execute(const char *command, uint8_t has_parent) {
 	pcb->pid = cur_pid;
 	pcb->parent_pid = parent_pid;
 	pcb->vid_mem = NULL;
+	pcb->kernel_stack_base = kernel_stack_base;
 
 	// Create file_t objects for stdin and stdout
 	file_t stdin_file, stdout_file;

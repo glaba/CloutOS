@@ -650,6 +650,9 @@ void launch_tests() {
 	// divide_by_zero_test();
 	// paging_test_invalid_region();
 
+	// THIS IS AN EVIL EVIL TEST UNCOMMENT IT IF YOU WANT TO THINK YOU HAVE A PAGE FAULT SOMEWHERE
+	//  BUT IT'S ACTUALLY JUST THIS TEST CLEARING THE HEAP I'VE GOTTEN BITTEN TWICE CONSIDER YOURSELF
+	//  WARNED
 	// TEST_OUTPUT("kheap_test", kheap_test());
 
 	/* CHECKPOINT 2 TESTS */
@@ -659,5 +662,5 @@ void launch_tests() {
 	// TEST_OUTPUT("extensive testing terminal read/write",extensive_terminal_read_write());
 	// TEST_OUTPUT("file_system_test", test_fs());
 
-	eth_test();
+	// eth_test();
 }
