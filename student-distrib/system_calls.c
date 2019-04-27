@@ -39,7 +39,7 @@ int32_t execute(const char *command) {
 	if (is_userspace_string_valid((void*)command, cur_pcb->pid) == -1)
 		return FAIL;
 
-	return process_execute(command, 1);
+	return process_execute(command, 1, cur_pcb->tty);
 }
 
 /*
@@ -277,18 +277,7 @@ int32_t getargs(uint8_t* buf, int32_t nbytes) {
 int32_t vidmap(uint8_t **screen_start) {
 	SYSCALL_DEBUG("Begin vidmap system call\n");
 
-	// Check that the provided pointer is valid
-	if (is_userspace_region_valid((void*)screen_start, -1, get_pcb()->pid) == -1)
-		return FAIL;
-
-	int32_t retval = map_video_mem_user((void**)screen_start);
-
-	// Copy the value into the PCB if the mapping succeeded
-	if (retval == 0)
-		get_pcb()->vid_mem = *screen_start;
-
-	// Return whether or not it succeeded
-	return retval;
+	return process_vidmap(screen_start);
 }
 
 /*

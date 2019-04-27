@@ -16,6 +16,9 @@
 	#define PROC_DEBUG(f, ...) // Nothing
 #endif
 
+// The number of text-based TTYs (1-based indices)
+#define NUM_TEXT_TTYS 3
+
 // Magic number that must appear in the first 4 bytes of all executables
 #define ELF_MAGIC 0x464C457F
 // The virtual address that all processes' data is mapped to
@@ -59,23 +62,26 @@ typedef struct file_t {
 // A dynamic array containing file_t elements
 typedef DYNAMIC_ARRAY(file_t, file_dyn_arr) file_dyn_arr;
 
-typedef struct large_page_mapping {
+// Represents a page mapping
+typedef struct page_mapping {
 	// The index of the virtual address of the page (corresponding to 4MB jumps per index)
 	int virt_index;
 	// The index of the physical address of the page (corresponding to 4MB jumps per index)
 	int phys_index;
-} large_page_mapping;
+} page_mapping;
 
-// A linked list of ints where each item represents an index of a 4MB page used by a process
-typedef LIST_ITEM(large_page_mapping, large_page_mapping_list_item) large_page_mapping_list_item;
+// A dynamic array of ints where each item represents an index of a 4MB page used by a process
+typedef DYNAMIC_ARRAY(page_mapping, page_mapping_dyn_arr) page_mapping_dyn_arr;
 
 typedef struct pcb_t {
 	// A dynamic array of the files that are being used by the process
 	file_dyn_arr files;
-	// A linked list of the indices of the 4MB pages allocated to this process
-	large_page_mapping_list_item *page_mappings_head;
+	// A dynamic array of the indices of the 4MB pages allocated to this process (excluding video memory)
+	page_mapping_dyn_arr large_page_mappings;
 	// The address of the base of the kernel stack
 	void *kernel_stack_base;
+	// The TTY that this process is in (1-based indices)
+	uint8_t tty;
 	// The PID of the process; a negative value indicates that this PCB does not represent a valid process
 	int32_t pid;
 	// The PID of the parent process
@@ -89,14 +95,20 @@ typedef struct pcb_t {
 // Initializes any supporting data structures for managing user level processes
 int init_processes();
 // Starts the process associated with the given shell command
-int32_t process_execute(const char *command, uint8_t has_parent);
+int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty);
 // Halts the current process and returns the provided status code to the parent process
 int32_t process_halt(uint16_t status);
+// Maps video memory for the current userspace program to either video memory or a buffer depending
+//  on whether or not the current program is in the active TTY
+int32_t process_vidmap(uint8_t **screen_start);
 // Checks if the given region lies within the memory assigned to the process with the given PID
 int8_t is_userspace_region_valid(void *ptr, uint32_t size, int32_t pid);
 // Checks if the given string lies within the memory assigned to the process with the given PID
 int8_t is_userspace_string_valid(void *ptr, int32_t pid);
 // Gets the current pcb from the stack
 pcb_t* get_pcb();
+
+// The currently active TTY
+extern uint8_t active_tty;
 
 #endif

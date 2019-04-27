@@ -185,18 +185,28 @@ int32_t identity_map_containing_region(void *start_addr, uint32_t size, unsigned
 }
 
 /*
- * Maps an open virtual region into video memory so that a userspace program can access it
+ * Maps the virtual region starting at 192MB into video memory / video memory buffer so that
+ *  a userspace program can access it
  *
- * OUTPUTS: addr: the virtual address that video memory is mapped to
+ * INPUTS: phys_addr: a 4KB aligned address that will serve as a video memory buffer
  * RETURNS: 0 on success and -1 otherwise
  */
-int32_t map_video_mem_user(void **addr) {
-	// We will just put this in the 4MB region from 192MB - 196MB for now
-	page_directory[VIDEO_USER_VIRT_ADDR >> 22] = (unsigned long)(&user_video_page_table) |
-		PAGE_READ_WRITE | PAGE_USER_LEVEL | PAGE_PRESENT;
+int32_t map_video_mem_user(void *phys_addr) {
+	// First, check that phys_addr is 4KB aligned
+	if ((uint32_t)phys_addr % NORMAL_PAGE_SIZE != 0)
+		return -1;
 
-	// Return the address that it was mapped to
-	*addr = (void*)VIDEO_USER_VIRT_ADDR;
+	// Then, fill in the user_video_page_table to point to the desired physical address
+	int i;
+	for (i = 0; i < VIDEO_SIZE / NORMAL_PAGE_SIZE; i++) {
+		// The page is present, and points to an offset from phys_addr
+		user_video_page_table[i] = ((uint32_t)phys_addr + i * NORMAL_PAGE_SIZE) |
+			PAGE_READ_WRITE | PAGE_USER_LEVEL | PAGE_PRESENT;
+	}
+
+	// Set the page directory entry
+	page_directory[VIDEO_USER_VIRT_ADDR >> 22] = (uint32_t)(&user_video_page_table) |
+		PAGE_READ_WRITE | PAGE_USER_LEVEL | PAGE_PRESENT;
 
 	// Reload the page directory
 	write_cr3(&page_directory);
@@ -206,12 +216,10 @@ int32_t map_video_mem_user(void **addr) {
 }
 
 /*
- * Unmaps the video memory paged in for userspace programs 
- *
- * INPUTS: addr: the virtual address that the video memory was paged into
+ * Unmaps the video memory paged in for userspace programs
  */
-void unmap_video_mem_user(void *addr) {
-	page_directory[(uint32_t)addr >> 22] = 0;
+void unmap_video_mem_user() {
+	page_directory[VIDEO_USER_VIRT_ADDR >> 22] = 0;
 
 	// Reload the page directory
 	write_cr3(&page_directory);
@@ -267,17 +275,15 @@ void free_page(int32_t index) {
 void init_paging() {
 	int i;
 
-	// Set the entries in video_page_table as well as user_video_page_table
+	// Set the entries in video_page_table
 	for (i = 0; i < PAGE_TABLE_SIZE; i++) {
 		// If the current entry does not correspond to the region in video memory
 		if (i < VIDEO / NORMAL_PAGE_SIZE || i >= (VIDEO + VIDEO_SIZE) / NORMAL_PAGE_SIZE) {
 			// The page is not present
 			video_page_table[i] = ~PAGE_PRESENT;
-			user_video_page_table[i] = ~PAGE_PRESENT;
 		} else {
 			// The page is present
 			video_page_table[i] = (i * NORMAL_PAGE_SIZE) | PAGE_READ_WRITE | PAGE_PRESENT;
-			user_video_page_table[i] = (i * NORMAL_PAGE_SIZE) | PAGE_USER_LEVEL | PAGE_READ_WRITE | PAGE_PRESENT;
 		}
 	}
 

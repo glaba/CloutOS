@@ -199,7 +199,7 @@ void entry(unsigned long magic, unsigned long addr) {
 #endif
 	
 		/* Execute the first program ("shell") ... */
-		process_execute("shell", 0);
+		process_execute("shell", 0, 1);
 	}
 
 	/* Unregister the E1000 Ethernet device */
