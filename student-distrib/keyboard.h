@@ -32,11 +32,13 @@
 #define CTRL      0x4
 #define ALT       0x8
 
-/*Important masks*/
+/* Important bitmasks */
 #define KEY_DOWN_MASK 0x80
 #define SCAN_CODE_MASK 0x7F
 #define TERMINAL_SIZE 128
 
+/* The number of spaces printed for a tab character */
+#define NUM_SPACES_PER_TAB 4
 
 // Initializes the keyboard to use interrupts and enables the keyboard interrupt
 void init_keyboard();
@@ -44,13 +46,13 @@ void init_keyboard();
 // Interrupt handler for IRQ1 (keyboard interrupt)
 void keyboard_handler();
 
-//open
+// Initializes the terminal to be written or read from
 extern int32_t terminal_open(void);
-//close
+// Uninitializes the terminal from being written or read
 extern int32_t terminal_close(void);
-//read
+// Blocking call that returns the string typed after 127 characters or the enter key is pressed
 extern int32_t terminal_read(int32_t fd, char* buf, int32_t bytes);
-//write
+// Writes the provided string to the screen
 extern int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes);
 
 #endif

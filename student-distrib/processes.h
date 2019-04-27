@@ -107,6 +107,10 @@ int8_t is_userspace_region_valid(void *ptr, uint32_t size, int32_t pid);
 int8_t is_userspace_string_valid(void *ptr, int32_t pid);
 // Gets the current pcb from the stack
 pcb_t* get_pcb();
+// Gets the pointer to the start of video memory for the given TTY
+void *get_vid_mem(uint8_t tty);
+// Switches from the current TTY to the provided TTY
+int32_t tty_switch(uint8_t tty);
 
 // The currently active TTY
 extern uint8_t active_tty;

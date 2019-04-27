@@ -40,10 +40,20 @@ int init_processes() {
 	if (vid_mem_buffer_page == -1)
 		return -1;
 
+	// Map in the page
+	identity_map_containing_region((void*)(vid_mem_buffer_page * LARGE_PAGE_SIZE), LARGE_PAGE_SIZE,
+		PAGE_GLOBAL | PAGE_READ_WRITE);
+
 	// The buffers will simply be sequential within the 4MB page
 	int i;
 	for (i = 0; i < NUM_TEXT_TTYS; i++)
 		vid_mem_buffers[i] = (void*)(vid_mem_buffer_page * LARGE_PAGE_SIZE + VIDEO_SIZE * i);
+
+	// Clear the TTYs that are not currently active
+	for (i = 0; i < NUM_TEXT_TTYS; i++) {
+		if (i + 1 != active_tty)
+			clear_tty(i + 1);
+	}
 
 	return 0;
 }
@@ -110,6 +120,24 @@ pcb_t* get_pcb() {
 }
 
 /*
+ * Gets the pointer to the start of video memory for the given TTY
+ *
+ * INPUTS: TTY: the TTY to get the video memory for
+ * OUTPUTS: a pointer to either video memory itself, or a buffer of the same size that the inactive
+ *          provided TTY is writing to
+ */
+void *get_vid_mem(uint8_t tty) {
+	// Check that TTY is valid
+	if (tty < 1 || tty > NUM_TEXT_TTYS)
+		return NULL;
+
+	if (active_tty == tty)
+		return (void*)VIDEO;
+	else
+		return vid_mem_buffers[tty - 1];
+}
+
+/*
  * Checks if the given region of memory lies within the memory assigned to the process with the given PID 
  *
  * INPUTS: ptr: the base virtual address of the region of memory
@@ -173,12 +201,9 @@ int32_t map_process(int32_t pid) {
 
 	// Map in video memory if it is supposed to be mapped in
 	if (pcb->vid_mem != NULL) {
-		// Check whether it should write to video memory or a buffer
-		void *phys_addr;
-		if (pcb->tty == active_tty)
-			phys_addr = (void*)VIDEO;
-		else
-			phys_addr = vid_mem_buffers[pcb->tty];
+		// Check whether it should write to video memory or a buffer, and get
+		//  the physical address corresponding to the correct option
+		void *phys_addr = get_vid_mem(pcb->tty);
 
 		map_video_mem_user(phys_addr);
 	}
@@ -541,11 +566,7 @@ int32_t process_vidmap(uint8_t **screen_start) {
 
 	// Check whether or not the process should be writing directly to video memory
 	//  or if it should be writing to a buffer (based on whether or not it is in the active TTY)
-	void *phys_addr;
-	if (pcb->tty == active_tty)
-		phys_addr = (void*)VIDEO;
-	else
-		phys_addr = vid_mem_buffers[pcb->tty];
+	void *phys_addr = get_vid_mem(pcb->tty);
 
 	int32_t retval = map_video_mem_user(phys_addr);
 
@@ -571,19 +592,34 @@ int32_t tty_switch(uint8_t tty) {
 	if (tty == 0 || tty > NUM_TEXT_TTYS)
 		return -1;
 
-	// We don't want a scheduling interrupt to occur while we're copying buffers over
+	// We don't want a scheduling / keyboard interrupt to occur while we're copying buffers over
+	//  or modifying active_tty
 	cli();
 
-	uint32_t *vid_mem = (uint32_t*)VIDEO;
-	uint32_t *active_tty_buffer = (uint32_t*)vid_mem_buffers[active_tty];
-	uint32_t *new_tty_buffer = (uint32_t*)vid_mem_buffers[tty];
+	uint8_t *vid_mem = (uint8_t*)VIDEO;
+	uint8_t *active_tty_buffer = (uint8_t*)vid_mem_buffers[active_tty - 1];
+	uint8_t *new_tty_buffer = (uint8_t*)vid_mem_buffers[tty - 1];
 
 	// Copy video memory into the buffer for active_tty (the old TTY)
 	//  and copy the buffer for tty into video memory
 	int i;
-	for (i = 0; i < VIDEO_SIZE / 4; i++) {
+	for (i = 0; i < VIDEO_SIZE; i++) {
 		active_tty_buffer[i] = vid_mem[i];
 		vid_mem[i] = new_tty_buffer[i]; 
+	}
+
+	// Remap the video memory for the currently running process if it is in the old TTY
+	//  or if it's in the new TTY
+	pcb_t *pcb = get_pcb();
+	if (pcb->vid_mem != NULL) {
+		unmap_video_mem_user();
+		
+		// If its TTY is not the new TTY, have it write to the buffer for that TTY
+		if (pcb->tty != tty)
+			map_video_mem_user(vid_mem_buffers[pcb->tty - 1]);
+		// Otherwise, we are switching to this process' TTY, and it should map directly to video memory
+		else
+			map_video_mem_user(vid_mem);
 	}
 
 	// Update the active TTY
@@ -591,6 +627,9 @@ int32_t tty_switch(uint8_t tty) {
 
 	// Restore interrupts now that we're done copying the buffers over
 	sti();
+
+	// Update the cursor position
+	update_cursor();
 	return 0;
 }
 

@@ -162,7 +162,7 @@ void entry(unsigned long magic, unsigned long addr) {
 
 	/* Initialize keyboard */
 	init_keyboard();
-	/* Initialize RTC (will run test_interrupts() only for Checkpoint 1) */
+	/* Initialize RTC */
 	init_rtc();
 
 	/* Enable interrupts */
