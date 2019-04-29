@@ -31,7 +31,7 @@ static int scheduling_enabled = 0;
 double sys_time = 0.0;
 
 /*
- * Initializes the Programmable Interval Timer to generate interrupts at a frequency of very close to 69 Hz
+ * Initializes the Programmable Interval Timer to generate interrupts at a frequency of very close to 100 Hz
  */
 void init_pit() {
 	spin_lock(&pit_spin_lock);
@@ -58,7 +58,7 @@ void init_pit() {
 }
 
 /*
- * Begins callbacks to scheduler_interrupt_handler at a rate of 69 Hz
+ * Begins callbacks to scheduler_interrupt_handler at a rate of 100 Hz
  */
 void enable_scheduling() {
 	scheduling_enabled = 1;

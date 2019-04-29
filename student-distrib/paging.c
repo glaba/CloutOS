@@ -121,7 +121,7 @@ void unmap_region(void *start_addr, uint32_t num_pdes) {
 }
 
 /*
- * If there is no mapping already existing, maps in a 4MB-aligned region made up of large 4MB pages that fully contains
+ * Unconditionally maps in a 4MB-aligned region made up of large 4MB pages that fully contains
  *  the desired region. Both start_phys_addr and start_virt_addr are assumed to have the same offset mod 4MB
  *
  * INPUTS: start_phys_addr: the start of the region in physical memory

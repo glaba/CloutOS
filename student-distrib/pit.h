@@ -21,16 +21,16 @@
 	#define PIT_CMD_BINARY_MODE 0x0
 
 // Frequency at which the PIT generates interrupts
-#define PIT_FREQUENCY 69
+#define PIT_FREQUENCY 50
 // The base frequency of the PIT in Hz
 #define PIT_BASE_FREQUENCY 1193182
 // The reload value based off of the desired frequency and the base frequency
 #define PIT_RELOAD_VALUE (PIT_BASE_FREQUENCY / PIT_FREQUENCY)
 
-// Initializes the Programmable Interval Timer to generate interrupts at a frequency of very close to 69 Hz
+// Initializes the Programmable Interval Timer to generate interrupts at a frequency of very close to 100 Hz
 void init_pit();
 
-// Begins callbacks to scheduler_interrupt_handler at a rate of 69 Hz
+// Begins callbacks to scheduler_interrupt_handler at a rate of 100 Hz
 void enable_scheduling();
 
 // Handler for the timer interrupt

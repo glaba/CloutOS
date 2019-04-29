@@ -1,13 +1,32 @@
 #include "rtc.h"
 #include "lib.h"
 #include "i8259.h"
-#include "rtc.h"
+#include "processes.h"
+#include "kheap.h"
 
-/* Whether or not user is waiting for interrupt */
-volatile int interrupt = 0;
+// Each process can have a virtual RTC device associated with it, which is described
+//  by this struct
+typedef struct rtc_client {
+	// The PID of the processes
+	int32_t pid;
+	// The number of RTC ticks that must pass for this process to finish its read
+	// Set by rtc_write
+	int interval;
+	// Whether or not the client is waiting to be woken up
+	int waiting;
+} rtc_client;
 
-/* Indicates whether or not initialization has been called */
+// We will keep the metadata in a linked list
+typedef LIST_ITEM(rtc_client, rtc_client_list_item) rtc_client_list_item;
+
+// A list of processes that have an RTC device open
+rtc_client_list_item *rtc_client_list_head = NULL;
+
+// Indicates whether or not initialization has been called
 static int init = 0;
+
+// The counter that keeps track of the number of ticks at 1024 Hz
+static volatile int counter = 0;
 
 /*
  * NMI_enable()
@@ -54,7 +73,8 @@ void init_rtc() {
 	outb(REGISTER_B, RTC_ADDRESS_PORT);
 	outb(prev_data | 0x40, RTC_DATA_PORT);
 
-	set_freq(_2HZ_);
+	// Set to the maximum frequency so that we can divide the frequency for any processes reading RTC
+	set_freq(BASE_FREQ);
 
 	/* Enables NMI again */
 	NMI_enable();
@@ -113,17 +133,26 @@ int32_t set_freq(int32_t f) {
  * SIDE EFFECTS: Handler for the RTC
  */
 void rtc_handler() {
-	cli();
 	/* Select register C */
 	outb(REGISTER_C, RTC_ADDRESS_PORT);
 	/* Throw away contents they don't matter :( */
 	inb(RTC_DATA_PORT);
 	/* Send EOI */
 	send_eoi(RTC_IRQ);
-	/* Set user interrupt to 0 */
-	interrupt = 0;
 
-	sti();
+	// Update the counter
+	counter = (counter + 1) % BASE_FREQ;
+
+	// Go through the list of all RTC clients and wake up those that should be triggered
+	rtc_client_list_item *cur;
+	for (cur = rtc_client_list_head; cur != NULL; cur = cur->next) {
+		// Check if the correct interval has passed and if the process was waiting
+		if (cur->data.waiting && counter % cur->data.interval == 0) {
+			// If so, wake up the process
+			cur->data.waiting = 0;
+			process_wake(cur->data.pid);
+		}
+	}
 }
 
 /*
@@ -131,22 +160,47 @@ void rtc_handler() {
  * Does necessary stuff to initialize/start rtc
  *
  * INPUTS: filename: unused
- * OUTPUTS: 0 for pass
+ * OUTPUTS: 0 for pass and -1 for failure
  * SIDE EFFECTS: Initializes RTC if not initialized
  *               and sets freq to 2 HZ
  */
 int32_t rtc_open(const uint8_t *filename) {
+	/* Clear interrupts so nothing stops us from setting freq */
+	cli();
+
 	/* Call init_rtc if not yet initialized */
 	if (!init)
 		init_rtc();
 
-	/* Clear interrupts so nothing stops us from setting freq */
-	cli();
-	/* Set freq to 2 HZ by default */
-	set_freq(2);
-	/* Enable interrupts again */
+	// Look through the linked list to make sure that the RTC isn't already opened by this process
+	int32_t pid = get_pid();
+	rtc_client_list_item *cur;
+	for (cur = rtc_client_list_head; cur != NULL; cur = cur->next) {
+		// If the current PID is equal to a PID in the list, we fail
+		if (cur->data.pid == pid) {
+			sti();
+			return -1;
+		}
+	}
+
+	// Allocate memory for the linked list node
+	rtc_client_list_item *client = kmalloc(sizeof(rtc_client_list_item));
+	if (client == NULL) {
+		sti();
+		return -1;
+	}
+
+	// Fill in the fields of the linked list node
+	client->data.pid = pid;
+	client->data.interval = BASE_FREQ / DEFAULT_FREQ;
+	client->data.waiting = 0;
+
+	// Push the linked list node into the linked list
+	client->next = rtc_client_list_head;
+	rtc_client_list_head = client;
+	
+	// Re-enable interrupts and return success
 	sti();
-	/* There is no way for this to fail, so return 0 */
 	return 0;
 }
 
@@ -159,7 +213,33 @@ int32_t rtc_open(const uint8_t *filename) {
  * SIDE EFFECTS: N/A
  */
 int32_t rtc_close(int32_t fd) {
-	/* Nothing to do, so return 0 */
+	int32_t pid = get_pid();
+
+	// Block interrupts while we modify the linked list
+	cli();
+
+	// Find the item in the linked list corresponding to the current process
+	rtc_client_list_item *prev, *cur;
+	for (prev = NULL, cur = rtc_client_list_head; 
+	     cur != NULL; 
+	     prev = cur, cur = cur->next) {
+
+		// Look for the node with the same PID
+		if (cur->data.pid == pid) {
+			// Remove the item from the linked list
+			if (prev == NULL)
+				rtc_client_list_head = cur->next;
+			else
+				prev->next = cur->next;
+
+			// Free the linked list node
+			kfree(cur);
+			break;
+		}
+	}
+
+	// Re-enable interrupts now that we are done touching the linked list
+	sti();
 	return 0;
 }
 
@@ -174,16 +254,28 @@ int32_t rtc_close(int32_t fd) {
  * SIDE EFFECTS: Waits for RTC interrupt
  */
 int32_t rtc_read(int32_t fd, void *buf, int32_t bytes) {
-	/* Use user controlled flag for interrupt */
-	interrupt = 1;
+	// Block interrupts while we use the linked list
+	cli();
 
-	/* Enable all interrupts, so that we get the RTC interrupt when it occurs */
+	// Find the item in the RTC linked list corresponding to this PID
+	int32_t pid = get_pid();
+	rtc_client_list_item *cur, *item;
+	for (cur = rtc_client_list_head; cur != NULL; cur = cur->next) {
+		// If the PID matches, store the item
+		if (cur->data.pid == pid) {
+			item = cur;
+			break;
+		}
+	}
+
+	// Mark the item as waiting
+	item->data.waiting = 1;
 	sti();
 
-	/* While loop causes program to poll until interrupt is 0, which occurs when rtc_handler() is called */
-	while (interrupt == 1);
+	// Put the process to sleep and let the RTC handler take care of waking it up
+	process_sleep(pid);
 
-	/* Everything done correctly, so return 0 */
+	// When the process is woken up, it will return here and back to the userspace program
 	return 0;
 }
 
@@ -194,22 +286,42 @@ int32_t rtc_read(int32_t fd, void *buf, int32_t bytes) {
  * INPUTS: int32_t fd = file descriptor
  *         const void* buf = buffer that contains frequency
  *         int32_t bytes = number of bytes in buf (should be 4)
- * OUTPUTS: 0 for pass
+ * OUTPUTS: the number of bytes written, or -1 if the input was bad
  * SIDE EFFECTS: Waits for RTC interrupt
  */
 int32_t rtc_write(int32_t fd, const void *buf, int32_t bytes) {
 	if (buf == NULL || bytes != 4)
 		return -1;
 
-	/* Read in buffer and cast it to freq */
+	// Read the frequency as a 32-bit integer from the buffer
 	int32_t freq;
 	freq = *(int32_t*)buf;
-	/* Clear interrupts for setting freq */
+
+	// Validate that the frequency is a power of 2 between 2 and 1024
+	//  using a nice binary trick
+	if (freq < 2 || freq > 1024 || (freq & (freq - 1)) != 0)
+		return -1;
+
+	// Clear interrupts before we modify items in the linked list
 	cli();
-	/* Call set_freq to set frequency of RTC */
-	int32_t ret = set_freq(freq);
-	/* Enable interrupts again */
+
+	// Find the item in the linked list corresponding to the current PID and set the interval
+	//  field to correspond to the frequency
+	int32_t pid = get_pid();
+	rtc_client_list_item *cur;
+	for (cur = rtc_client_list_head; cur != NULL; cur = cur->next) {
+		if (cur->data.pid == pid) {
+			// Set the interval to be 1024 / freq, which gives the number of ticks at 1024 Hz
+			//  to skip to get a frequency of freq
+			cur->data.interval = BASE_FREQ / freq;
+
+			// In some sense, we have "written" 4 bytes (the frequency) to the virtual RTC device
+			sti();
+			return sizeof(int32_t);
+		}
+	}
+
+	// If we got here, the RTC was not opened before being written to, so return -1
 	sti();
-	/* Return number of bytes written or -1 if bad input */
-	return ret;
+	return -1;
 }

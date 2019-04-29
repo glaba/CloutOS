@@ -72,7 +72,7 @@ const char* skeleton = "\n\n\n\n\n\n\
  */
 void check_userspace_exception() {
 	if (in_userspace) {
-		process_halt(256);
+		// process_halt(256);
 	}
 }
 

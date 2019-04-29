@@ -63,14 +63,14 @@
 //  that maps the 4M kernel page as well as video memory
 void init_paging();
 
-// If there is no mapping already existing, maps a region of specified size starting from the
+// Unconditionally maps a region of specified size starting from the
 //  given virtual address to the region of the same size starting from the given physical address
 int32_t map_region(void *start_phys_addr, void *start_virt_addr, uint32_t num_pdes, uint32_t flags);
 
 // Unconditionally unmaps the 4MB aligned region containing the specified region
 void unmap_region(void* start_addr, uint32_t num_pdes);
 
-// If there is no mapping already existing, maps in a 4MB-aligned region made up of large 4MB pages
+// Unconditionally maps in a 4MB-aligned region made up of large 4MB pages
 //  that fully contains the desired region
 int32_t map_containing_region(void *start_phys_addr, void *start_virt_addr, uint32_t size, uint32_t flags);
 

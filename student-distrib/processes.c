@@ -4,6 +4,7 @@
 #include "paging.h"
 #include "x86_desc.h"
 #include "kheap.h"
+#include "i8259.h"
 
 // A dynamic array indicating which PIDs are currently in use by running programs
 // Each index corresponds to a PID and contains a pointer to that process' PCB
@@ -112,10 +113,9 @@ pcb_t* get_pcb_from_pid(int32_t pid) {
 }
 
 /*
- * Get the current pcb from tss.esp0
- * INPUTS: N/A
+ * Gets the current PID from tss.esp0
  */
-pcb_t* get_pcb() {
+int32_t get_pid() {
 	// Initialize a pointer to the PID which is stored at the base of the kernel stack
 	void* addr_of_pid;
 	// Mask out lower 8 kB to get to prev 8kB
@@ -124,8 +124,16 @@ pcb_t* get_pcb() {
 	addr_of_pid += KERNEL_STACK_SIZE;
 	// Decrement to get to the PID
 	addr_of_pid -= sizeof(int32_t);
-	// Return the PCB corresponding to the PID
-	return get_pcb_from_pid(*(int32_t*)addr_of_pid);
+	// Return the PID at the address we discovered
+	return *(int32_t*)addr_of_pid;
+}
+
+/*
+ * Get the current pcb from tss.esp0
+ * INPUTS: N/A
+ */
+pcb_t* get_pcb() {
+	return get_pcb_from_pid(get_pid());
 }
 
 /*
@@ -375,9 +383,19 @@ int32_t process_halt(uint16_t status) {
 int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, uint8_t save_context) {
 	cli();
 
+	// Check the number of processes
+	int i, num_procs;
+	for (i = 0, num_procs = 0; i < pcbs.length; i++) {
+		if (pcbs.data[i].pid >= 0)
+			num_procs++;
+	}
+	if (num_procs == MAX_NUM_PROCESSES) {
+		sti();
+		return -1;
+	}
+
 	// Get the filename of the executable from the command
 	char name[MAX_FILENAME_LENGTH + 1];
-	int i;
 	for (i = 0; i < MAX_FILENAME_LENGTH && command[i] != '\0' && command[i] != ' '; i++)
 		name[i] = command[i];
 	name[i] = '\0';
@@ -648,6 +666,41 @@ int32_t process_vidmap(uint8_t **screen_start) {
 }
 
 /*
+ * Puts the process of given PID to sleep, and context switches to the next process
+ */
+int32_t process_sleep(int32_t pid) {
+	// Check that the PID is valid
+	if (pid < 0 || pid >= pcbs.length)
+		return -1;
+	if (pcbs.data[pid].pid == -1)
+		return -1;
+
+	// Set the process to be asleep
+	get_pcb_from_pid(pid)->state = PROCESS_SLEEPING;
+
+	// Call the scheduler to switch to the next process
+	scheduler_interrupt_handler();
+
+	// We will come back here after the process is woken up
+	return 0;
+}
+
+/*
+ * Puts the process into the state PROCESS_RUNNING
+ */
+int32_t process_wake(int32_t pid) {
+	// Check that the PID is valid
+	if (pid < 0 || pid >= pcbs.length)
+		return -1;
+	if (pcbs.data[pid].pid == -1)
+		return -1;
+
+	// Set the process to state PROCESS_RUNNING so that it will be given time to run
+	get_pcb_from_pid(pid)->state = PROCESS_RUNNING;
+	return 0;
+}
+
+/*
  * Switches from the current TTY to the provided TTY
  * Must be called from the kernel stack of a userspace program
  *
@@ -658,19 +711,36 @@ int32_t tty_switch(uint8_t tty) {
 	if (tty == 0 || tty > NUM_TEXT_TTYS)
 		return -1;
 
+	int32_t old_tty = active_tty;
+
+	// Enable the timer IRQ in case this interrupt occurred during the execution of the scheduler
+	//  where the timer interrupt gets disabled
+	enable_irq(TIMER_IRQ);
+
 	// We don't want a scheduling / keyboard interrupt to occur while we're copying buffers over
 	//  or modifying active_tty
 	cli();
 
+	// Check the number of processes
+	int i, num_procs;
+	for (i = 0, num_procs = 0; i < pcbs.length; i++) {
+		if (pcbs.data[i].pid >= 0)
+			num_procs++;
+	}
+	// Don't switch TTYs if it will involve creating a new shell
+	if (num_procs == MAX_NUM_PROCESSES && !tty_inited[tty - 1]) {
+		sti();
+		return -1;
+	}
+
 	uint8_t *vid_mem = (uint8_t*)VIDEO;
-	uint8_t *active_tty_buffer = (uint8_t*)vid_mem_buffers[active_tty - 1];
+	uint8_t *old_tty_buffer = (uint8_t*)vid_mem_buffers[old_tty - 1];
 	uint8_t *new_tty_buffer = (uint8_t*)vid_mem_buffers[tty - 1];
 
 	// Copy video memory into the buffer for active_tty (the old TTY)
 	//  and copy the buffer for tty into video memory
-	int i;
 	for (i = 0; i < VIDEO_SIZE; i++) {
-		active_tty_buffer[i] = vid_mem[i];
+		old_tty_buffer[i] = vid_mem[i];
 		vid_mem[i] = new_tty_buffer[i];
 	}
 
@@ -691,9 +761,6 @@ int32_t tty_switch(uint8_t tty) {
 	// Update the active TTY
 	active_tty = tty;
 
-	// Restore interrupts now that we're done copying the buffers over
-	sti();
-
 	// Update the cursor position
 	update_cursor();
 
@@ -704,6 +771,7 @@ int32_t tty_switch(uint8_t tty) {
 		process_execute("shell", 0, tty, 1);
 	}
 
+	sti();
 	return 0;
 }
 
@@ -716,12 +784,16 @@ int32_t tty_switch(uint8_t tty) {
  */
 int32_t context_switch(int32_t pid) {
 	// Check that the PID is valid
-	if (pid < 0 || pid >= pcbs.length)
+	if (pid < 0 || pid >= pcbs.length) {
+		sti();
 		return -1;
+	}
 
 	// Check that the PID represents an existing process
-	if (pcbs.data[pid].pid == -1)
+	if (pcbs.data[pid].pid == -1) {
+		sti();
 		return -1;
+	}
 
 	// Get the PCB for the current process and the process we are switching to
 	pcb_t *old_pcb = get_pcb();
@@ -753,6 +825,7 @@ int32_t context_switch(int32_t pid) {
 		movl 0(%k1), %%esp  \n\
 		movl 4(%k1), %%ebp  \n\
 		pushl 8(%k1)        \n\
+		sti                 \n\
 		ret"
 		:
 		: "r"((&old_pcb->context)), "r"((&new_pcb->context))
@@ -765,27 +838,38 @@ context_switch_return:
 	return 0;
 }
 
+static int balance = 0;
+
 /*
  * Handler called by timer that switches to the next process in a round robin fashion
  */
 void scheduler_interrupt_handler() {
-	// We don't want the scheduler to be interrupted by anything, it should be fast
-	cli();
-
 	// If there are no running processes, exit
 	if (pcbs.length == 0)
 		return;
+
+	// Also, specifically disable the timer IRQ so that if all the processes are sleeping
+	//  and need interrupts to be woken up, we don't get a ton of timer IRQs all on the 
+	//  same stack, causing a stack overflow
+	disable_irq(TIMER_IRQ);
+	balance -= 1;
 
 	// Get the current PCB and the current PID, we will just go to the next PID
 	pcb_t *pcb = get_pcb();
 	int pid = pcb->pid;
 
+	int next_pid = -1;
+
 	// Iterate through the pcbs array until we find an existing process that is in 
 	//  the state PROCESS_RUNNING, which means we can switch to it
-	int i, next_pid;
-	i = (pid + 1) % pcbs.length;
-	next_pid = -1;
-	for (i = (pid + 1) % pcbs.length; i != pid; i = (i + 1) % pcbs.length) {
+	// If no process is in state PROCESS_RUNNING, this will loop until one is
+	int i;
+	for (i = (pid + 1) % pcbs.length; /* No stop condition */; i = (i + 1) % pcbs.length) {
+		// Re-enable interrupts if we have gone all the way through the list
+		// This means that all the processes are sleeping and waiting on some resource
+		if (i == pid && pcbs.data[i].state != PROCESS_RUNNING)
+			sti();
+
 		if (pcbs.data[i].pid >= 0 && pcbs.data[i].state == PROCESS_RUNNING) {
 			// Set this as the process we will switch to
 			next_pid = i;
@@ -793,9 +877,15 @@ void scheduler_interrupt_handler() {
 		}
 	}
 
-	// If we found no process to switch to, just return and keep going with this process
-	if (next_pid == -1)
+	// Re-enable the timer interrupt
+	enable_irq(TIMER_IRQ);
+	balance += 1;
+
+	// If there is no running process other than the current one, just return
+	if (next_pid == pid) {
+		sti();
 		return;
+	}
 
 	// Otherwise, context switch to that process
 	context_switch(next_pid);

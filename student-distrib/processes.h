@@ -121,10 +121,16 @@ int32_t process_halt(uint16_t status);
 // Maps video memory for the current userspace program to either video memory or a buffer depending
 //  on whether or not the current program is in the active TTY
 int32_t process_vidmap(uint8_t **screen_start);
+// Puts the process of given PID to sleep, and context switches to the next process
+int32_t process_sleep(int32_t pid);
+// Puts the process into the state PROCESS_RUNNING
+int32_t process_wake(int32_t pid);
 // Checks if the given region lies within the memory assigned to the process with the given PID
 int8_t is_userspace_region_valid(void *ptr, uint32_t size, int32_t pid);
 // Checks if the given string lies within the memory assigned to the process with the given PID
 int8_t is_userspace_string_valid(void *ptr, int32_t pid);
+// Gets the current PID from the stack
+int32_t get_pid();
 // Gets the current pcb from the stack
 pcb_t* get_pcb();
 // Gets the pointer to the start of video memory for the given TTY
