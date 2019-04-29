@@ -1,0 +1,71 @@
+CP# indicates the time in which the bug was found / resolved rather than the checkpoint to which it applies
+
+Anshul - CP1
+The format and order of the bits when setting idt to ensure interrupt gates and tra gates were wrong
+
+Ansh - CP2 
+Keyboard was frozen when 127 characters were typed in. When 127 characters were typed in, I stopped more typing until enter was pressed, but one of the checks before executing next line was whether 127 characters were typed in. Fixed by terminating with’\n’ and then executing that \n, causing it to shift to the next line and hence clearing the keyboard buffer
+
+Ansh - CP2 
+Backspacing allowed backspacing into previous lines. This is because when a newline was entered, the linebuffer wasn’t cleared. So it allowed backspacing into testprint code that showed what the test was doing.
+
+Ansh - CP2
+Terminal write would end as soon as a newline character was called. Ended up that terminal write would stop printing characters as soon as a newline character was detected. 
+
+Ansh - CP2 
+After CTRL+L was called and all the characters echoed to the screen were called, the backspace allowed more backspacing, so after that, if a character was typed, the character wouldn’t display. But it would still be in the linebuffer so if CTRL+L was called after, the character would then display. The problem ended up being that when backspace was at 0 in linebuffer and a character was there, it would replace the character in linebuffer with ‘\0’. But after, when backspace was called again, the pos = 0 in linebuffer and no character was there, it would allow a backspace. I added a check for when there are supposed to be no characters in linebuffer. Eventually this whole logic got rewritten after CP2 so this bug didn’t appear again and the solution wasn’t used again.
+
+Kapil - CP2
+The EOI for PCI interrupts should be sent at the end of the exception handler, not in the beginning. If you do it in the beginning, undefined behavior occurs with respect to PCI devices
+
+Kapil - CP2-CP5
+Various mistakes with incorrectly modifying linked lists for the kernel heap, which caused loops in the lists of free / allocated blocks, as well as missing blocks. Additionally, kmalloc_aligned was returning the wrong address, which caused the kernel stacks to not actually be aligned to 8KB boundaries (simple fix, but it took a while to debug).
+
+Anshul - CP2-CP5
+When working with the graphics card driver was having a problem with FIFO buffer overflowing and not getting emptied properly due to large number of update rectangles or copy rectangles.
+
+Anshul - CP2-CP5
+When  implementing drivers for PS/2 mouse, the format of the packets on OSDEV were incorrect. The x and y coordinate packets are not in fact unsigned, they are signed and we are using the packets with the assumption they are signed.
+
+Anshul - CP2-CP5
+For the mouse, packets are delivered sequentially by successive interrupts. This means that a single movement fires a certain number of interrupts depending on the mouse. For a type 3 mouse it will cause four successive rapid interrupts. The first one is status packet, and the last three are coordinates and scroll wheel clicks. To handle this, there is a global variable that keeps track of which interrupt it is.
+
+Anshul - CP2-CP5
+Was having odd problems with mouse causing only a single interrupt when the OS boots up and messed up the synchronization and offset the packets from what it’s supposed to be. To solve this the global synch variable is set to some dummy value so the first interrupt re-syncs it.
+
+Ansh - CP3
+There were compile warnings/errors for whenever I would place the fops table for read/write/open/close in the H file. It got fixed by placing the fops in the C file with static.
+
+Kapil - CP3
+Used the wrong option among USER_CS, USER_DS, KERNEL_CS, KERNEL_DS (specifically in TSS and before IRET), which we fixed by using them in the correct place
+
+Kapil - CP3
+Memory was not correctly mapped when returning from a child process to a parent process, which caused page faults
+
+Anshul - CP4
+In rtc, wrong control word was being sent to the slave PIC causing some issues for interrupts using the slave
+
+Ansh - CP4
+When cat was called with no argument after it was called with an argument, it printed out the previous argument, which it isn’t supposed to. This is because in the pcb struct, the args array wasn’t getting cleared. To fix this, in the execute I cleared the previous argument.
+
+Kapil - CP4
+If a struct definition changes in a header file, make will not recompile object files that use that struct, and the code will put struct values in the wrong offsets. This was relevant because we modified the PCB struct, and other files that used the PCB struct had incorrect offsets, which led to inexplicable bugs of garbage data being written into the PCBs. 
+
+Anshul -  CP5
+Include guards for rtc.h were incorrect and needed to be fixed
+
+Ansh - CP5
+If there is a filesystem with more than 32 characters, it copied over only 32 characters to struct, but read more than 32 characters from struct. It was because of strlen, which ends on a null terminate. Fixed by finding out length, not using strlen AT ALL
+
+Kapil - CP5
+We modified PCBs to be dynamically allocated, and we had a use after free error that caused process_execute to crash
+
+Kapil - CP5
+We ran into page faults when switching terminals while running programs. Initially, it was inexplicable, since the exception information indicated that memory address 0x3 was being accessed from instruction “pop %ebx”, while the stack pointer had a value that was not anywhere near 3. We hypothesized that maybe TSS, IDT, stack frame were getting corrupted, but a lot of stepping through the kernel code verified that this was not the case. Finally, we added the symbols from the userspace program as well to gdb, and stepped through the assembly, and discovered that the actual instruction that was in memory was not “pop %ebx”, but “add %al, (%eax)”, which in machine code is 0x0. This led to the realization that the process was not being paged correctly. Specifically, this error occurred because when we switch to a new terminal, we call process_execute to create a new shell, but process_execute only unmapped the pages of the previous process if the previous process was a PARENT process, but it should also do so if we are switching terminals. 
+
+Kapil - CP5
+RTC was inexplicably not working (randomly not delivering interrupts). After a lot of debugging, we eventually realized that our IDT from Checkpoint 1 was wrong, and that we flipped the configuration for interrupt gates and trap gates. Because of this, interrupts were not masked which led to the RTC handler being interrupted by the RTC interrupt and failing.
+
+Kapil - CP5
+We had random page faults / double faults when switching between terminals. We tracked this down to mismatched / incorrect cli() and sti() calls, which caused timer interrupts / RTC interrupts to occur when they were not supposed to occur which led to inexplicable errors. We fixed this by rewriting most of the code that caused the bug, and also using cli_and_save and restore_flags instead of cli and sti alone.
+
