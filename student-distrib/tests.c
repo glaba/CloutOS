@@ -318,7 +318,7 @@ void divide_by_zero_test() {
 int rtc_read_write() {
 	int32_t freq,i,response;
 	response = 0;
-	terminal_open();
+	terminal_open((uint8_t *) "");
 	rtc_open(NULL);
 	for(freq = 2; freq <= 1024; freq*=2) {
 		//set freq of rtc to 4
@@ -342,7 +342,7 @@ int rtc_read_write() {
 			break;
 		}
 	}
-	terminal_close();
+	terminal_close(0);
 	rtc_close(0);
 	putc('\n');
 	if (response == -1)
@@ -361,7 +361,7 @@ int negative_null_rtc_read_write() {
 	int response;
 	printf("calling rtc_write with negative number of bytes\n");
 	rtc_open(NULL);
-	terminal_open();
+	terminal_open((uint8_t *) "");
 	//check if negative bytes does something
 	int32_t FOUR_BYTES = 64;
 	rtc_write(0,(const void*)&FOUR_BYTES,4);
@@ -386,7 +386,7 @@ int negative_null_rtc_read_write() {
 
 	//close rtc and terminal
 	rtc_close(0);
-	terminal_close();
+	terminal_close(0);
 
 	return PASS;
 }
@@ -404,7 +404,7 @@ int terminal_read_write() {
 	int passorfail;
 	char buf[10];
 	//open terminal
-	terminal_open();
+	terminal_open((uint8_t *) "");
 	printf("Read is called with abcd\n");
 
 	//read in 10 characters using terminal_read
@@ -437,7 +437,7 @@ int extensive_terminal_read_write() {
 	char* buf = NULL;
 
 	//open the terminal
-	terminal_open();
+	terminal_open((uint8_t *) "");
 
 	//TEST CASE: buf = NULL
 	printf("buffer is initalized to null\n");

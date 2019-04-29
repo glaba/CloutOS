@@ -393,7 +393,9 @@ void keyboard_handler() {
  * OUTPUTS: 0, to indicate it went well
  * SIDE EFFECTS: modifies linebuffer
  */
-int32_t terminal_open() {
+int32_t terminal_open(const uint8_t* filename) {
+	// Never actually used
+	(void) filename;
 	if (!keyboard_init)
 		init_keyboard();
 
@@ -416,7 +418,8 @@ int32_t terminal_open() {
  * OUTPUTS: 0, to indicate it went well
  * SIDE EFFECTS: nothing
  */
-int32_t terminal_close(void) {
+int32_t terminal_close(int32_t fd) {
+	(void) fd;
 	int32_t i;
 
 	// Clear buffer, blocking keyboard interrupts while this happenss

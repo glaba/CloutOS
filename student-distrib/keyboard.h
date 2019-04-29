@@ -50,9 +50,9 @@ void init_keyboard();
 void keyboard_handler();
 
 // Initializes the terminal to be written or read from
-extern int32_t terminal_open(void);
+extern int32_t terminal_open(const uint8_t *filname);
 // Uninitializes the terminal from being written or read
-extern int32_t terminal_close(void);
+extern int32_t terminal_close(int32_t fd);
 // Blocking call that returns the string typed after 127 characters or the enter key is pressed
 extern int32_t terminal_read(int32_t fd, char* buf, int32_t bytes);
 // Writes the provided string to the screen
