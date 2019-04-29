@@ -19,9 +19,14 @@ static uint8_t attrib = 0x3;
  * INPUTS: tty: the TTY for which to clear the screen
  */
 void clear_tty(uint8_t tty) {
+	unsigned long flags;
+	cli_and_save(flags);
+
 	uint8_t *video_mem = (uint8_t*)get_vid_mem(tty);
-	if (video_mem == NULL)
+	if (video_mem == NULL) {
+		restore_flags(flags);
 		return;
+	}
 
 	int32_t i;
 	for (i = 0; i < NUM_ROWS * NUM_COLS; i++) {
@@ -32,6 +37,8 @@ void clear_tty(uint8_t tty) {
 	screen_x[tty - 1] = 0;
 	screen_y[tty - 1] = 0;
 	update_cursor();
+
+	restore_flags(flags);
 }
 
 /*
@@ -61,8 +68,13 @@ void set_color(uint8_t back_color, uint8_t fore_color) {
  * SIDE EFFECTS: screen_x and screen_y are updated
  */
 void set_cursor_location(int x, int y) {
+	unsigned long flags;
+	cli_and_save(flags);
+
 	screen_x[active_tty - 1] = x;
 	screen_y[active_tty - 1] = y;
+
+	restore_flags(flags);
 }
 
 /*
@@ -72,8 +84,13 @@ void set_cursor_location(int x, int y) {
  * SIDE EFFECTS: screen_x and screen_y are updated for the given TTY
  */
 void decrement_location(uint8_t tty) {
-	if (screen_x[tty - 1] <= 0 && screen_y[tty - 1] <= 0)
+	unsigned long flags;
+	cli_and_save(flags);
+
+	if (screen_x[tty - 1] <= 0 && screen_y[tty - 1] <= 0) {
+		restore_flags(flags);
 		return;
+	}
 	screen_x[tty - 1]--;
 
 	if (screen_x[tty - 1] < 0 && screen_y[tty - 1] > 0) {
@@ -81,6 +98,8 @@ void decrement_location(uint8_t tty) {
 		screen_x[tty - 1] = NUM_COLS - 1;
 	}
 	update_cursor();
+
+	restore_flags(flags);
 }
 
 /*
@@ -92,8 +111,13 @@ void decrement_location(uint8_t tty) {
  *               updates cursor
  */
 void clear_char(uint8_t tty) {
-	if (screen_x[tty - 1] <= 0 && screen_y[tty - 1] <= 0)
+	unsigned long flags;
+	cli_and_save(flags);
+
+	if (screen_x[tty - 1] <= 0 && screen_y[tty - 1] <= 0) {
+		restore_flags(flags);
 		return;
+	}
 
 	uint8_t *video_mem = get_vid_mem(tty);
 
@@ -106,6 +130,8 @@ void clear_char(uint8_t tty) {
 
 	// Update the screen coordinates
 	decrement_location(tty);
+
+	restore_flags(flags);
 }
 
 /* Standard printf().
@@ -131,6 +157,9 @@ void clear_char(uint8_t tty) {
  *         varargs: typical printf format
  */
 int32_t printf_tty(uint8_t tty, int8_t *format, ...) {
+	unsigned long flags;
+	cli_and_save(flags);
+
 	/* Pointer to the format string */
 	int8_t* buf = format;
 
@@ -235,6 +264,9 @@ format_char_switch:
 		}
 		buf++;
 	}
+
+	restore_flags(flags);
+
 	return (buf - format);
 }
 
@@ -245,11 +277,17 @@ format_char_switch:
  *         tty: the TTY to output the string to
  */
 int32_t puts_tty(int8_t* s, uint8_t tty) {
+	unsigned long flags;
+	cli_and_save(flags);
+
 	register int32_t index = 0;
 	while (s[index] != '\0') {
 		putc_tty(s[index], tty);
 		index++;
 	}
+
+	restore_flags(flags);
+
 	return index;
 }
 
@@ -271,6 +309,9 @@ int32_t puts(int8_t* s) {
  * SIDE EFFECTS: prints an image onto the screen, overwriting what may already be there
  */
 void print_image(const char* s, unsigned int x, unsigned int y) {
+	unsigned long flags;
+	cli_and_save(flags);
+
 	uint8_t *video_mem = (uint8_t*)get_vid_mem(active_tty);	
 	unsigned int start_x = x;
 
@@ -291,6 +332,8 @@ void print_image(const char* s, unsigned int x, unsigned int y) {
 			x++;
 		}
 	}
+
+	restore_flags(flags);
 }
 
 /*
@@ -301,6 +344,9 @@ void print_image(const char* s, unsigned int x, unsigned int y) {
  * SIDE EFFECTS: scrolls the text in the video memory upwards like a console
  */
 static void scroll_screen_tty(uint8_t tty) {
+	unsigned long flags;
+	cli_and_save(flags);
+
 	uint8_t *video_mem = (uint8_t*)get_vid_mem(tty);
 	screen_y[tty - 1] = NUM_ROWS - 1;
 	screen_x[tty - 1] = 0;
@@ -319,6 +365,8 @@ static void scroll_screen_tty(uint8_t tty) {
 		*(video_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1)) = ' ';
 		*(video_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1) + 1) = attrib;
 	}
+
+	restore_flags(flags);
 }
 
 /*
@@ -329,6 +377,9 @@ static void scroll_screen_tty(uint8_t tty) {
  * SIDE EFFECTS: screen_x and screen_y are updated
  */
 void increment_location(uint8_t tty) {
+	unsigned long flags;
+	cli_and_save(flags);
+
 	screen_x[tty - 1] = (screen_x[tty - 1] + 1) % NUM_COLS;
 
 	if (screen_x[tty - 1] == 0)
@@ -339,6 +390,8 @@ void increment_location(uint8_t tty) {
 		scroll_screen_tty(tty);
 
 	update_cursor();
+
+	restore_flags(flags);
 }
 
 /* 
@@ -348,6 +401,9 @@ void increment_location(uint8_t tty) {
  *         tty: the TTY to print the character to
  */
 void putc_tty(uint8_t c, uint8_t tty) {
+	unsigned long flags;
+	cli_and_save(flags);
+
 	uint8_t *video_mem = (uint8_t*)get_vid_mem(tty);
 
 	// If it is a newline character, move the cursor down one and reset x
@@ -371,6 +427,8 @@ void putc_tty(uint8_t c, uint8_t tty) {
 		scroll_screen_tty(tty);
 	}
 	update_cursor();
+
+	restore_flags(flags);
 }
 
 /* 
@@ -389,12 +447,17 @@ void putc(uint8_t c) {
  * Source: https://wiki.osdev.org/Text_Mode_Cursor
  */
 void update_cursor() {
+	unsigned long flags;
+	cli_and_save(flags);
+
 	uint16_t post = screen_y[active_tty - 1] * NUM_COLS + screen_x[active_tty - 1];
 
 	outb(0x0F, 0x3D4);
 	outb(post & 0xFF, 0x3D5);
 	outb(0x0E, 0x3D4);
 	outb((post >> 8) & 0xFF, 0x3D5);
+
+	restore_flags(flags);
 }
 
 

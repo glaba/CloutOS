@@ -23,7 +23,6 @@ keyboard_linkage:
 	pushal                      # Push all general purpose registers in 32 bit form
 	call keyboard_handler
 	popal                       # Pop general purpose registers
-	sti                         # Enable interrupts due to interrupt gate
 	iret
 
 # Function: rtc_linkage
@@ -35,7 +34,6 @@ rtc_linkage:
 	pushal                      # Push all general purpose registers in 32 bit form
 	call rtc_handler
 	popal                       # Pop general purpose registers
-	sti                         # Enable interrupts due to interrupt gate
 	iret
 
 # Function: pci_linkage
@@ -45,11 +43,8 @@ rtc_linkage:
 # Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
 pci_linkage:
 	pushal                      # Push all general purpose registers in 32 bit form
-	pushfl                      # Push flags
 	call pci_irq_handler
-	popfl                       # Pop flags
 	popal                       # Pop general purpose registers
-	sti                         # Enable interrupts due to interrupt gate
 	iret
 
 # Function: timer_linkage
@@ -59,9 +54,6 @@ pci_linkage:
 # Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
 timer_linkage:
 	pushal                      # Push all general purpose registers in 32 bit form
-	pushfl                      # Push flags
 	call timer_handler
-	popfl                       # Pop flags
 	popal                       # Pop general purpose registers
-	sti                         # Enable interrupts due to interrupt gate
 	iret

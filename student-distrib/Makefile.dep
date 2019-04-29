@@ -47,10 +47,10 @@ pit.o: pit.c pit.h types.h lib.h processes.h system_calls.h rtc.h \
   dynamic_array.h list.h i8259.h kheap.h paging.h spinlock.h
 processes.o: processes.c processes.h types.h system_calls.h lib.h rtc.h \
   irq_defs.h file_system.h keyboard.h system_call_linkage.h \
-  dynamic_array.h list.h paging.h x86_desc.h kheap.h
+  dynamic_array.h list.h paging.h x86_desc.h kheap.h i8259.h
 rtc.o: rtc.c rtc.h types.h irq_defs.h lib.h processes.h system_calls.h \
   file_system.h keyboard.h system_call_linkage.h dynamic_array.h list.h \
-  i8259.h
+  i8259.h kheap.h paging.h
 spinlock.o: spinlock.c spinlock.h types.h lib.h processes.h \
   system_calls.h rtc.h irq_defs.h file_system.h keyboard.h \
   system_call_linkage.h dynamic_array.h list.h
