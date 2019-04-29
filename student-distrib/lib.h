@@ -55,6 +55,7 @@ int32_t puts_tty(int8_t *s, uint8_t tty);
 int8_t *itoa(uint32_t value, int8_t* buf, int32_t radix);
 int8_t *strrev(int8_t* s);
 uint32_t strlen(const int8_t* s);
+uint32_t strnlen(const int8_t* s, uint32_t max);
 void clear_tty(uint8_t tty);
 void clear();
 

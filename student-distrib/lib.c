@@ -529,6 +529,19 @@ uint32_t strlen(const int8_t* s) {
 	return len;
 }
 
+
+/* strlen_avoid_overflow(const int8_t* s, uint32_t max);
+ * Inputs: const int8_t* s = string to take length of
+ * 		   uint32_t max    = max posible len of string
+ * Return Value: length of string s
+ * Function: return length of string s */
+uint32_t strnlen(const int8_t* s, uint32_t max) {
+	register uint32_t len = 0;
+	while (len < max && s[len] != '\0')
+		len++;
+	return len;
+}
+
 /* void* memset(void* s, int32_t c, uint32_t n);
  * Inputs:    void* s = pointer to memory
  *          int32_t c = value to set memory to

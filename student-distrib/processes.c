@@ -278,7 +278,7 @@ int32_t process_halt(uint16_t status) {
 	// Close all files and delete the files table
 	int i;
 	for (i = 0; i < pcb->files.length; i++) {
-		if (pcb->files.data[i].fd_table->close != NULL)
+		if (pcb->files.data[i].in_use && pcb->files.data[i].fd_table->close != NULL)
 			pcb->files.data[i].fd_table->close(i);
 	}
 	DYN_ARR_DELETE(pcb->files);
