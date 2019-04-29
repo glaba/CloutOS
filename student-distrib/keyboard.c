@@ -314,7 +314,7 @@ void keyboard_handler() {
 
 		// Trigger any terminal_read calls that may be waiting and null-terminate the string
 		enter_flag = 0;
-		linebuffer[active_tty - 1][TERMINAL_SIZE - 1] = '\0';
+		linebuffer[active_tty - 1][linepos[active_tty - 1]] = '\0';
 		linepos[active_tty - 1] = 0;
 
 		// Return, since we have printed the character already
@@ -452,6 +452,17 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
 	else if (bytes == 0)
 		return 0;
 
+	// Print out the contents of the line buffer that are there so far
+	int i;
+	for (i = 0; i < linepos[tty - 1]; i++) {
+		putc_tty(linebuffer[tty - 1][i], tty);
+	}
+
+	// Set the enter_flag if we are in the active TTY
+	// If we are not, enter_flag will be set upon switching to this TTY
+	if (tty == active_tty)
+		enter_flag = 1;
+
 	// Restore interrupts now that we're done with "critical" stuff
 	sti();
 
@@ -467,7 +478,7 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
 		bytes = TERMINAL_SIZE;
 
 	// Copy bytes into the buffer until we reach \0 or until we reach the end of buffer
-	int i, bytes_copied;
+	int bytes_copied;
 	for (i = 0; i < bytes; i++) {
 		buf[i] = linebuffer[tty - 1][i];
 
