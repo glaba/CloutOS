@@ -65,7 +65,7 @@ static inline void enable_page_size_extension() {
 }
 
 /*
- * If there is no mapping already existing, maps a region of specified size starting from the
+ * Unconditionally maps a region of specified size starting from the
  *  given virtual address to the region of the same size starting from the given physical address
  *
  * INPUTS: start_phys_addr: the start of the region in physical memory
@@ -79,18 +79,8 @@ int32_t map_region(void *start_phys_addr, void *start_virt_addr, uint32_t num_pd
 	start_phys_addr = (void*)(((uint32_t)start_phys_addr / LARGE_PAGE_SIZE) * LARGE_PAGE_SIZE);
 	start_virt_addr = (void*)(((uint32_t)start_virt_addr / LARGE_PAGE_SIZE) * LARGE_PAGE_SIZE);
 
-	// Check if the memory is mapped at any of the desired page directory entries, we fail if so
-	unsigned int i, cur_pde_index, cur_pde;
-	for (i = 0; i < num_pdes; i++) {
-		cur_pde_index = (unsigned int)(start_virt_addr) / LARGE_PAGE_SIZE + i;
-		cur_pde = page_directory[cur_pde_index];
-
-		// If the page is already present, we don't want to mess with whatever is happening there
-		if (cur_pde & PAGE_PRESENT)
-			return -1;
-	}
-
 	// Mark all the desired pages as 4M, present pages, as well as the custom flags
+	unsigned int i, cur_pde_index;
 	unsigned int cur_phys_index;
 	for (i = 0; i < num_pdes; i++) {
 		cur_pde_index = (unsigned int)(start_virt_addr) / LARGE_PAGE_SIZE + i;

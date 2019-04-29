@@ -123,20 +123,24 @@ typedef struct keyboard_shortcut {
 	// Defines which modifier keys need to be held to trigger this shortcut
 	unsigned int req_keyboard_status;
 	// The ASCII character that must also be depressed (assuming the non-shift mapping from scancodes to ASCII)
+	// A value of zero means no character need be pressed
 	char character;
-	// The function to call when the shortcut is pressed, taking the character as an argument
-	void (*callback)(char);
+	// The FN key that must be pressed (going from 1 to 12)
+	// A value of zero means no function key need be pressed
+	char fn_key;
+	// The function to call when the shortcut is pressed, taking the character and fn number as an argument
+	void (*callback)(char, char);
 } keyboard_shortcut;
 
 // Prototypes for keyboard shortcut handlers
-void ctrl_L_handler(char character);
-void tty_switch_handler(char character);
+void ctrl_L_handler(char character, char fn_key);
+void tty_switch_handler(char character, char fn_key);
 
 static keyboard_shortcut keyboard_shortcuts[NUM_KEYBOARD_SHORTCUTS] = {
-	{.req_keyboard_status = CTRL, .character = 'l', .callback = ctrl_L_handler},
-	{.req_keyboard_status = ALT,  .character = '1', .callback = tty_switch_handler},
-	{.req_keyboard_status = ALT,  .character = '2', .callback = tty_switch_handler},
-	{.req_keyboard_status = ALT,  .character = '3', .callback = tty_switch_handler}
+	{.req_keyboard_status = CTRL, .character = 'l', .fn_key = 0, .callback = ctrl_L_handler},
+	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 1, .callback = tty_switch_handler},
+	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 2, .callback = tty_switch_handler},
+	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 3, .callback = tty_switch_handler}
 };
 
 /*
@@ -184,9 +188,10 @@ void init_keyboard() {
 
 /* 
  * Clears the screen and prints the current contents of the linebuffer at the top
- * INPUTS: the character pressed (it is always L), which we ignore
+ * INPUTS: character: the character pressed (it is always L), which we ignore
+ *         fn_key: the number of the function key pressed (none) which we ignore
  */
-void ctrl_L_handler(char character) {
+void ctrl_L_handler(char character, char fn_key) {
 	clear();
 
 	// Print the contents of the current linebuffer
@@ -213,16 +218,12 @@ void ctrl_L_handler(char character) {
 
 /*
  * Switches to the TTY indicated by the character pressed
- * INPUTS: character: either '1', '2', ... NUM_TEXT_TTYS, indicating which TTY to switch to
+ * INPUTS: character: the character pressed (none)
+ *         fn_key: the number of the function key pressed, which indicates the TTY to switch to
  */
-void tty_switch_handler(char character) {
-	// Validate that the character is a number
-	if (character < '1' || character > '9')
-		return;
-
-	// Validate that it points to a valid TTY
-	uint8_t tty = (uint8_t)character - '1' + 1;
-	if (tty > NUM_TEXT_TTYS)
+void tty_switch_handler(char character, char fn_key) {
+	// Validate that the fn_key is a number in range
+	if (fn_key < 1 || fn_key > NUM_TEXT_TTYS)
 		return;
 
 	// Disable the enter flag, since any enter that happened in this TTY should not 
@@ -230,7 +231,7 @@ void tty_switch_handler(char character) {
 	enter_flag = 1;
 
 	// Switch to that TTY
-	tty_switch(tty);
+	tty_switch(fn_key);
 }
 
 /*
@@ -277,6 +278,15 @@ void keyboard_handler() {
 	if (!key_down)
 		return;
 
+	// Get the fn_key number, if it was a function key that was pressed
+	char fn_key = 0;
+	if ((scancode & SCAN_CODE_MASK) >= FN1_TO_10_START && (scancode & SCAN_CODE_MASK) < FN1_TO_10_START + 10)
+		fn_key = (scancode & SCAN_CODE_MASK) - FN1_TO_10_START + 1;
+	if ((scancode & SCAN_CODE_MASK) == FN11)
+		fn_key = 11;
+	if ((scancode & SCAN_CODE_MASK) == FN12)
+		fn_key = 12;
+
 	// Get the character
 	char character = kbdus[scancode & SCAN_CODE_MASK];
 
@@ -286,12 +296,13 @@ void keyboard_handler() {
 		// Mask out any bits that correspond to modifiers that are not CTRL, ALT, and SHIFT
 		unsigned int modifier_status = keyboard_key_status & (CTRL | ALT | SHIFT);
 
-		// Check if the modifier keys are correct, and if the character is correct
+		// Check if the modifier keys are correct, and if the character and fn_key are correct
 		if (keyboard_shortcuts[i].req_keyboard_status == modifier_status &&
-			keyboard_shortcuts[i].character == character) {
+			keyboard_shortcuts[i].character == character &&
+			keyboard_shortcuts[i].fn_key == fn_key) {
 
 			// Call the callback
-			keyboard_shortcuts[i].callback(character);
+			keyboard_shortcuts[i].callback(character, fn_key);
 			return;
 		}
 	}

@@ -25,6 +25,9 @@
 #define LEFT_ALT_CODE    0x38
 #define BACKSPACE_CODE   0x0E
 #define TAB_CODE         0x0F
+#define FN1_TO_10_START  59
+#define FN11             125
+#define FN12             126
 
 /* Keyboard key status flags */
 #define SHIFT     0x1

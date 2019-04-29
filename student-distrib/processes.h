@@ -9,7 +9,7 @@
 #include "list.h"
 
 // Uncomment PROC_DEBUG_ENABLE to enable debugging
-#define PROC_DEBUG_ENABLE
+// #define PROC_DEBUG_ENABLE
 #ifdef PROC_DEBUG_ENABLE
 	#define PROC_DEBUG(f, ...) printf(f, ##__VA_ARGS__)
 #else
@@ -73,6 +73,22 @@ typedef struct page_mapping {
 // A dynamic array of ints where each item represents an index of a 4MB page used by a process
 typedef DYNAMIC_ARRAY(page_mapping, page_mapping_dyn_arr) page_mapping_dyn_arr;
 
+// States that a process can take on
+// In this state, the process is running normally and will get scheduled
+#define PROCESS_RUNNING  0
+// In this state, the process is blocking on some system call, and will be scheduled when its state
+//  is switched back to RUNNING
+#define PROCESS_SLEEPING 1
+
+// The order of the items in this struct are NOT to be changed
+struct process_context {
+	uint32_t esp;
+	uint32_t ebp;
+	uint32_t eip; // Should be inside the kernel code
+} __attribute__((packed));
+
+typedef struct process_context process_context;
+
 typedef struct pcb_t {
 	// A dynamic array of the files that are being used by the process
 	file_dyn_arr files;
@@ -90,12 +106,16 @@ typedef struct pcb_t {
 	int8_t args[TERMINAL_SIZE];
 	// The virtual address of paged in video memory
 	void *vid_mem;
+	// The state of the process (either LIVE or SLEEP)
+	uint8_t state;
+	// The context of the process before the scheduler switched to another process
+	process_context context;
 } pcb_t;
 
 // Initializes any supporting data structures for managing user level processes
 int init_processes();
 // Starts the process associated with the given shell command
-int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty);
+int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, uint8_t save_context);
 // Halts the current process and returns the provided status code to the parent process
 int32_t process_halt(uint16_t status);
 // Maps video memory for the current userspace program to either video memory or a buffer depending
@@ -111,6 +131,8 @@ pcb_t* get_pcb();
 void *get_vid_mem(uint8_t tty);
 // Switches from the current TTY to the provided TTY
 int32_t tty_switch(uint8_t tty);
+// The handler called by the timer that switches to the next process 
+void scheduler_interrupt_handler();
 
 // The currently active TTY
 extern uint8_t active_tty;

@@ -4,6 +4,7 @@
 #include "init_idt.h"
 #include "exception_handlers.h"
 #include "interrupt_service_routines.h"
+#include "system_call_linkage.h"
 #include "irq_defs.h"
 
 #define END_OF_EXCEPTIONS 32

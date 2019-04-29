@@ -197,9 +197,10 @@ void entry(unsigned long magic, unsigned long addr) {
 		/* Run tests */
 		launch_tests();
 #endif
-	
+		enable_scheduling();
+
 		/* Execute the first program ("shell") ... */
-		process_execute("shell", 0, 1);
+		process_execute("shell", 0, 1, 0);
 	}
 
 	/* Unregister the E1000 Ethernet device */

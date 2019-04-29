@@ -39,7 +39,7 @@ int32_t execute(const char *command) {
 	if (is_userspace_string_valid((void*)command, cur_pcb->pid) == -1)
 		return FAIL;
 
-	return process_execute(command, 1, cur_pcb->tty);
+	return process_execute(command, 1, cur_pcb->tty, 0);
 }
 
 /*

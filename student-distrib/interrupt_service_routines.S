@@ -9,7 +9,6 @@
 
 .globl keyboard_linkage
 .globl rtc_linkage
-.globl system_call_linkage
 .globl pci_linkage
 .globl timer_linkage
 

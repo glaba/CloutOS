@@ -17,9 +17,6 @@ extern void keyboard_linkage();
 /* Linkage for RTC interrupt handler */
 extern void rtc_linkage();
 
-/* Linkage for system call handler */
-extern void system_call_linkage();
-
 /* Linkage for all PCI interrupt handlers */
 extern void pci_linkage();
 
