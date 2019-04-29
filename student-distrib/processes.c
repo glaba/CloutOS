@@ -258,7 +258,7 @@ int32_t unmap_process(int32_t pid) {
  * Halts the current process and returns the provided status code to the parent process
  * INPUTS: status: the status with which the program existed (256 for exception, [0-256) otherwise)
  * SIDE EFFECTS: it jumps to the kernel stack for the parent process and returns
- *               the correct status value from execute
+*               the correct status value from execute
  */
 int32_t process_halt(uint16_t status) {
 	// Stop any scheduling interrupts while this is happening

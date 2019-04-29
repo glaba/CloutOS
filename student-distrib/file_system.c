@@ -232,14 +232,14 @@ int32_t read_dentry_by_index(uint32_t index, dentry_t *dentry){
 }
 
 /*
- *	  DESCRIPTION: copies over 'length' bytes of directory entries into 'buf'
- *    INPUTS: entry - directory entry to copy over
- *			  buf - buffer to be filled by the bytes read from the file
- *			  length - number of bytes to read
- *    OUTPUTS: none
- *    RETURN VALUE: number of bytes read and placed in the buffer
- *    SIDE EFFECTS: fills the first arg (buf) with the bytes read from
- *					the file
+ * DESCRIPTION: copies over 'length' bytes of directory entries into 'buf'
+ * INPUTS: entry - directory entry to copy over
+ * 		  buf - buffer to be filled by the bytes read from the file
+ * 		  length - number of bytes to read
+ * OUTPUTS: none
+ * RETURN VALUE: number of bytes read and placed in the buffer
+ * SIDE EFFECTS: fills the first arg (buf) with the bytes read from
+ *  			 the file
  */
 uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length) {
 	uint32_t i;
@@ -263,20 +263,19 @@ uint32_t read_directory_entry(uint32_t dir_entry, uint8_t* buf, uint32_t length)
 }
 
 /*
- * Description:
- * Reads (up to) 'length' bytes starting from position 'offset' in the file
+ * DESCRIPTION: Reads (up to) 'length' bytes starting from position 'offset' in the file
  * with inode number 'inode'. Returns the number of bytes read and placed
  * in the buffer 'buf'.
  *
  * Inputs:
- * inode- index node
- * offset- offset
- * buf- buffer
- * length- number of bytes
+ * 		inode- index node
+ * 		offset- offset
+ * 		buf- buffer
+ * 		length- number of bytes
  *
  * Returns:
- * -1- failure (bad inode, bad data block)
- * n- number of bytes read and placed in the buffer
+ * 		-1- failure (bad inode, bad data block)
+ * 		n- number of bytes read and placed in the buffer
  */
 int32_t read_data(uint32_t inode, uint32_t offset, uint8_t * buf,
                   uint32_t length) {
