@@ -11,6 +11,9 @@
 typedef DYNAMIC_ARRAY(pcb_t, pcb_dyn_arr) pcb_dyn_arr;
 pcb_dyn_arr pcbs;
 
+// A spinlock that prevents the pcbs dynamic array from being modified
+struct spinlock_t pcb_spin_lock = SPIN_LOCK_UNLOCKED;
+
 static struct fops_t stdin_table  = {.open = NULL, .close = NULL,
 	                                 .read = (int32_t (*)(int32_t, void*, int32_t))&terminal_read,
 	                                 .write = NULL};
@@ -21,6 +24,10 @@ static struct fops_t stdout_table = {.open = NULL, .close = NULL,
 // Pointers to the video memory back buffers for each of the TTYs, which programs will draw to
 //  when their TTY is not active
 static void *vid_mem_buffers[NUM_TEXT_TTYS];
+
+// A spinlock that prevents the TTY from changing while it is owned
+struct spinlock_t tty_spin_lock = SPIN_LOCK_UNLOCKED;
+
 // Indicates whether or not the shell program has been started for the TTY of each index
 static int tty_inited[NUM_TEXT_TTYS];
 
@@ -76,23 +83,30 @@ void set_in_userspace(uint32_t value) {
 }
 
 /*
- * Returns an unused PID, but does not mark it used (marking it used is the caller's responsibility)
+ * Returns an unused PID, and marks it used
  * If none can be found, it returns -1
  *
  * SIDE EFFECTS: may resize pcbs if there are no unused PIDs
  */
 int32_t get_open_pid() {
+	spin_lock_irqsave(pcb_spin_lock);
+
 	int i;
 	for (i = 0; i < pcbs.length; i++) {
-		if (pcbs.data[i].pid < 0)
+		if (pcbs.data[i].pid < 0) {
+			pcbs.data[i].pid = i;
+			spin_unlock_irqsave(pcb_spin_lock);
 			return i;
+		}
 	}
 
 	// If we got this far, that means no PID was found
 	// Add a new empty entry to the dynamic array
 	pcb_t new_pcb;
-	new_pcb.pid = -1;
+	new_pcb.pid = pcbs.length;
 	int pid = DYN_ARR_PUSH(pcb_t, pcbs, new_pcb);
+
+	spin_unlock_irqsave(pcb_spin_lock);
 
 	// Return the pid
 	// If pushing to pcbs failed, it will be -1 which already means failure, so we need no more checks
@@ -101,6 +115,7 @@ int32_t get_open_pid() {
 
 /*
  * Gets the PCB corresponding to the given PID
+ * pcb_spin_lock should be locked before calling this function
  *
  * INPUTS: pid: a non-negative number indicating the PID of the process whose PCB we want
  * OUTPUTS: a pointer to the desired process' PCB (NULL if the process doesn't exist)
@@ -130,7 +145,9 @@ int32_t get_pid() {
 
 /*
  * Get the current pcb from tss.esp0
- * INPUTS: N/A
+ * pcb_spin_lock should be locked before calling this function
+ *
+ * OUTPUTS: the PCB corresponding to the current userspace program's PID
  */
 pcb_t* get_pcb() {
 	return get_pcb_from_pid(get_pid());
@@ -163,6 +180,8 @@ void *get_vid_mem(uint8_t tty) {
  * RETURNS: 0 if the region is valid and -1 otherwise
  */
 int8_t is_userspace_region_valid(void *ptr, uint32_t size, int32_t pid) {
+	spin_lock_irqsave(pcb_spin_lock);
+
 	pcb_t *pcb = get_pcb_from_pid(pid);
 
 	// Go through the list of allocated pages
@@ -172,10 +191,14 @@ int8_t is_userspace_region_valid(void *ptr, uint32_t size, int32_t pid) {
 
 		// Check if it is within the virtual address given by this page
 		if (((uint32_t)ptr < start_addr) || 
-		    ((uint32_t)ptr + size >= start_addr + LARGE_PAGE_SIZE))
+		    ((uint32_t)ptr + size >= start_addr + LARGE_PAGE_SIZE)) {
+
+			spin_unlock_irqsave(pcb_spin_lock);
 			return -1;
+		}
 	}
 
+	spin_unlock_irqsave(pcb_spin_lock);
 	return 0;
 }
 
@@ -201,9 +224,13 @@ int8_t is_userspace_string_valid(void *ptr, int32_t pid) {
  * OUTPUTS: -1 if the PID is invalid and 0 on success
  */
 int32_t map_process(int32_t pid) {
+	spin_lock_irqsave(pcb_spin_lock);
+
 	pcb_t *pcb = get_pcb_from_pid(pid);
-	if (pcb == NULL)
+	if (pcb == NULL) {
+		spin_unlock_irqsave(pcb_spin_lock);
 		return -1;
+	}
 
 	// Iterate through all the large page mappings for this PID
 	int i;
@@ -225,6 +252,7 @@ int32_t map_process(int32_t pid) {
 		map_video_mem_user(phys_addr);
 	}
 
+	spin_unlock_irqsave(pcb_spin_lock);
 	return 0;
 }
 
@@ -235,9 +263,13 @@ int32_t map_process(int32_t pid) {
  * OUTPUTS: -1 if the PID is invalid and 0 on success
  */
 int32_t unmap_process(int32_t pid) {
+	spin_lock_irqsave(pcb_spin_lock);
+
 	pcb_t *pcb = get_pcb_from_pid(pid);
-	if (pcb == NULL)
+	if (pcb == NULL) {
+		spin_unlock_irqsave(pcb_spin_lock);
 		return -1;
+	}
 
 	// Iterate through all the large page mappings for this PID
 	int i;
@@ -251,6 +283,7 @@ int32_t unmap_process(int32_t pid) {
 		unmap_video_mem_user();
 	}
 
+	spin_unlock_irqsave(pcb_spin_lock);
 	return 0;
 }
 
@@ -261,8 +294,7 @@ int32_t unmap_process(int32_t pid) {
 *               the correct status value from execute
  */
 int32_t process_halt(uint16_t status) {
-	// Stop any scheduling interrupts while this is happening
-	cli();
+	spin_lock_irqsave(pcb_spin_lock);
 
 	// Get the PCB corresponding to this kernel stack
 	pcb_t *pcb = get_pcb();
@@ -324,6 +356,9 @@ int32_t process_halt(uint16_t status) {
 	// Set the parent process as RUNNING instead of SLEEPING
 	pcbs.data[parent_pid].state = PROCESS_RUNNING;
 
+	// Unlock the pcb spinlock now that we are done using it
+	spin_unlock_irqsave(pcb_spin_lock);
+
 	// Get the address of the top of the parent process' kernel stack
 	uint32_t esp = (uint32_t)pcbs.data[parent_pid].kernel_stack_base;
 
@@ -381,22 +416,9 @@ int32_t process_halt(uint16_t status) {
  *         save_context: whether or not to save the context in the current kernel stack's PCB
  */
 int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, uint8_t save_context) {
-	unsigned int flags;
-	cli_and_save(flags);
-
-	// Check the number of processes
-	int i, num_procs;
-	for (i = 0, num_procs = 0; i < pcbs.length; i++) {
-		if (pcbs.data[i].pid >= 0)
-			num_procs++;
-	}
-	if (num_procs == MAX_NUM_PROCESSES) {
-		restore_flags(flags);
-		return -1;
-	}
-
 	// Get the filename of the executable from the command
 	char name[MAX_FILENAME_LENGTH + 1];
+	int i;
 	for (i = 0; i < MAX_FILENAME_LENGTH && command[i] != '\0' && command[i] != ' '; i++)
 		name[i] = command[i];
 	name[i] = '\0';
@@ -425,10 +447,10 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 
 	// Get the PID for this process
 	int32_t cur_pid = get_open_pid();
-	if (cur_pid < 0) {
-		restore_flags(flags);
+	if (cur_pid < 0)
 		return -1;
-	}
+
+	spin_lock_irqsave(pcb_spin_lock);
 
 	// Get the PID of the current parent process (if it exists) as well as the parent TTY before 
 	//  we remap the pages to point to the new process
@@ -557,6 +579,9 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 	if (save_context)
 		parent_pcb->context.eip = (uint32_t)(&&process_execute_return);
 
+	// We intentionally do not unlock pcb_spin_lock because it will get unlocked (read: sti will be called)
+	//  when the jump into userspace occurs
+
 	// Save the context if desired
 	//  which involves putting ESP and EBP into the context struct at offsets 0 and 4 respectively
 	// Push parameters onto stack for IRET into userspace
@@ -622,10 +647,13 @@ process_execute_fail:
 	parent_pcb->state = PROCESS_RUNNING;
 
 	// Set the PID as unused
+	// We do not need a lock around this because no one would have made use of a PID
+	//  marked as used anyway
 	pcbs.data[cur_pid].pid = -1;
 
+	spin_unlock_irqsave(pcb_spin_lock);
+
 	// Restore interrupts and return -1
-	restore_flags(flags);
 	return -1;
 }
 
@@ -639,30 +667,37 @@ process_execute_fail:
  * SIDE EFFECTS: may modify the page directory
  */
 int32_t process_vidmap(uint8_t **screen_start) {
+	spin_lock_irqsave(pcb_spin_lock);
+
 	pcb_t *pcb = get_pcb();
 
 	// Check if video is already mapped in
-	if (pcb->vid_mem != NULL)
+	if (pcb->vid_mem != NULL) {
+		spin_unlock_irqsave(pcb_spin_lock);
 		return -1;
+	}
 
 	// Check that the provided pointer is valid
-	if (is_userspace_region_valid((void*)screen_start, 1, pcb->pid) == -1)
+	if (is_userspace_region_valid((void*)screen_start, 1, pcb->pid) == -1) {
+		spin_unlock_irqsave(pcb_spin_lock);
 		return -1;
+	}
 
 	// Check whether or not the process should be writing directly to video memory
 	//  or if it should be writing to a buffer (based on whether or not it is in the active TTY)
 	void *phys_addr = get_vid_mem(pcb->tty);
 
-	int32_t retval = map_video_mem_user(phys_addr);
-
-	if (retval == -1)
+	if (map_video_mem_user(phys_addr) == -1) {
+		spin_unlock_irqsave(pcb_spin_lock);
 		return -1;
+	}
 
 	// Copy the value into the PCB and the return value
 	*screen_start = (uint8_t*)VIDEO_USER_VIRT_ADDR;
 	get_pcb()->vid_mem = (void*)VIDEO_USER_VIRT_ADDR;
 
 	// Return success
+	spin_unlock_irqsave(pcb_spin_lock);
 	return 0;
 }
 
@@ -674,17 +709,21 @@ int32_t process_vidmap(uint8_t **screen_start) {
  * OUTPUTS: 0 on success, which is always 
  */
 int32_t process_sleep(int32_t pid) {
-	unsigned long flags;
-	cli_and_save(flags);
+	spin_lock_irqsave(pcb_spin_lock);
 
 	pcb_t *pcb = get_pcb_from_pid(pid);
 	pcb->state = PROCESS_SLEEPING;
 
-	restore_flags(flags);
+	spin_unlock_irqsave(pcb_spin_lock);
 
 	// Spin while the process is in the sleep state 
 	// The scheduler will take us out of this loop
-	while (get_pcb_from_pid(pid)->state == PROCESS_SLEEPING);
+	int sleeping = 1;
+	while (sleeping) {
+		spin_lock_irqsave(pcb_spin_lock);
+		sleeping = (get_pcb_from_pid(pid)->state == PROCESS_SLEEPING);
+		spin_unlock_irqsave(pcb_spin_lock);
+	}
 
 	// Return when the scheduler returns back to this process and it is awake
 	return 0;
@@ -697,13 +736,12 @@ int32_t process_sleep(int32_t pid) {
  * OUTPUTS: 0 on success, which is always
  */
 int32_t process_wake(int32_t pid) {
-	unsigned long flags;
-	cli_and_save(flags);
+	spin_lock_irqsave(pcb_spin_lock);
 
 	pcb_t *pcb = get_pcb_from_pid(pid);
 	pcb->state = PROCESS_RUNNING;
 
-	restore_flags(flags);
+	spin_unlock_irqsave(pcb_spin_lock);
 
 	return 0;
 }
@@ -719,23 +757,13 @@ int32_t tty_switch(uint8_t tty) {
 	if (tty == 0 || tty > NUM_TEXT_TTYS)
 		return -1;
 
+	spin_lock_irqsave(tty_spin_lock);
+
 	int32_t old_tty = active_tty;
 
 	// We don't want a scheduling / keyboard interrupt to occur while we're copying buffers over
 	//  or modifying active_tty
 	cli();
-
-	// Check the number of processes
-	int i, num_procs;
-	for (i = 0, num_procs = 0; i < pcbs.length; i++) {
-		if (pcbs.data[i].pid >= 0)
-			num_procs++;
-	}
-	// Don't switch TTYs if it will involve creating a new shell
-	if (num_procs == MAX_NUM_PROCESSES && !tty_inited[tty - 1]) {
-		sti();
-		return -1;
-	}
 
 	uint8_t *vid_mem = (uint8_t*)VIDEO;
 	uint8_t *old_tty_buffer = (uint8_t*)vid_mem_buffers[old_tty - 1];
@@ -743,10 +771,13 @@ int32_t tty_switch(uint8_t tty) {
 
 	// Copy video memory into the buffer for active_tty (the old TTY)
 	//  and copy the buffer for tty into video memory
+	int i;
 	for (i = 0; i < VIDEO_SIZE; i++) {
 		old_tty_buffer[i] = vid_mem[i];
 		vid_mem[i] = new_tty_buffer[i];
 	}
+
+	spin_lock_irqsave(pcb_spin_lock);
 
 	// Remap the video memory for the currently running process if it is in the old TTY
 	//  or if it's in the new TTY
@@ -762,8 +793,13 @@ int32_t tty_switch(uint8_t tty) {
 			map_video_mem_user(vid_mem);
 	}
 
+	spin_unlock_irqsave(pcb_spin_lock);
+
 	// Update the active TTY
 	active_tty = tty;
+
+	// Unlock the spinlock now that we are done modifying active_tty and related data
+	spin_unlock_irqsave(tty_spin_lock);
 
 	// Update the cursor position
 	update_cursor();
@@ -791,13 +827,19 @@ int32_t tty_switch(uint8_t tty) {
  * OUTPUTS: -1 if the context switch could not be completed and 0 if it was
  */
 int32_t context_switch(int32_t pid) {
+	spin_lock_irqsave(pcb_spin_lock);
+
 	// Check that the PID is valid
-	if (pid < 0 || pid >= pcbs.length)
+	if (pid < 0 || pid >= pcbs.length) {
+		spin_unlock_irqsave(pcb_spin_lock);
 		return -1;
+	}
 
 	// Check that the PID represents an existing process
-	if (pcbs.data[pid].pid == -1)
+	if (pcbs.data[pid].pid == -1) {
+		spin_unlock_irqsave(pcb_spin_lock);
 		return -1;
+	}
 
 	// Get the PCB for the current process and the process we are switching to
 	pcb_t *old_pcb = get_pcb();
@@ -816,10 +858,15 @@ int32_t context_switch(int32_t pid) {
 	//  && is a GCC-specific operator that gets the address of a label
 	old_pcb->context.eip = (uint32_t)(&&context_switch_return);
 
+	// We don't unlock the spinlock because the inline assembly is still using the PCBs
+	// Instead, we have a sti instruction in the assembly after using the PCBs
+	// We cannot have a call to spin_unlock_irqsave because the stack has been messed up
+	//  and the compiler generates bad code
+
 	// Push all general purpose registers and flags
 	// Copy the ESP and EBP to return into this process' PCB
 	//  and restore the ESP, EBP for the next process
-	// Finally, push EIP for the next process onto the stack, and return to it
+	// Push EIP for the next process onto the stack
 	// The offsets into the struct for esp, ebp, and eip are 0, 4, 8 respectively
 	asm volatile ("         \n\
 		pushal              \n\
@@ -829,9 +876,11 @@ int32_t context_switch(int32_t pid) {
 		movl 0(%k1), %%esp  \n\
 		movl 4(%k1), %%ebp  \n\
 		pushl 8(%k1)        \n\
+		sti                 \n\
 		ret"
 		:
 		: "r"((&old_pcb->context)), "r"((&new_pcb->context))
+		: "esp"
 	);
 
 context_switch_return:
@@ -865,19 +914,21 @@ void scheduler_interrupt_handler() {
 	int i, next_pid;
 	next_pid = -1;
 	for (i = (pid + 1) % pcbs.length; /* No condition */; i = (i + 1) % pcbs.length) {
-		// If we have gone in a full circle through all the processes, re-enable interrupts
-		//  because one of the processes is probably waiting on an interrupt
-		// Any interrupts that may cause a context switch MUST re-enable TIMER_IRQ
-		if (i == pid)
-			sti();
-
 		if (pcbs.data[i].pid >= 0 && pcbs.data[i].state == PROCESS_RUNNING) {
 			// Set this as the next process
 			next_pid = i;
 			break;
 		}
+
+		// If we have gone in a full circle through all the processes, re-enable interrupts
+		//  because one of the processes is probably waiting on an interrupt
+		// Any interrupts that may cause a context switch MUST re-enable TIMER_IRQ
+		if (i == pid)
+			sti();
 	}
 
+	// Block interrupts again so that we don't get a timer interrupt
+	cli();
 	enable_irq(TIMER_IRQ);
 
 	// If we found no process to switch to, just return and keep going with this process

@@ -7,6 +7,7 @@
 #include "keyboard.h"
 #include "dynamic_array.h"
 #include "list.h"
+#include "spinlock.h"
 
 // Uncomment PROC_DEBUG_ENABLE to enable debugging
 // #define PROC_DEBUG_ENABLE
@@ -31,11 +32,9 @@
 // Bitmask for ESP that will yield the top of the kernel stack
 #define KERNEL_STACK_BASE_BITMASK 0xFFFFE000
 
-// The maximum number of processes that can be running at the same time
-#define MAX_NUM_PROCESSES 6
 // The maximum number of files that can be open for a process
 // This limit only exists to prevent userspace programs from using up too much kernel memory
-#define MAX_NUM_FILES 8
+#define MAX_NUM_FILES 64
 
 // The static file descriptors assigned to stdin and stdout for all programs
 #define STDIN  0
@@ -143,5 +142,11 @@ void scheduler_interrupt_handler();
 
 // The currently active TTY
 extern uint8_t active_tty;
+
+// A spinlock that should be acquired whenever anything that changes based on the TTY is used
+//  such as the return value of get_vid_mem, for example
+extern struct spinlock_t tty_spin_lock;
+// A spinlock that prevents the pcbs dynamic array from being modified concurrently
+extern struct spinlock_t pcb_spin_lock;
 
 #endif

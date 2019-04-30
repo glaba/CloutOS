@@ -12,17 +12,7 @@
  * SIDE EFFECTS: locks the provided spinlock
  */
 inline void spin_lock(struct spinlock_t *lock) {
-	asm volatile("\
-		try_lock%=:       \n\
-		movb $1, %%al     \n\
-		xchgb %%al, %0    \n\
-		testb %%al, %%al  \n\
-		jnz try_lock%=\
-		"
-		: "=m"(lock->lock) // uses lock->lock as output
-		: "m"(lock->lock) // uses lock->lock as input
-		: "eax", "cc", "memory" // clobbers
-	);
+	// Actually do nothing, since we are not running an SMP
 }
 
 /*
@@ -33,12 +23,5 @@ inline void spin_lock(struct spinlock_t *lock) {
  * SIDE EFFECTS: unlocks the provided spinlock
  */
 inline void spin_unlock(struct spinlock_t *lock) {
-	asm volatile("\
-		movb $0, %%al   \n\
-		xchgb %%al, %0  \n\
-		"
-		: "=m"(lock->lock)
-		: "m"(lock->lock)
-		: "eax", "memory"
-	);
+	// Do nothing, since we are not running an SMP
 }
