@@ -318,7 +318,7 @@ void divide_by_zero_test() {
 int rtc_read_write() {
 	int32_t freq,i,response;
 	response = 0;
-	terminal_open((uint8_t *) "");
+	terminal_open();
 	rtc_open(NULL);
 	for(freq = 2; freq <= 1024; freq*=2) {
 		//set freq of rtc to 4
@@ -342,7 +342,7 @@ int rtc_read_write() {
 			break;
 		}
 	}
-	terminal_close(0);
+	terminal_close();
 	rtc_close(0);
 	putc('\n');
 	if (response == -1)
@@ -361,7 +361,7 @@ int negative_null_rtc_read_write() {
 	int response;
 	printf("calling rtc_write with negative number of bytes\n");
 	rtc_open(NULL);
-	terminal_open((uint8_t *) "");
+	terminal_open();
 	//check if negative bytes does something
 	int32_t FOUR_BYTES = 64;
 	rtc_write(0,(const void*)&FOUR_BYTES,4);
@@ -386,7 +386,7 @@ int negative_null_rtc_read_write() {
 
 	//close rtc and terminal
 	rtc_close(0);
-	terminal_close(0);
+	terminal_close();
 
 	return PASS;
 }
@@ -404,7 +404,7 @@ int terminal_read_write() {
 	int passorfail;
 	char buf[10];
 	//open terminal
-	terminal_open((uint8_t *) "");
+	terminal_open();
 	printf("Read is called with abcd\n");
 
 	//read in 10 characters using terminal_read
@@ -437,7 +437,7 @@ int extensive_terminal_read_write() {
 	char* buf = NULL;
 
 	//open the terminal
-	terminal_open((uint8_t *) "");
+	terminal_open();
 
 	//TEST CASE: buf = NULL
 	printf("buffer is initalized to null\n");
@@ -632,127 +632,6 @@ kheap_test_fail:
 	init_kheap();
 	return FAIL;
 }
-
-/***************test cases**********************/
-
-/*
- * Print out a text file and/or an executable.
- * Print out the size in bytes of a text file and/or an executable.
- * input: none
- * output: none
- * effect: print out the content in the specific file, depending on the file flag
- */
-void read_test_text(uint8_t* filename){
-	printf("test reading file...\n");
-	clear();
-	printf("test reading file...\n");
-
-  printf("Filename: %s\n", filename);
-
-	dentry_t test_file;
-	uint32_t i;
-	int32_t bytes_read;
-
-	uint32_t buffer_size = SMALL_BUF;
-	uint8_t buffer[buffer_size];
-	if (read_dentry_by_name((uint8_t*)filename, &test_file)==-1){
-		printf("failed reading file");
-		return;
-	}
-	read_dentry_by_name((uint8_t*)filename, &test_file);   // Read the text file
-
-	printf("The file type the file:%d\n", test_file.filetype);
-	printf("The inode index of the file:%d\n", test_file.inode);
-	bytes_read = read_data(test_file.inode, 0, buffer, buffer_size);  // Size of file
-	printf("size of file is : %d btyes\n", (int32_t)bytes_read);
-
-	if (bytes_read <= 0){
-		printf("read data failed\n");
-		return;
-	}
-
-	// Print the content of file depending on how large it is
-	if (bytes_read>=SIZE_THREAD){
-		printf("Since the file is too large,\nwe print the first and last 200 bytes in the file.\n");
-		printf("\n");
-		printf("First 400 bytes:\n");
-		for (i=0; i<SIZE_THREAD/2; i++){
-			printf("%c", buffer[i]);
-		}
-		printf("\n\n");
-		printf("Last 400 bytes:\n");
-		for (i=bytes_read-SIZE_THREAD/2; i<bytes_read; i++){
-			printf("%c", buffer[i]);
-		}
-		return;
-	}
-
-	for (i=0; i<bytes_read; i++){
-		printf("%c", buffer[i]);
-	}
-	return;
-}
-
-
-/*
- * Print out a text file and/or an executable.
- * Print out the size in bytes of a text file and/or an executable.
- * input: none
- * output: none
- * effect: print out the content in the specific file, depending on the file flag
- */
-void read_test_exe(uint8_t* filename){
-	printf("test reading file...\n");
-	clear();
-	printf("test reading file...\n");
-
-  printf("Filename: %s\n", filename);
-
-	dentry_t test_file;
-	uint32_t i;
-	int32_t bytes_read;
-
-
-	uint32_t buffer_size = LARGE_BUF;
-	uint8_t buffer[buffer_size];
-	if (read_dentry_by_name((uint8_t*)filename, &test_file)==-1){
-		printf("failed reading file");
-		return;
-	}
-	read_dentry_by_name((uint8_t*)filename, &test_file);   // Read the execute file
-
-	printf("The file type the file:%d\n", test_file.filetype);
-	printf("The inode index of the file:%d\n", test_file.inode);
-	bytes_read = read_data(test_file.inode, 0, buffer, buffer_size);  // Size of file
-	printf("size of file is : %d btyes\n", (int32_t)bytes_read);
-
-	if (bytes_read <= 0){
-		printf("read data failed\n");
-		return;
-	}
-
-	// Print the content of file depending on how large it is
-	if (bytes_read>=SIZE_THREAD){
-		printf("Since the file is too large,\nwe print the first and last 200 bytes in the file.\n");
-		printf("\n");
-		printf("First 400 bytes:\n");
-		for (i=0; i<SIZE_THREAD/2; i++){
-			printf("%c", buffer[i]);
-		}
-		printf("\n\n");
-		printf("Last 400 bytes:\n");
-		for (i=bytes_read-SIZE_THREAD/2; i<bytes_read; i++){
-			printf("%c", buffer[i]);
-		}
-		return;
-	}
-
-	for (i=0; i<bytes_read; i++){
-		printf("%c", buffer[i]);
-	}
-	return;
-}
-
 
 /*
  * eth_test

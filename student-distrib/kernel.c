@@ -19,6 +19,10 @@
 #include "pit.h"
 #include "network/arp.h"
 #include "network/eth_device.h"
+#include "graphics/VMwareSVGA.h"
+#include "mouse.h"
+#include "graphics/graphics.h"
+#include "window_manager/window_manager.h"
 
 #define RUN_TESTS
 
@@ -26,9 +30,12 @@
 /* Check if the bit BIT in FLAGS is set. */
 #define CHECK_FLAG(flags, bit)   ((flags) & (1 << (bit)))
 
+int vga_text_enabled = 1;
+
 /* Check if MAGIC is valid and print the Multiboot information structure
    pointed by ADDR. */
 void entry(unsigned long magic, unsigned long addr) {
+
 
 	multiboot_info_t *mbi;
 
@@ -162,7 +169,9 @@ void entry(unsigned long magic, unsigned long addr) {
 
 	/* Initialize keyboard */
 	init_keyboard();
-	/* Initialize RTC */
+	/* Initialize mouse */
+	init_mouse();
+	/* Initialize RTC (will run test_interrupts() only for Checkpoint 1) */
 	init_rtc();
 
 	/* Enable interrupts */
@@ -184,6 +193,7 @@ void entry(unsigned long magic, unsigned long addr) {
 	init_arp();
 
 	/* Initialize E1000 PCI driver and Ethernet device in the correct order */
+	os_ready &= (register_pci_driver(svga_driver) == 0);
 	os_ready &= (register_pci_driver(e1000_driver) == 0);
 	enumerate_pci_devices();
 	uint32_t e1000_eth_dev_id = (uint32_t)register_eth_dev(&e1000_eth_device);
@@ -195,12 +205,19 @@ void entry(unsigned long magic, unsigned long addr) {
 	if (os_ready) {
 #ifdef RUN_TESTS
 		/* Run tests */
-		launch_tests();
+		// launch_tests();
 #endif
-		enable_scheduling();
+		vga_text_enabled = 0;
+		init_graphics();
+		
+		
+		clear();
+		// init_desktop();
 
+
+		// process_execute("window", 0);
 		/* Execute the first program ("shell") ... */
-		process_execute("shell", 0, 1, 0);
+		process_execute("shell", 0);
 	}
 
 	/* Unregister the E1000 Ethernet device */

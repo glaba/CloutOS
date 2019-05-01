@@ -9,6 +9,8 @@
 
 .globl keyboard_linkage
 .globl rtc_linkage
+.globl mouse_linkage
+.globl system_call_linkage
 .globl pci_linkage
 .globl timer_linkage
 
@@ -34,6 +36,19 @@ rtc_linkage:
 	pushal                      # Push all general purpose registers in 32 bit form
 	call rtc_handler
 	popal                       # Pop general purpose registers
+	iret
+
+# Function: mouse_linkage
+# Description: linkage between IDT and mouse_handler
+# Inputs   : none
+# Outputs  : none
+# Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
+mouse_linkage:
+	cli
+	pushal                      # Push all general purpose registers in 32 bit form
+	call mouse_handler
+	popal                       # Pop general purpose registers
+	sti
 	iret
 
 # Function: pci_linkage

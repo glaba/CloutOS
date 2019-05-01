@@ -9,7 +9,7 @@
 
 .align 4
 
-// Set to 1 if a userspace process is currently running, and 0 if the kernel is running
+# Set to 1 if a userspace process is currently running, and 0 if the kernel is running
 in_userspace:
 	.long 0
 
@@ -33,7 +33,7 @@ system_call_linkage:
 	movl $0, in_userspace
 
 	addl $-1, %eax					  # Subtract 1 for 0 based index
-    cmpl $10, %eax                    # check eax values
+    cmpl $13, %eax          		  # check eax values
 	jae eax_error                	  # if eax - 1 >= 10, go to eax_error
 	call *sys_call_table(, %eax, 4)	  # Jumps to correct system call
     jmp return_normal
@@ -55,4 +55,4 @@ return_normal:
 	iret
 
 sys_call_table:
-	.long halt, execute, read, write, open, close, getargs, vidmap, set_handler, sigreturn
+	.long halt, execute, read, write, open, close, getargs, vidmap, set_handler, sigreturn, allocate_window, update_window

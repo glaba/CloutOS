@@ -1,12 +1,8 @@
 #include "lib.h"
 #include "i8259.h"
 #include "keyboard.h"
-#include "processes.h"
-
-// The keyboard shortcuts we have so far are
-//  - Ctrl+L to clear the screen (1)
-//  - Alt+1,2,3 to switch TTYs (NUM_TEXT_TTYS)
-#define NUM_KEYBOARD_SHORTCUTS (1 + NUM_TEXT_TTYS)
+#include "kheap.h"
+#include "graphics/graphics.h"
 
 // Sets a bit in bitfield based on set (sets the bit if set is truthy)
 // The input flag should be a binary number containing only one 1
@@ -26,13 +22,24 @@ static unsigned int keyboard_key_status = 0;
 volatile unsigned int enter_flag = 1;
 
 /* store the position of where to store next linebuffer character */
-static unsigned int linepos[NUM_TEXT_TTYS];
+static unsigned int linepos = 0;
 
 /*store whether keyboard has been initialized or not*/
 static unsigned int keyboard_init = 0;
 
 //line buffer to store everything typed into terminal
-unsigned char linebuffer[NUM_TEXT_TTYS][TERMINAL_SIZE];
+unsigned char linebuffer[(TERMINAL_SIZE)];
+
+// Test variable lol
+int rect_copy_key_pressed = 0;
+
+//for open,close,read,write
+#define RTC_PASS 0
+#define RTC_FAIL -1
+
+void clear_linebuffer() {
+	memset(linebuffer, '\0', TERMINAL_SIZE);
+}
 
 /* KBDUS means US Keyboard Layout.
  * CREDIT TO http://www.osdever.net/bkerndev/Docs/keyboard.htm
@@ -117,32 +124,6 @@ const unsigned char shift_kbdus[TERMINAL_SIZE] = {
 	0,      /* All other keys are undefined */
 };
 
-// Defines a keyboard shortcut as well as the function to call when that shortcut is triggered
-typedef struct keyboard_shortcut {
-	// A bitmask of the same format as keyboard_key_status, but only with fields for ctrl, alt, and shift
-	// Defines which modifier keys need to be held to trigger this shortcut
-	unsigned int req_keyboard_status;
-	// The ASCII character that must also be depressed (assuming the non-shift mapping from scancodes to ASCII)
-	// A value of zero means no character need be pressed
-	char character;
-	// The FN key that must be pressed (going from 1 to 12)
-	// A value of zero means no function key need be pressed
-	char fn_key;
-	// The function to call when the shortcut is pressed, taking the character and fn number as an argument
-	void (*callback)(char, char);
-} keyboard_shortcut;
-
-// Prototypes for keyboard shortcut handlers
-void ctrl_L_handler(char character, char fn_key);
-void tty_switch_handler(char character, char fn_key);
-
-static keyboard_shortcut keyboard_shortcuts[NUM_KEYBOARD_SHORTCUTS] = {
-	{.req_keyboard_status = CTRL, .character = 'l', .fn_key = 0, .callback = ctrl_L_handler},
-	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 1, .callback = tty_switch_handler},
-	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 2, .callback = tty_switch_handler},
-	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 3, .callback = tty_switch_handler}
-};
-
 /*
  * Initializes keyboard and enables keyboard interrupt
  *
@@ -152,7 +133,7 @@ static keyboard_shortcut keyboard_shortcuts[NUM_KEYBOARD_SHORTCUTS] = {
  */
 void init_keyboard() {
 	unsigned char ccb;
-	int i, j;
+	int i;/*used for loop*/
 
 	// Read value of CCB
 	outb(CCB_READ, KEYBOARD_CONTROLLER_STATUS_PORT);
@@ -169,69 +150,13 @@ void init_keyboard() {
 	enable_irq(KEYBOARD_IRQ);
 
 	// Initialize line buffer
-	for (i = 0; i < TERMINAL_SIZE; i++) {
-		for (j = 0; j < NUM_TEXT_TTYS; j++)
-			linebuffer[j][i] = '\0';
+	for(i = 0; i < TERMINAL_SIZE;i++) {
+	  linebuffer[i] = '\0';
 	}
-
-	// Initialize the line positions
-	for (i = 0; i < NUM_TEXT_TTYS; i++) {
-		linepos[i] = 0;
-	}
-
 	// Update cursor to point at beginning
 	update_cursor();
-
 	// Say keyboard_init is done
 	keyboard_init = 1;
-}
-
-/* 
- * Clears the screen and prints the current contents of the linebuffer at the top
- * INPUTS: character: the character pressed (it is always L), which we ignore
- *         fn_key: the number of the function key pressed (none) which we ignore
- */
-void ctrl_L_handler(char character, char fn_key) {
-	clear();
-
-	// Print the contents of the current linebuffer
-	int i, j;
-	for (i = 0; i <= linepos[active_tty - 1]; i++) {
-		// Print some number of spaces for a tab character
-		if (linebuffer[active_tty - 1][i] == '\t') {
-			for (j = 0; j < NUM_SPACES_PER_TAB; j++)
-				putc_tty(' ', active_tty);
-		}
-		// Move 1 ahead b/c linebuffer[active_tty - 1][TERMINAL_SIZE-1] = '\n'
-		else if (i == TERMINAL_SIZE - 1) {
-			increment_location(active_tty);
-			continue;
-		}
-		// Simply print the character regularly
-		else
-			putc_tty(linebuffer[active_tty - 1][i], active_tty);
-	}
-
-	// Decrement the location by one to put the cursor in the right location
-	decrement_location(active_tty);
-}
-
-/*
- * Switches to the TTY indicated by the character pressed
- * INPUTS: character: the character pressed (none)
- *         fn_key: the number of the function key pressed, which indicates the TTY to switch to
- */
-void tty_switch_handler(char character, char fn_key) {
-	// Validate that the fn_key is a number in range
-	if (fn_key < 1 || fn_key > NUM_TEXT_TTYS)
-		return;
-
-	// Disable the enter flag, since any enter that happened in this TTY should not 
-	//  affect processes running in another TTY
-	enter_flag = 1;
-
-	// Switch to that TTY
-	tty_switch(fn_key);
 }
 
 /*
@@ -248,10 +173,14 @@ void keyboard_handler() {
 	unsigned char scancode;
 	unsigned char key_down;
 
-	/* Check for shift, ctrl, alt, CapsLock, Backspace, and tab*/
-	unsigned char is_shift, is_ctrl, is_alt, is_caps_lock, is_backspace, is_tab;
+	/* Check for shift,ctrl,alt,CapsLock,Backspace, and tab*/
+	unsigned char is_shift, is_ctrl, is_alt, is_caps_lock, is_backspace, is_tab, is_up, is_down;
 
+	/* Used for loops later*/
 	int i;
+
+	/* Keeps track of if ctrl+L was clicked*/
+	int ctrlL = 0;
 
 	/* Read the scan code and check if it corresponds to a key press or a key release */
 	scancode = inb(KEYBOARD_CONTROLLER_DATA_PORT);
@@ -264,67 +193,51 @@ void keyboard_handler() {
 	is_caps_lock = ((scancode & SCAN_CODE_MASK) == CAPS_LOCK_CODE);
 	is_backspace = ((scancode & SCAN_CODE_MASK) == BACKSPACE_CODE);
 	is_tab       = ((scancode & SCAN_CODE_MASK) == TAB_CODE);
-
+	is_up 		 = ((scancode & SCAN_CODE_MASK) == UP_CDOE);
+	is_down		 = ((scancode & SCAN_CODE_MASK) == DOWN_CODE);
 	// Set shift, ctrl, alt based on whether the key is down or up
 	if (is_shift) SET_BIT(keyboard_key_status, SHIFT, key_down);
 	if (is_ctrl)  SET_BIT(keyboard_key_status, CTRL,  key_down);
 	if (is_alt)   SET_BIT(keyboard_key_status, ALT,   key_down);
 
+
 	// Set caps lock to the opposite of what it was
 	if (is_caps_lock && key_down)
 		SET_BIT(keyboard_key_status, CAPS_LOCK, !(keyboard_key_status & CAPS_LOCK));
 
-	// We no longer care about keyup, since we only use keyup to keep track of modifier keys
-	if (!key_down)
-		return;
+	/* Check for ctrl+ something command*/
+	if ((keyboard_key_status & CTRL) != 0) {
+		/* All CTRL+ commands HERE*/
 
-	// Get the fn_key number, if it was a function key that was pressed
-	char fn_key = 0;
-	if ((scancode & SCAN_CODE_MASK) >= FN1_TO_10_START && (scancode & SCAN_CODE_MASK) < FN1_TO_10_START + 10)
-		fn_key = (scancode & SCAN_CODE_MASK) - FN1_TO_10_START + 1;
-	if ((scancode & SCAN_CODE_MASK) == FN11)
-		fn_key = 11;
-	if ((scancode & SCAN_CODE_MASK) == FN12)
-		fn_key = 12;
-
-	// Get the character
-	char character = kbdus[scancode & SCAN_CODE_MASK];
-
-	// Check for any keyboard shortcuts that should be specially handled
-	//  and exit the function after handling them
-	for (i = 0; i < NUM_KEYBOARD_SHORTCUTS; i++) {
-		// Mask out any bits that correspond to modifiers that are not CTRL, ALT, and SHIFT
-		unsigned int modifier_status = keyboard_key_status & (CTRL | ALT | SHIFT);
-
-		// Check if the modifier keys are correct, and if the character and fn_key are correct
-		if (keyboard_shortcuts[i].req_keyboard_status == modifier_status &&
-			keyboard_shortcuts[i].character == character &&
-			keyboard_shortcuts[i].fn_key == fn_key) {
-
-			// Call the callback
-			keyboard_shortcuts[i].callback(character, fn_key);
-			return;
+		/* If CTRL+L
+		   clear screen and put cursor in upper right corner*/
+		if (kbdus[(scancode & SCAN_CODE_MASK)] == 'l') {
+			set_color(V_BLACK,V_CYAN);
+			clear();
+			/* Print linebuffer*/
+			for(i = 0; i <= linepos;i++) {
+				/* Print 4 spaces for tab*/
+				if (linebuffer[i] == '\t') {
+					putc(' ');
+					putc(' ');
+					putc(' ');
+					putc(' ');
+				}
+				/* Move 1 ahead b/c linebuffer[TERMINAL_SIZE-1] = '\n'*/
+				else if (i == TERMINAL_SIZE-1) {
+					increment_location();
+					continue;
+				}
+				else
+				  putc(linebuffer[i]);
+			}
+			// Set CTRL+L to pressed
+			ctrlL = 1;
+			/* In the end decrement location so blinking cursor
+				is at correct location*/
+			decrement_location();
 		}
 	}
-
-	// If either the character is a newline, or if the buffer is full, we have the same behavior
-	//  of flushing the line buffer and printing a newline
-	if (character == '\n' || linepos[active_tty - 1] == TERMINAL_SIZE - 1) {
-		putc_tty('\n', active_tty);
-
-		// Trigger any terminal_read calls that may be waiting and null-terminate the string
-		enter_flag = 0;
-		linebuffer[active_tty - 1][linepos[active_tty - 1]] = '\0';
-		linepos[active_tty - 1] = 0;
-
-		// Return, since we have printed the character already
-		return;
-	}
-
-	// Now, we are printing regularly to the screen rather than handling special cases
-
-	// Check whether or not the character is alphabetical for caps lock
-	char is_alphabetical = (character >= 'a' && character <= 'z');
 
 	// If the character is alphabetical:
 	// The printed character should be uppercase if either shift or caps lock is on (but not both, hence the XOR)
@@ -334,80 +247,98 @@ void keyboard_handler() {
 	// Whether or not to use the shifted character set
 	unsigned char use_shift = ((keyboard_key_status & SHIFT) != 0);
 
-	// Handle the special case of a backspace
-	if (is_backspace && linepos[active_tty - 1] < TERMINAL_SIZE) {
-		// Do nothing if we are already at the beginning
-		if (linepos[active_tty - 1] == 0)
-			return;
+	// Print the character
+	char character = kbdus[scancode & SCAN_CODE_MASK];
+	char is_alphabetical = (character >= 'a' && character <= 'z');
+
+	if (character == '\n' && key_down) {
+		enter_flag = 0;
+		linepos = 0;
+	}
+
+	// BACKSPACE
+	// Clear 1 byte back in memory
+	if (is_backspace && key_down && linepos > 0 && linepos < TERMINAL_SIZE) {
+		// If buffer is full, remove \n and previous char
+		//   set color
+		set_color(V_BLACK,V_CYAN);
 
 		// If clearing tab, clear back four characters
-		if (linebuffer[active_tty - 1][linepos[active_tty - 1] - 1] == '\t') {
-			// Clear back 4 spaces
-			for (i = 0; i < NUM_SPACES_PER_TAB; i++)
-				clear_char(active_tty);
+		if (linebuffer[linepos-1] == '\t') {
+			// Clear back 4 characters
+			clear_char();
+			clear_char();
+			clear_char();
+			clear_char();
 		} else {
-			// Clear back only 1 character
-			clear_char(active_tty);
+			// Call on clear_char
+			clear_char();
 		}
 
 		// Clear keyboard buffer at linepos
-		linebuffer[active_tty - 1][linepos[active_tty - 1] - 1] = '\0';
-		
-		// Decrement linepos if we can go backwards
-		if (linepos[active_tty - 1] > 0)
-			linepos[active_tty - 1]--;
-
-		return;
+		linebuffer[linepos - 1] = '\0';
+		// Decrement linepos
+		if (linepos > 0) {
+			linepos--;
+		}
 	}
 
-	// Use the shifted set if it's alphabetical and uppercase
-	//   OR if it's non alphabetical but the shift key is down
-	if ((is_alphabetical && uppercase) || (!is_alphabetical && use_shift))
-		character = shift_kbdus[scancode & SCAN_CODE_MASK];
+	if (key_down) {
+		// Use the shifted set if it's alphabetical and uppercase
+		//   OR if it's non alphabetical but the shift key is down
+		if ((is_alphabetical && uppercase) || (!is_alphabetical && use_shift))
+			character = shift_kbdus[scancode & SCAN_CODE_MASK];
 
-	// Finally, we are just printing characters regularly
-	// Only print the character if the character is non-zero
-	if (character) {
-		// If it's a tab, print 4 spaces
-		if (is_tab) {
-			for (i = 0; i < NUM_SPACES_PER_TAB; i++)
-				putc_tty(' ', active_tty);
-		} else {
-			putc_tty(character, active_tty);
+		/* Only print the character if:
+		 *    - character is not 0
+		 *    - backspace is NOT being used
+		 *    - terminal buffer is NOT full
+		 */
+		if (character && ctrlL == 0 && (!is_backspace) && (linepos < TERMINAL_SIZE - 1) && character != '\n') {
+			// If it's a tab, print 4 spaces
+			if (is_tab && key_down) {
+				putc(' ');
+				putc(' ');
+				putc(' ');
+				putc(' ');
+			} else {
+				putc(character);
+			}
+			// Store character into line
+			linebuffer[linepos] = character;
+			linepos++;
+			update_cursor();
 		}
-
-		// Store character into line buffer and move the cursor over
-		linebuffer[active_tty - 1][linepos[active_tty - 1]] = character;
-		linepos[active_tty - 1]++;
-		update_cursor();
-	
-		return;
+		// If enter is pressed ONLY print the \n character
+		else if (character == '\n' && key_down) {
+			putc('\n');
+		}
+		/* If buffer is full, then put \n as last character and print a newline */
+		else if (linepos == TERMINAL_SIZE - 1) {
+			putc('\n');
+			character = '\n';
+			linebuffer[linepos] = character;
+			enter_flag = 0;
+			linepos = 0;
+		}
 	}
 }
 
 /*
- * Initializes vairables if needed and if keyboard
- * has not been initialized, initializes it
+ * initializes vairables if needed and if keyboard
+ * has not been initialized, initialize it
  *
  * INPUTS: none
  * OUTPUTS: 0, to indicate it went well
  * SIDE EFFECTS: modifies linebuffer
  */
-int32_t terminal_open(const uint8_t* filename) {
-	// Never actually used
-	(void) filename;
+int32_t terminal_open(void) {
+	int32_t i;
 	if (!keyboard_init)
 		init_keyboard();
-
-	cli();
-	// Get the TTY of the calling process
-	uint8_t tty = get_pcb()->tty;
-
-	int i;
-	for (i = 0; i < TERMINAL_SIZE; i++)
-		linebuffer[tty - 1][i] = '\0';
-	sti();
-
+	for(i = 0; i < TERMINAL_SIZE;i++) {
+		linebuffer[i] = '\0';
+	}
 	update_cursor();
 	return 0;
 }
@@ -418,17 +349,12 @@ int32_t terminal_open(const uint8_t* filename) {
  * OUTPUTS: 0, to indicate it went well
  * SIDE EFFECTS: nothing
  */
-int32_t terminal_close(int32_t fd) {
-	(void) fd;
+int32_t terminal_close(void) {
 	int32_t i;
-
-	// Clear buffer, blocking keyboard interrupts while this happenss
-	cli();
-	uint8_t tty = get_pcb()->tty;
-	for (i = 0; i < TERMINAL_SIZE; i++)
-		linebuffer[tty - 1][i] = '\0';
-	sti();
-
+	// Clear buffer
+	for(i = 0; i < TERMINAL_SIZE;i++) {
+		linebuffer[i] = '\0';
+	}
 	return 0;
 }
 
@@ -441,13 +367,6 @@ int32_t terminal_close(int32_t fd) {
  * SIDE EFFECTS: modifies linebuffer
  */
 int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
-	// Block context switch while we access the PCB
-	cli();
-
-	// Get the current TTY and save it
-	pcb_t *pcb = get_pcb();
-	uint8_t tty = pcb->tty;
-
 	// Check for null buffer or a negative number of bytes, both of which are invalid
 	if (buf == NULL || bytes < 0)
 		return -1;
@@ -455,22 +374,8 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
 	else if (bytes == 0)
 		return 0;
 
-	// Print out the contents of the line buffer that are there so far
-	int i;
-	for (i = 0; i < linepos[tty - 1]; i++) {
-		putc_tty(linebuffer[tty - 1][i], tty);
-	}
-
-	// Set the enter_flag if we are in the active TTY
-	// If we are not, enter_flag will be set upon switching to this TTY
-	if (tty == active_tty)
-		enter_flag = 1;
-
-	// Restore interrupts now that we're done with "critical" stuff
-	sti();
-
-	// Let the program spin while waiting for the keyboard handler to set the enter_flag to 0
-	while (tty != active_tty || enter_flag);
+	// Let the program spin while waiting for the keyboard handler to set the enter_flag
+	while (enter_flag);
 	enter_flag = 1;
 
 	// Disable interrupts so that keyboard_handler doesn't touch linebuffer during read
@@ -481,11 +386,11 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
 		bytes = TERMINAL_SIZE;
 
 	// Copy bytes into the buffer until we reach \0 or until we reach the end of buffer
-	int bytes_copied;
+	int i, bytes_copied;
 	for (i = 0; i < bytes; i++) {
-		buf[i] = linebuffer[tty - 1][i];
+		buf[i] = linebuffer[i];
 
-		if (linebuffer[tty - 1][i] == '\0') {
+		if (linebuffer[i] == '\0') {
 			buf[i] = '\n';
 			break;
 		}
@@ -494,11 +399,11 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
 
 	// Shift over the rest of the line buffer that wasn't copied to index 0
 	for (i = bytes_copied; i < TERMINAL_SIZE; i++) {
-		linebuffer[tty - 1][i - bytes_copied] = linebuffer[tty - 1][i];
+		linebuffer[i - bytes_copied] = linebuffer[i];
 	}
 	// Clear the rest of the line buffer
 	for (i = TERMINAL_SIZE - bytes_copied; i < TERMINAL_SIZE; i++) {
-		linebuffer[tty - 1][i] = '\0';
+		linebuffer[i] = '\0';
 	}
 
 	// Enable interrupts and return number of bytes copied
@@ -515,15 +420,6 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
  * SIDE EFFECTS: outputs to terminal
  */
 int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes) {
-	cli();
-
-	// Get the PCB for the current process
-	// We are mainly interested in getting the current TTY
-	pcb_t *pcb = get_pcb();
-	uint8_t tty = pcb->tty;
-
-	sti();
-
 	int i;
 	// If buf is NULL or bytes is negative, function can't complete
 	if (buf == NULL || bytes < 0)
@@ -535,10 +431,11 @@ int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes) {
 	for (i = 0; i < bytes; i++) {
 		// Should end at \0
 		if (buf[i] != '\0') {
-			putc_tty(buf[i], tty);
+			putc(buf[i]);
 		} else
 			break;
 	}
 	// End with new line
 	return 0;
+
 }

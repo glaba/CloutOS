@@ -3,6 +3,7 @@
 #include "i8259.h"
 #include "exception_handlers.h"
 #include "processes.h"
+#include "graphics/VMwareSVGA.h"
 
 // Uncomment to show the error screen (useful to disable for debugging)
 #define SHOW_ERROR_SCREEN
@@ -20,6 +21,7 @@ int line1_##handler_name(uint32_t err_code) {line1_gen return 0;}           \
 int line2_##handler_name(uint32_t err_code) {line2_gen return 0;}           \
 void handler_name(args) {                                                   \
 	cli();                                                                  \
+  svga_disable();																													\
 	check_userspace_exception();                                            \
 	print_error(err, line1_##handler_name, line2_##handler_name, 0);        \
 	while (1);                                                              \
@@ -39,6 +41,7 @@ int line1_##handler_name(uint32_t err_code) {line1_gen return 0;}               
 int line2_##handler_name(uint32_t err_code) {line2_gen return 0;}                 \
 void handler_name(uint32_t err_code) {                                            \
 	cli();                                                                        \
+	svga_disable();																																\
 	check_userspace_exception();                                                  \
 	print_error(err, line1_##handler_name, line2_##handler_name, err_code);       \
 	while (1);                                                                    \

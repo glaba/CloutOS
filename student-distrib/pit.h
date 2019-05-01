@@ -30,9 +30,6 @@
 // Initializes the Programmable Interval Timer to generate interrupts at a frequency of very close to 69 Hz
 void init_pit();
 
-// Begins callbacks to scheduler_interrupt_handler at a rate of 69 Hz
-void enable_scheduling();
-
 // Handler for the timer interrupt
 void timer_handler();
 

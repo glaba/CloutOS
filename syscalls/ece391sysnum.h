@@ -11,5 +11,7 @@
 #define SYS_VIDMAP  8
 #define SYS_SET_HANDLER  9
 #define SYS_SIGRETURN  10
+#define SYS_ALLOCATE_WINDOW  11
+#define SYS_UPDATE_WINDOW  12
 
 #endif /* ECE391SYSNUM_H */

@@ -8,5 +8,6 @@
 #define PCI_IRQ        11
 #define MOUSE_IRQ      12
 #define HARD_DRIVE_IRQ 14
+#define MOUSE_IRQ      12
 
 #endif 
