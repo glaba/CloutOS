@@ -27,6 +27,9 @@ int32_t vidmap(uint8_t** screen_start);
 int32_t set_handler(int32_t signum, void* handler_address);
 int32_t sigreturn(void);
 
+/* A generic system call interface that the assembly linkage calls */
+void sys_call(uint32_t syscall_number, uint32_t param1, uint32_t param2, uint32_t param3);
+
 // Macros to specify type of name
 #define RTC_FILE 0
 #define DIRECTORY 1

@@ -5,10 +5,10 @@
 #include "x86_desc.h"
 #include "kheap.h"
 #include "i8259.h"
+#include "interrupt_service_routines.h"
 
 // A dynamic array indicating which PIDs are currently in use by running programs
 // Each index corresponds to a PID and contains a pointer to that process' PCB
-typedef DYNAMIC_ARRAY(pcb_t, pcb_dyn_arr) pcb_dyn_arr;
 pcb_dyn_arr pcbs;
 
 // A spinlock that prevents the pcbs dynamic array from being modified
@@ -154,6 +154,32 @@ pcb_t* get_pcb() {
 }
 
 /*
+ * Gets a pointer to the current userspace program's registers stored on the kernel stack
+ *
+ * OUTPUTS: a pointer to the context of the current userspace program, which if modified, will cause
+ *          the userspace program to have the modified context when the kernel returns back to it
+ */
+process_context *get_user_context() {
+	spin_lock_irqsave(pcb_spin_lock);
+
+	process_context *context;
+
+	// Get the base of the stack
+	void *stack_base = get_pcb()->kernel_stack_base;
+
+	// Subtract sizeof(int32_t) to get the base of the stack excluding the PID
+	stack_base -= sizeof(int32_t);
+	// Subtract sizeof(process_context) to get the base of the process_context
+	stack_base -= sizeof(process_context);
+
+	// Cast it to a process_context
+	context = (process_context*)stack_base;
+
+	spin_unlock_irqsave(pcb_spin_lock);
+	return context;
+}
+
+/*
  * Gets the pointer to the start of video memory for the given TTY
  *
  * INPUTS: TTY: the TTY to get the video memory for
@@ -288,24 +314,25 @@ int32_t unmap_process(int32_t pid) {
 }
 
 /*
- * Halts the current process and returns the provided status code to the parent process
- * INPUTS: status: the status with which the program existed (256 for exception, [0-256) otherwise)
- * SIDE EFFECTS: it jumps to the kernel stack for the parent process and returns
-*               the correct status value from execute
+ * Frees the resources consumed by the process of given PID and removes it from the PCBs array
+ * WARNING: in general, the process cannot be the one whose kernel stack we are currently running on
+ * There are very few scenarios where it can be, and it should be used in that case very cautiously
+ *
+ * INPUTS: pid: the PID of the process to free
+ * OUTPUTS: -1 if the PID is invalid or the one whose kernel stack we're on, and 0 otherwise
  */
-int32_t process_halt(uint16_t status) {
+int32_t free_pid(int32_t pid) {
 	spin_lock_irqsave(pcb_spin_lock);
 
-	// Get the PCB corresponding to this kernel stack
-	pcb_t *pcb = get_pcb();
+	// Set TSS.esp0 to that of the process we are trying to free so that get_pid() and 
+	//  get_pcb() return the right thing
+	uint32_t saved_esp0 = tss.esp0;
+	tss.esp0 = (uint32_t)(get_pcb_from_pid(pid)->kernel_stack_base - sizeof(uint32_t));
+
+	pcb_t *pcb = get_pcb_from_pid(pid);
 
 	// Store the top of the kernel stack and the current TTY
 	void *kernel_stack_top = pcb->kernel_stack_base - KERNEL_STACK_SIZE;
-	uint8_t tty = pcb->tty;
-
-	// Unmap video memory if it was mapped in
-	if (pcb->vid_mem != NULL)
-		unmap_video_mem_user();
 
 	// Close all files and delete the files table
 	int i;
@@ -315,9 +342,6 @@ int32_t process_halt(uint16_t status) {
 	}
 	DYN_ARR_DELETE(pcb->files);
 
-	// Unmap the pages for this process
-	unmap_process(pcb->pid);
-
 	// Free all the pages for this process
 	for (i = 0; i < pcb->large_page_mappings.length; i++)
 		free_page(pcb->large_page_mappings.data[i].phys_index);
@@ -325,8 +349,8 @@ int32_t process_halt(uint16_t status) {
 	// Free the page mapping dynamic array
 	DYN_ARR_DELETE(pcb->large_page_mappings);
 
-	// Store the parent PID from the PCB before deleting it
-	int32_t parent_pid = pcb->parent_pid;
+	// Free the kernel stack for this process
+	kfree(kernel_stack_top);
 
 	// Mark the current PID as unused and attempt to remove items from the end of the pcbs array
 	pcb->pid = -1;
@@ -339,69 +363,54 @@ int32_t process_halt(uint16_t status) {
 		}
 	}
 
+	tss.esp0 = saved_esp0;
+	spin_unlock_irqsave(pcb_spin_lock);
+	return 0;
+}
+
+/*
+ * Halts the current process and returns the provided status code to the parent process
+ * INPUTS: status: the status with which the program existed (256 for exception, [0-256) otherwise)
+ * SIDE EFFECTS: it jumps to the kernel stack for the parent process and returns
+*               the correct status value from execute
+ */
+int32_t process_halt(uint16_t status) {
+	spin_lock_irqsave(pcb_spin_lock);
+
+	// Get the PCB corresponding to this kernel stack
+	pcb_t *pcb = get_pcb();
+	pcb_t *parent_pcb = get_pcb_from_pid(pcb->parent_pid);	
+
 	// If the parent PID is -1, that means that this is the parent shell and we should
 	//  simply spawn a new shell
-	if (parent_pid == -1) {
-		// Free the kernel stack, knowing that interrupts are blocked to prevent the stack from being allocated
-		//  while we use it for some more time
-		kfree(kernel_stack_top);
+	if (pcb->parent_pid == -1) {
+		// Store the TTY
+		uint8_t tty = pcb->tty;
+		// Unmap the pages allocated to this process
+		unmap_process(pcb->pid);
+		// Free the PCB and all associated data
+		// Notice that this also frees the kernel stack that we are currently on
+		// However, interrupts are disabled due to the spin_lock_irqsave, and will remain disabled
+		//  throughout the execution of process_execute until we jump into the new shell
+		free_pid(pcb->pid);
 		// Spawn a new shell in the same TTY
 		process_execute("shell", 0, tty, 0);
 	}
 
-	// Otherwise, we have a normal process that has a parent
-	// Map the parent process in
-	map_process(parent_pid);
-
 	// Set the parent process as RUNNING instead of SLEEPING
-	pcbs.data[parent_pid].state = PROCESS_RUNNING;
+	parent_pcb->state = PROCESS_RUNNING;
+	// Set the current process as STOPPING
+	pcb->state = PROCESS_STOPPING;
+
+	// Set the blocking call data in the parent PCB to the status code
+	parent_pcb->blocking_call.data = status;
 
 	// Unlock the pcb spinlock now that we are done using it
 	spin_unlock_irqsave(pcb_spin_lock);
 
-	// Get the address of the top of the parent process' kernel stack
-	uint32_t esp = (uint32_t)pcbs.data[parent_pid].kernel_stack_base;
-
-	// Set TSS.ESP0 to point to where the top of the stack will be, containing only the PID
-	tss.esp0 = esp - sizeof(int32_t);
-
-	// Set TSS.SS0 as well 
-	tss.ss0 = KERNEL_DS;
-
-	// Push esp down to where it was when execute() was called
-	// The stack will contain, in order:
-	//  - the PID
-	//  - since it is a privilege switching interrupt: userspace DS segment selector, userspace esp
-	//  - EFLAGS, userspace CS segment selector, userspace return address
-	//  - 3 saved 32-bit registers
-	//  - 3 32-bit parameters from registers edx, ecx, ebx
-	//  - a 32-bit return address
-	//  - possibly some other stuff that we don't care about
-	// In total, one PID and twelve 32-bit values (that we care about)
-	// So we can decrement esp by the corresponding amount
-	esp = esp - sizeof(int32_t) - 12 * 4;
-	// esp now points to the return address to the assembly linkage
-
-	// We are switching back to userspace
-	in_userspace = 1;
-
-	// Lastly, we need to free the current kernel stack
-	// We know that interrupts are blocked for the time being to prevent the freed stack from being allocated
-	//  during an interrupt and used (potentially messing up the execution of this function)
-	kfree(kernel_stack_top);
-
-	// Set eax to the desired return value, set esp to the the esp of the parent process
-	//  and return back to the assembly linkage
-	// Re-enable interrupts now that we have switched stacks entirely
-	asm volatile ("      \n\
-		movl %k0, %%eax  \n\
-		movl %k1, %%esp  \n\
-		sti              \n\
-		ret"
-		:
-		: "r"(((uint32_t)status)), "r"((esp))
-		: "eax", "esp" // An entirely insufficient and pointless list
-	);
+	// Spin and wait for scheduler
+	sti();
+	while (1);
 
 	// Placeholder to get gcc to shut up
 	return 0;
@@ -458,10 +467,12 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 	int32_t parent_pid = has_parent ? parent_pcb->pid : -1;
 	uint8_t parent_tty = has_parent ? parent_pcb->tty : tty;
 	
-	// If the parent process exists, mark it as SLEEPING, since it will be blocking 
-	//  on process_execute for as long as the new child process runs
-	if (has_parent)
+	// If the parent process exists, mark it as SLEEPING, and fill the blocking_call field
+	//  since it will be blocking on process_execute for as long as the new child process runs
+	if (has_parent) {
 		parent_pcb->state = PROCESS_SLEEPING;
+		parent_pcb->blocking_call.type = BLOCKING_CALL_PROCESS_EXEC;
+	}
 
 	// Get a physical 4MB page for the executable
 	int page_index = get_open_page();	
@@ -520,6 +531,12 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 	pcb->parent_pid = parent_pid;
 	pcb->vid_mem = NULL;
 	pcb->kernel_stack_base = kernel_stack_base;
+
+	// Initialize the signal_handlers to NULL and signal_statuses to SIGNAL_OPEN
+	for (i = 0; i < NUM_SIGNALS; i++) {
+		pcb->signal_handlers[i] = NULL;
+		pcb->signal_status[i] = SIGNAL_OPEN;
+	}
 
 	// Create file_t objects for stdin and stdout
 	file_t stdin_file, stdout_file;
@@ -594,8 +611,6 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 	asm volatile ("          \n\
 		cmpl $0, %k5         \n\
 		je dont_save_context \n\
-		pushal               \n\
-		pushfl               \n\
 		movl %%esp, 0(%k4)   \n\
 		movl %%ebp, 4(%k4)   \n\
 	dont_save_context:       \n\
@@ -625,10 +640,7 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 	//  return back to this label, which will return back to the keyboard handler, which will then return back
 	//  to the user program
 process_execute_return:
-	// Reload the general purpose registers and flags
-	asm volatile ("popfl; popal");
-
-	return 0;
+	return get_pcb()->blocking_call.data;
 
 	// An idiomatic way to use gotos in C is error handling
 process_execute_fail:
@@ -761,10 +773,6 @@ int32_t tty_switch(uint8_t tty) {
 
 	int32_t old_tty = active_tty;
 
-	// We don't want a scheduling / keyboard interrupt to occur while we're copying buffers over
-	//  or modifying active_tty
-	cli();
-
 	uint8_t *vid_mem = (uint8_t*)VIDEO;
 	uint8_t *old_tty_buffer = (uint8_t*)vid_mem_buffers[old_tty - 1];
 	uint8_t *new_tty_buffer = (uint8_t*)vid_mem_buffers[tty - 1];
@@ -808,15 +816,12 @@ int32_t tty_switch(uint8_t tty) {
 	//  return back to here
 	if (!tty_inited[tty - 1]) {
 		tty_inited[tty - 1] = 1;
-		// Re-enable the timer IRQ since we are performing a context switch to a new active process
-		enable_irq(TIMER_IRQ);
 		// Start the new shell
 		process_execute("shell", 0, tty, 1);
 	}
 
 	sti();
 	return 0;
-
 }
 
 /*
@@ -836,7 +841,7 @@ int32_t context_switch(int32_t pid) {
 	}
 
 	// Check that the PID represents an existing process
-	if (pcbs.data[pid].pid == -1) {
+	if (pcbs.data[pid].pid == -1 || pcbs.data[pid].state == PROCESS_STOPPING) {
 		spin_unlock_irqsave(pcb_spin_lock);
 		return -1;
 	}
@@ -869,8 +874,6 @@ int32_t context_switch(int32_t pid) {
 	// Push EIP for the next process onto the stack
 	// The offsets into the struct for esp, ebp, and eip are 0, 4, 8 respectively
 	asm volatile ("         \n\
-		pushal              \n\
-		pushfl              \n\
 		movl %%esp, 0(%k0)  \n\
 		movl %%ebp, 4(%k0)  \n\
 		movl 0(%k1), %%esp  \n\
@@ -880,13 +883,15 @@ int32_t context_switch(int32_t pid) {
 		ret"
 		:
 		: "r"((&old_pcb->context)), "r"((&new_pcb->context))
-		: "esp"
 	);
 
 context_switch_return:
-	// Reload the general purpose registers and flags
-	asm volatile ("popfl; popal");
+	spin_lock_irqsave(pcb_spin_lock);
+	
+	if (timer_linkage_esp == tss.esp0)
+		handle_signals();
 
+	spin_unlock_irqsave(pcb_spin_lock);
 	return 0;
 }
 
@@ -896,10 +901,6 @@ context_switch_return:
 void scheduler_interrupt_handler() {
 	// We don't want the scheduler to be interrupted by anything, it should be fast
 	cli();
-
-	// Also, specifically disable the timer IRQ so that if we re-enable interrupts to check
-	//  on other resources, the scheduler doesn't try to run again
-	disable_irq(TIMER_IRQ);
 
 	// If there are no running processes, exit
 	if (pcbs.length == 0)
@@ -911,29 +912,30 @@ void scheduler_interrupt_handler() {
 
 	// Iterate through the pcbs array until we find an existing process that is in 
 	//  the state PROCESS_RUNNING, which means we can switch to it
+	// Stop looping when we run into the current process
 	int i, next_pid;
 	next_pid = -1;
-	for (i = (pid + 1) % pcbs.length; /* No condition */; i = (i + 1) % pcbs.length) {
+	for (i = (pid + 1) % pcbs.length; i != pid; i = (i + 1) % pcbs.length) {
 		if (pcbs.data[i].pid >= 0 && pcbs.data[i].state == PROCESS_RUNNING) {
 			// Set this as the next process
 			next_pid = i;
 			break;
 		}
 
-		// If we have gone in a full circle through all the processes, re-enable interrupts
-		//  because one of the processes is probably waiting on an interrupt
-		// Any interrupts that may cause a context switch MUST re-enable TIMER_IRQ
-		if (i == pid)
-			sti();
+		// If we find a process that needs to be stopped, let's just clear it out
+		if (pcbs.data[i].pid >= 0 && pcbs.data[i].pid != pid && pcbs.data[i].state == PROCESS_STOPPING) {
+			free_pid(i);
+		}
 	}
 
-	// Block interrupts again so that we don't get a timer interrupt
-	cli();
-	enable_irq(TIMER_IRQ);
-
-	// If we found no process to switch to, just return and keep going with this process
-	if (next_pid == -1)
+	// If we found no process to switch to, just keep going with this process
+	if (next_pid == -1) {
+		// Handle signals only if the timer interrupt for scheduling is the only thing on the stack
+		if (timer_linkage_esp == tss.esp0)
+			handle_signals();
+		sti();
 		return;
+	}
 
 	// Otherwise, context switch to that process
 	context_switch(next_pid);

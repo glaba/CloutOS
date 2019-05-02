@@ -7,8 +7,8 @@
 
 static uint8_t charbuf;
 static volatile uint8_t* badbuf = 0;
-void segfault_sighandler (int signum);
-void alarm_sighandler (int signum);
+void segfault_sighandler (int signum, int data);
+void alarm_sighandler (int signum, int data);
 
 int main ()
 {
@@ -46,7 +46,7 @@ int main ()
 }
 
 void
-segfault_sighandler (int signum)
+segfault_sighandler (int signum, int data)
 {
     char buf;
 	uint32_t* eax;
@@ -61,14 +61,14 @@ segfault_sighandler (int signum)
     ece391_fdputs(1, (uint8_t*)"Press enter to continue...\n");
     ece391_read(0, &buf, 1);
 	badbuf = &charbuf;
-	eax = (uint32_t*)(&signum + 7);
+	eax = (uint32_t*)(&signum + 8);
 	*eax = (uint32_t)&charbuf;
 
     ece391_fdputs(1, (uint8_t*)"Signal handler returning\n");
 }
 
 void
-alarm_sighandler (int signum)
+alarm_sighandler (int signum, int data)
 {
     ece391_fdputs(1, (uint8_t*)"Alarm signal handler called, signum: ");
     switch (signum) {

@@ -19,6 +19,7 @@
 #include "pit.h"
 #include "network/arp.h"
 #include "network/eth_device.h"
+#include "signals.h"
 
 #define RUN_TESTS
 
@@ -191,6 +192,9 @@ void entry(unsigned long magic, unsigned long addr) {
 
 	/* Initialize user level processes */
 	os_ready &= (init_processes() == 0);
+
+	/* Initialize signals */
+	init_signals();
 
 	if (os_ready) {
 #ifdef RUN_TESTS

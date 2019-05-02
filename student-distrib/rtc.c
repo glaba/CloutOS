@@ -133,6 +133,9 @@ int32_t set_freq(int32_t f) {
  * SIDE EFFECTS: Handler for the RTC
  */
 void rtc_handler() {
+	// Set that we are not in userspace
+	in_userspace = 0;
+
 	/* Select register C */
 	outb(REGISTER_C, RTC_ADDRESS_PORT);
 	/* Throw away contents they don't matter :( */
@@ -153,6 +156,9 @@ void rtc_handler() {
 			process_wake(cur->data.pid);
 		}
 	}
+
+	// Set that we are back in userspace
+	in_userspace = 1;
 }
 
 /*
@@ -269,12 +275,16 @@ int32_t rtc_read(int32_t fd, void *buf, int32_t bytes) {
 
 	// Mark the item as waiting
 	item->data.waiting = 1;
+
+	// Set the blocking call field in the PCB
+	get_pcb()->blocking_call.type = BLOCKING_CALL_RTC;
+
 	sti();
 
 	// Put the process to sleep and let the RTC handler take care of waking it up
 	process_sleep(pid);
 
-	// When the process is woken up, it will return here and back to the userspace program
+	// When the process is woken up, it will return here
 	return 0;
 }
 

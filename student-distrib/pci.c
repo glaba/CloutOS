@@ -69,6 +69,9 @@ void _pci_config_write(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, 
  * Handles all PCI interrupts
  */
 void pci_irq_handler() {
+	// Set that we are not in userspace
+	in_userspace = 0;
+
 	spin_lock(&pci_spin_lock);
 
 	PCI_DEBUG("Received PCI interrupt\n");
@@ -85,20 +88,19 @@ void pci_irq_handler() {
 		if (cur_function->data.inited && cur_driver->data.irq_handler(&cur_function->data) == 0) {
 			PCI_DEBUG("PCI interrupt successfully handled by %s driver\n", cur_driver->data.name);
 
-			// Unlock the lock
-			spin_unlock(&pci_spin_lock);
-
-			// Send EOI to the PIC
-			send_eoi(PCI_IRQ);
-			return;
+			goto pci_irq_handler_end;
 		}
 	}
 
 	// If we got here, then no driver returned success and the interrupt was not handled
 	PCI_DEBUG("No driver found to handle interrupt!\n");
 
+pci_irq_handler_end:
 	// Unlock the lock
 	spin_unlock(&pci_spin_lock);
+
+	// Mark that we are going back to userspace
+	in_userspace = 1;
 
 	// Send EOI to the PIC
 	send_eoi(PCI_IRQ);

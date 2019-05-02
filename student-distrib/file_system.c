@@ -2,6 +2,7 @@
 #include "x86_desc.h"
 #include "lib.h"
 #include "processes.h"
+#include "spinlock.h"
 
 
 /* Variable to ensure only one 'open' of the file system. */
@@ -373,11 +374,13 @@ int32_t file_read(int32_t fd, void* buf, int32_t nbytes){
 	int32_t bytes_read;
  	pcb_t* pcb;
 
+ 	spin_lock_irqsave(pcb_spin_lock);
  	pcb = get_pcb();
 	// Read the data from current location in file to buffer
  	bytes_read = read_data(pcb->files.data[fd].inode, pcb->files.data[fd].file_pos, buf, nbytes);
 	// Increment file position
  	pcb->files.data[fd].file_pos += bytes_read;
+ 	spin_unlock_irqsave(pcb_spin_lock);
 
  	return bytes_read;
 }
@@ -424,11 +427,13 @@ int32_t dir_read(int32_t fd, void* buf, int32_t nbytes){
 	int32_t bytes_read;
  	pcb_t* pcb;
 
+ 	spin_lock_irqsave(pcb_spin_lock);
  	pcb = get_pcb();
 	//load in the directory entry to the buffer
  	bytes_read = read_directory_entry(pcb->files.data[fd].file_pos, buf, nbytes);
 	//increment file pos in directory
  	pcb->files.data[fd].file_pos++;
+ 	spin_unlock_irqsave(pcb_spin_lock);
 
  	return bytes_read;
 }

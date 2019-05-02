@@ -31,4 +31,25 @@
 /* Array of function pointers to exception handlers */
 extern uint32_t exception_handlers[NUM_EXCEPTION_HANDLERS];
 
+// Assembly linkages for all the exception handlers
+extern void divide_zero_linkage();
+extern void debug_linkage();
+extern void nminterrupt_linkage();
+extern void breakpoint_linkage();
+extern void overflow_linkage();
+extern void bound_range_exceeded_linkage();
+extern void invalid_opcode_linkage();
+extern void device_na_linkage();
+extern void double_fault_linkage();
+extern void coprocessor_segment_overrun_linkage();
+extern void invalid_tss_linkage();
+extern void segment_np_linkage();
+extern void stack_segment_fault_linkage();
+extern void general_protection_linkage();
+extern void page_fault_linkage();
+extern void floating_point_error_linkage();
+extern void alignment_check_linkage();
+extern void machine_check_linkage();
+extern void floating_point_exception_linkage();
+
 #endif

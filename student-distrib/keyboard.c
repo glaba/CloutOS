@@ -2,11 +2,14 @@
 #include "i8259.h"
 #include "keyboard.h"
 #include "processes.h"
+#include "signals.h"
+#include "spinlock.h"
 
 // The keyboard shortcuts we have so far are
 //  - Ctrl+L to clear the screen (1)
+//  - Ctrl+C to send the SIGNAL_INTERRUPT signal (1)
 //  - Alt+1,2,3 to switch TTYs (NUM_TEXT_TTYS)
-#define NUM_KEYBOARD_SHORTCUTS (1 + NUM_TEXT_TTYS)
+#define NUM_KEYBOARD_SHORTCUTS (1 + 1 + NUM_TEXT_TTYS)
 
 // Sets a bit in bitfield based on set (sets the bit if set is truthy)
 // The input flag should be a binary number containing only one 1
@@ -21,9 +24,6 @@ do {                                 \
 
 /* Stores information about the current status of the keyboard (shift, caps lock, ctrl, alt)*/
 static unsigned int keyboard_key_status = 0;
-
-/*flag that is 1 until it enter is pressed*/
-volatile unsigned int enter_flag = 1;
 
 /* store the position of where to store next linebuffer character */
 static unsigned int linepos[NUM_TEXT_TTYS];
@@ -134,14 +134,18 @@ typedef struct keyboard_shortcut {
 
 // Prototypes for keyboard shortcut handlers
 void ctrl_L_handler(char character, char fn_key);
+void ctrl_C_handler(char character, char fn_key);
 void tty_switch_handler(char character, char fn_key);
 
 static keyboard_shortcut keyboard_shortcuts[NUM_KEYBOARD_SHORTCUTS] = {
 	{.req_keyboard_status = CTRL, .character = 'l', .fn_key = 0, .callback = ctrl_L_handler},
+	{.req_keyboard_status = CTRL, .character = 'c', .fn_key = 0, .callback = ctrl_C_handler},
 	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 1, .callback = tty_switch_handler},
 	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 2, .callback = tty_switch_handler},
 	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 3, .callback = tty_switch_handler}
 };
+
+struct spinlock_t terminal_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Initializes keyboard and enables keyboard interrupt
@@ -217,6 +221,57 @@ void ctrl_L_handler(char character, char fn_key) {
 }
 
 /*
+ * Sends a SIGNAL_INTERRUPT signal to the currently running process
+ * INPUTS: character: the character pressed (it is always C), which we ignore
+ *         fn_key: the number of the function key pressed (none) which we ignore 
+ */
+void ctrl_C_handler(char character, char fn_key) {
+	// Make sure that the current TTY is a text TTY
+	spin_lock_irqsave(tty_spin_lock);
+	if (active_tty > NUM_TEXT_TTYS) {
+		spin_unlock_irqsave(tty_spin_lock);
+		return;
+	}
+
+	// Get the process that is active in the current TTY
+	// We will also need to lock the pcbs array
+	spin_lock_irqsave(pcb_spin_lock);
+
+	// The active process in the current TTY may still be in state PROCESS_SLEEPING due to some
+	//  blocking I/O, so we will determine which process is active by instead picking the one
+	//  that has the longest chain going up to a root shell (which we check for by parent_pid < 0)
+	int i;
+	int active_proc_pid = -1;
+	int longest_chain = -1;
+	for (i = 0; i < pcbs.length; i++) {
+		if (pcbs.data[i].pid >= 0 && pcbs.data[i].tty == active_tty) {
+			// Find the length of the chain from this process back to the root shell
+			int cur_chain_len = 0;
+			int cur_pid = i;
+			while (pcbs.data[cur_pid].parent_pid >= 0) {
+				cur_chain_len++;
+				cur_pid = pcbs.data[cur_pid].parent_pid;
+			}
+			// Update the active_proc_pid and longest_chain if this one is longer
+			if (cur_chain_len > longest_chain) {
+				longest_chain = cur_chain_len;
+				active_proc_pid = i;
+			}
+		}
+	}
+
+	// Send the SIGNAL_INTERRUPT signal to this process
+	if (active_proc_pid >= 0) {
+		send_signal(active_proc_pid, SIGNAL_INTERRUPT, 0);
+	}
+
+	// Unlock the spinlocks and return
+	spin_unlock_irqsave(pcb_spin_lock);
+	spin_unlock_irqsave(tty_spin_lock);
+	return;
+}
+
+/*
  * Switches to the TTY indicated by the character pressed
  * INPUTS: character: the character pressed (none)
  *         fn_key: the number of the function key pressed, which indicates the TTY to switch to
@@ -225,10 +280,6 @@ void tty_switch_handler(char character, char fn_key) {
 	// Validate that the fn_key is a number in range
 	if (fn_key < 1 || fn_key > NUM_TEXT_TTYS)
 		return;
-
-	// Disable the enter flag, since any enter that happened in this TTY should not 
-	//  affect processes running in another TTY
-	enter_flag = 1;
 
 	// Switch to that TTY
 	tty_switch(fn_key);
@@ -242,6 +293,9 @@ void tty_switch_handler(char character, char fn_key) {
  * SIDE EFFECTS: outputs a key to the console when the keyboard interrupt is fired
  */
 void keyboard_handler() {
+	// Mark that we are not in userspace
+	in_userspace = 0;
+
 	// Send EOI
 	send_eoi(KEYBOARD_IRQ);
 
@@ -276,7 +330,7 @@ void keyboard_handler() {
 
 	// We no longer care about keyup, since we only use keyup to keep track of modifier keys
 	if (!key_down)
-		return;
+		goto keyboard_handler_end;
 
 	// Get the fn_key number, if it was a function key that was pressed
 	char fn_key = 0;
@@ -303,7 +357,7 @@ void keyboard_handler() {
 
 			// Call the callback
 			keyboard_shortcuts[i].callback(character, fn_key);
-			return;
+			goto keyboard_handler_end;
 		}
 	}
 
@@ -312,13 +366,21 @@ void keyboard_handler() {
 	if (character == '\n' || linepos[active_tty - 1] == TERMINAL_SIZE - 1) {
 		putc_tty('\n', active_tty);
 
-		// Trigger any terminal_read calls that may be waiting and null-terminate the string
-		enter_flag = 0;
 		linebuffer[active_tty - 1][linepos[active_tty - 1]] = '\0';
 		linepos[active_tty - 1] = 0;
 
+		// Look through all processes to find any that are in the current TTY and blocking on terminal read
+		for (i = 0; i < pcbs.length; i++) {
+			if (pcbs.data[i].pid >= 0 && pcbs.data[i].tty == active_tty && 
+				pcbs.data[i].blocking_call.type == BLOCKING_CALL_TERMINAL_READ) {
+				// Wake up the process, because it has received data
+				process_wake(i);
+				break;
+			}
+		}
+
 		// Return, since we have printed the character already
-		return;
+		goto keyboard_handler_end;
 	}
 
 	// Now, we are printing regularly to the screen rather than handling special cases
@@ -338,7 +400,7 @@ void keyboard_handler() {
 	if (is_backspace && linepos[active_tty - 1] < TERMINAL_SIZE) {
 		// Do nothing if we are already at the beginning
 		if (linepos[active_tty - 1] == 0)
-			return;
+			goto keyboard_handler_end;
 
 		// If clearing tab, clear back four characters
 		if (linebuffer[active_tty - 1][linepos[active_tty - 1] - 1] == '\t') {
@@ -357,7 +419,7 @@ void keyboard_handler() {
 		if (linepos[active_tty - 1] > 0)
 			linepos[active_tty - 1]--;
 
-		return;
+		goto keyboard_handler_end;
 	}
 
 	// Use the shifted set if it's alphabetical and uppercase
@@ -381,8 +443,12 @@ void keyboard_handler() {
 		linepos[active_tty - 1]++;
 		update_cursor();
 	
-		return;
+		goto keyboard_handler_end;
 	}
+
+keyboard_handler_end:
+	in_userspace = 1;
+	return;
 }
 
 /*
@@ -399,14 +465,16 @@ int32_t terminal_open(const uint8_t* filename) {
 	if (!keyboard_init)
 		init_keyboard();
 
-	cli();
+	spin_lock_irqsave(pcb_spin_lock);
 	// Get the TTY of the calling process
 	uint8_t tty = get_pcb()->tty;
+	spin_unlock_irqsave(pcb_spin_lock);
 
+	spin_lock_irqsave(terminal_lock);
 	int i;
 	for (i = 0; i < TERMINAL_SIZE; i++)
 		linebuffer[tty - 1][i] = '\0';
-	sti();
+	spin_unlock_irqsave(terminal_lock);
 
 	update_cursor();
 	return 0;
@@ -423,11 +491,13 @@ int32_t terminal_close(int32_t fd) {
 	int32_t i;
 
 	// Clear buffer, blocking keyboard interrupts while this happenss
-	cli();
+	spin_lock_irqsave(pcb_spin_lock);
+	spin_lock_irqsave(terminal_lock);
 	uint8_t tty = get_pcb()->tty;
 	for (i = 0; i < TERMINAL_SIZE; i++)
 		linebuffer[tty - 1][i] = '\0';
-	sti();
+	spin_unlock_irqsave(terminal_lock);
+	spin_unlock_irqsave(pcb_spin_lock);
 
 	return 0;
 }
@@ -442,18 +512,22 @@ int32_t terminal_close(int32_t fd) {
  */
 int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
 	// Block context switch while we access the PCB
-	cli();
+	spin_lock_irqsave(pcb_spin_lock);
 
 	// Get the current TTY and save it
 	pcb_t *pcb = get_pcb();
 	uint8_t tty = pcb->tty;
 
 	// Check for null buffer or a negative number of bytes, both of which are invalid
-	if (buf == NULL || bytes < 0)
+	if (buf == NULL || bytes < 0) {
+		spin_unlock_irqsave(pcb_spin_lock);
 		return -1;
+	}
 	// Nothing to do if 0 bytes are to be copied
-	else if (bytes == 0)
+	else if (bytes == 0) {
+		spin_unlock_irqsave(pcb_spin_lock);
 		return 0;
+	}
 
 	// Print out the contents of the line buffer that are there so far
 	int i;
@@ -461,20 +535,19 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
 		putc_tty(linebuffer[tty - 1][i], tty);
 	}
 
-	// Set the enter_flag if we are in the active TTY
-	// If we are not, enter_flag will be set upon switching to this TTY
-	if (tty == active_tty)
-		enter_flag = 1;
+	// Restore interrupts now that we're done with using the PCB
+	spin_unlock_irqsave(pcb_spin_lock);
 
-	// Restore interrupts now that we're done with "critical" stuff
+	// Set the blocking call field in the PCB
+	pcb->blocking_call.type = BLOCKING_CALL_TERMINAL_READ;
+
 	sti();
+	// Put the process to sleep
+	process_sleep(pcb->pid);
 
-	// Let the program spin while waiting for the keyboard handler to set the enter_flag to 0
-	while (tty != active_tty || enter_flag);
-	enter_flag = 1;
-
+	// Execution will return to here when the process is woken up
 	// Disable interrupts so that keyboard_handler doesn't touch linebuffer during read
-	cli();
+	spin_lock_irqsave(terminal_lock);
 
 	// We will only copy up to TERMINAL_SIZE, since that is the maximum size of the linebuffer
 	if (bytes > TERMINAL_SIZE)
@@ -502,7 +575,7 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
 	}
 
 	// Enable interrupts and return number of bytes copied
-	sti();
+	spin_unlock_irqsave(terminal_lock);
 	return bytes_copied;
 }
 
@@ -515,14 +588,14 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
  * SIDE EFFECTS: outputs to terminal
  */
 int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes) {
-	cli();
+	spin_lock_irqsave(pcb_spin_lock);
 
 	// Get the PCB for the current process
 	// We are mainly interested in getting the current TTY
 	pcb_t *pcb = get_pcb();
 	uint8_t tty = pcb->tty;
 
-	sti();
+	spin_unlock_irqsave(pcb_spin_lock);
 
 	int i;
 	// If buf is NULL or bytes is negative, function can't complete

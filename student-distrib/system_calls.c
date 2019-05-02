@@ -14,6 +14,55 @@ static struct fops_t file_table = {.open = &file_open, .close = &file_close, .re
 static struct fops_t dir_table = {.open = &dir_open, .close = &dir_close, .read = &dir_read, .write = &dir_write};
 
 /*
+ * Sets the return value of a system call by setting the new value of EAX after the kernel returns
+ *  back to userspace
+ *
+ * INPUTS: value: the value to return
+ */
+void syscall_set_retval(uint32_t value) {
+	get_user_context()->eax = value;
+}
+
+/*
+ * A generic system call interface that the assembly linkage calls
+ */ 
+void sys_call(uint32_t syscall_number, uint32_t param1, uint32_t param2, uint32_t param3) {
+	switch (syscall_number) {
+		case 1: 
+			syscall_set_retval(halt(param1)); 
+			break;
+		case 2: 
+			syscall_set_retval(execute((const char*)param1)); 
+			break;
+		case 3: 
+			syscall_set_retval(read((int32_t)param1, (void*)param2, (int32_t)param3)); 
+			break;
+		case 4: 
+			syscall_set_retval(write((int32_t)param1, (const void*)param2, (int32_t)param3)); 
+			break;
+		case 5: 
+			syscall_set_retval(open((const uint8_t*)param1)); 
+			break;
+		case 6: 
+			syscall_set_retval(close((int32_t)param1)); 
+			break;
+		case 7: 
+			syscall_set_retval(getargs((uint8_t*)param1, (int32_t)param2)); 
+			break;
+		case 8: 
+			syscall_set_retval(vidmap((uint8_t**)param1)); 
+			break;
+		case 9: 
+			syscall_set_retval(set_handler((int32_t)param1, (void*)param2)); 
+			break;
+		case 10: syscall_set_retval(sigreturn()); break;
+		default: 
+			syscall_set_retval(-1);
+			break;
+	}
+}
+
+/*
  * System call that halts the currently running process with the specified status
  * INPUTS: status: a status code between 0 and 256 that indicates how the program exited
  * OUTPUTS: FAIL if halting the process failed, and PASS otherwise
@@ -44,7 +93,7 @@ int32_t execute(const char *command) {
 	}
 
 	spin_unlock_irqsave(pcb_spin_lock);
-	return process_execute(command, 1, cur_pcb->tty, 0);
+	return process_execute(command, 1, cur_pcb->tty, 1);
 }
 
 /*
@@ -351,14 +400,44 @@ int32_t vidmap(uint8_t **screen_start) {
 int32_t set_handler(int32_t signum, void *handler_address) {
 	SYSCALL_DEBUG("Begin set_handler system call\n");
 
-	return FAIL;
+	// Check that the signal number is valid
+	if (signum < 0 || signum >= NUM_SIGNALS)
+		return FAIL;
+
+	spin_lock_irqsave(pcb_spin_lock);
+
+	pcb_t *cur_pcb = get_pcb();
+
+	// Check if the program wants to clear the handler to the default action
+	if (handler_address == NULL) {
+		cur_pcb->signal_handlers[signum] = NULL;
+		spin_unlock_irqsave(pcb_spin_lock);
+		return PASS;
+	}
+
+	// Check that the handler address is valid
+	if (is_userspace_region_valid(handler_address, 1, get_pid()) == -1) {
+		spin_unlock_irqsave(pcb_spin_lock);
+		return FAIL;
+	}
+
+	// Finally, set the actual handler
+	cur_pcb->signal_handlers[signum] = (signal_handler)handler_address;
+
+	spin_unlock_irqsave(pcb_spin_lock);
+	return PASS;
 }
 
 /*
  * Currently unimplemented
  */
-int32_t sigreturn(void) {
+int32_t sigreturn() {
 	SYSCALL_DEBUG("Begin sigreturn system call\n");
 
-	return FAIL;
+	// Cleanup any modifications to the userspace program by handle_signals and
+	//  restore the userspace stack / registers back to their previous values
+	cleanup_signal();
+
+	// Set the current value of EAX as the return value, since we don't want to overwrite it
+	return get_user_context()->eax;
 }

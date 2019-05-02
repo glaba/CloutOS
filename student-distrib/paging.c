@@ -72,7 +72,7 @@ static inline void enable_page_size_extension() {
  *         start_virt_addr: the start of the region in virtual memory
  *         num_pdes: the size of the region in multiples of 4MB
  *         flags: the flags that should be applied to the PDE (4MB page and present will be included by default)
- * OUTPUTS: 0 on success and -1 if the region was already being used
+ * OUTPUTS: 0 on success
  */
 int32_t map_region(void *start_phys_addr, void *start_virt_addr, uint32_t num_pdes, uint32_t flags) {
 	// Align the two inputs to the nearest 4MB boundary (if they are not already)
@@ -85,6 +85,9 @@ int32_t map_region(void *start_phys_addr, void *start_virt_addr, uint32_t num_pd
 	for (i = 0; i < num_pdes; i++) {
 		cur_pde_index = (unsigned int)(start_virt_addr) / LARGE_PAGE_SIZE + i;
 		cur_phys_index = (unsigned int)(start_phys_addr) / LARGE_PAGE_SIZE + i;
+
+		if (cur_pde_index >= PAGE_DIRECTORY_SIZE || cur_phys_index >= PAGE_DIRECTORY_SIZE) 
+			break;
 
 		page_directory[cur_pde_index] = (cur_phys_index * PAGE_TABLE_SIZE * PAGE_ALIGNMENT) |
 			flags | PAGE_SIZE_IS_4M | PAGE_PRESENT;
@@ -113,6 +116,9 @@ void unmap_region(void *start_addr, uint32_t num_pdes) {
 	for (i = 0; i < num_pdes; i++) {
 		cur_pde_index = (unsigned int)(start_addr_aligned) / LARGE_PAGE_SIZE + i;
 
+		if (cur_pde_index >= PAGE_DIRECTORY_SIZE)
+			break;
+
 		page_directory[cur_pde_index] = 0;
 	}
 
@@ -121,14 +127,14 @@ void unmap_region(void *start_addr, uint32_t num_pdes) {
 }
 
 /*
- * If there is no mapping already existing, maps in a 4MB-aligned region made up of large 4MB pages that fully contains
+ * Unconditionally maps in a 4MB-aligned region made up of large 4MB pages that fully contains
  *  the desired region. Both start_phys_addr and start_virt_addr are assumed to have the same offset mod 4MB
  *
  * INPUTS: start_phys_addr: the start of the region in physical memory
  *         start_virt_addr: the start of the region in virtual memory
  *         size: the size of the region in bytes
  *         flags: the flags that should be applied to the PDE (4MB page and present will be included by default)
- * OUTPUTS: 0 on success and -1 if the region was already being used or if the pointers are not correctly aligned
+ * OUTPUTS: 0 on success and -1 if the pointers are not correctly aligned
  */
 int32_t map_containing_region(void *start_phys_addr, void *start_virt_addr, uint32_t size, uint32_t flags) {
 	// Check if physical address and virtual address are offset by the same amount from a multiple of 4MB

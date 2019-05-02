@@ -51,13 +51,13 @@ static mem_desc *head = NULL;
 static mem_desc *free_head = NULL;
 static mem_desc *free_tail = NULL;
 
-static struct spinlock_t heap_lock = SPIN_LOCK_UNLOCKED;
+struct spinlock_t heap_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Clears the entire heap, fills it with zeroes, and initializes values
  */
 void init_kheap() {
-	spin_lock(&heap_lock);
+	spin_lock_irqsave(heap_lock);
 
 	// Fill the heap with zeroes
 	int i;
@@ -79,7 +79,7 @@ void init_kheap() {
 	head->next_free = NULL;
 	head->prev_free = NULL;
 
-	spin_unlock(&heap_lock);
+	spin_unlock_irqsave(heap_lock);
 }
 
 /*
@@ -161,7 +161,7 @@ mem_desc* split_free_block(mem_desc *cur, uint32_t size) {
  * OUTPUTS: a pointer to an aligned buffer of the specified size
  */
 void* kmalloc_aligned(uint32_t size, uint32_t alignment) {
-	spin_lock(&heap_lock);
+	spin_lock_irqsave(heap_lock);
 
 	// Look through all the free blocks
 	mem_desc *cur;
@@ -185,7 +185,7 @@ void* kmalloc_aligned(uint32_t size, uint32_t alignment) {
 				remove_free_element(cur);
 
 				// Return the corresponding pointer
-				spin_unlock(&heap_lock);
+				spin_unlock_irqsave(heap_lock);
 				return (void*)cur + sizeof(mem_desc);
 			}
 		} else if (start / alignment != end / alignment) {
@@ -230,12 +230,12 @@ void* kmalloc_aligned(uint32_t size, uint32_t alignment) {
 			remove_free_element(second_block);
 
 			// Return the corresponding pointer
-			spin_unlock(&heap_lock);
+			spin_unlock_irqsave(heap_lock);
 			return (void*)second_block + sizeof(mem_desc);
 		}
 	}
 
-	spin_unlock(&heap_lock);
+	spin_unlock_irqsave(heap_lock);
 	return NULL;
 }
 
@@ -246,7 +246,7 @@ void* kmalloc_aligned(uint32_t size, uint32_t alignment) {
  * OUTPUTS: a pointer to a buffer of specified size
  */
 void* kmalloc(uint32_t size) {
-	spin_lock(&heap_lock);
+	spin_lock_irqsave(heap_lock);
 
 	// Look for a free block in the linked list of free blocks
 	mem_desc *cur;
@@ -262,13 +262,13 @@ void* kmalloc(uint32_t size) {
 			remove_free_element(cur);
 
 			// Return the corresponding pointer
-			spin_unlock(&heap_lock);
+			spin_unlock_irqsave(heap_lock);
 			return (void*)cur + sizeof(mem_desc);
 		}
 	}
 
 	// If no free block was found, since we have a fixed size heap, return NULL
-	spin_unlock(&heap_lock);
+	spin_unlock_irqsave(heap_lock);
 	return NULL;
 }
 
@@ -283,7 +283,7 @@ void kfree(void* ptr) {
 	if (ptr == NULL)
 		return;
 
-	spin_lock(&heap_lock);
+	spin_lock_irqsave(heap_lock);
 
 	// Get memory descriptor corresponding to this pointer and mark it free
 	mem_desc *cur = (mem_desc*)((void*)ptr - sizeof(mem_desc));
@@ -331,7 +331,7 @@ void kfree(void* ptr) {
 		                                  (free_block->prev_free->next_free = free_block->next_free);
 	}
 
-	spin_unlock(&heap_lock);
+	spin_unlock_irqsave(heap_lock);
 }
 
 /*

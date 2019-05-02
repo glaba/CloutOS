@@ -8,6 +8,7 @@
 #include "dynamic_array.h"
 #include "list.h"
 #include "spinlock.h"
+#include "signals.h"
 
 // Uncomment PROC_DEBUG_ENABLE to enable debugging
 // #define PROC_DEBUG_ENABLE
@@ -78,15 +79,55 @@ typedef DYNAMIC_ARRAY(page_mapping, page_mapping_dyn_arr) page_mapping_dyn_arr;
 // In this state, the process is blocking on some system call, and will be scheduled when its state
 //  is switched back to RUNNING
 #define PROCESS_SLEEPING 1
+// In this state, the process is marked for deletion, and when its turn comes in the scheduler,
+//  all its resources will be deleted and it will not run
+#define PROCESS_STOPPING 2
+
+// All the registers that a process may be using before being interrupted that should be restored
+struct process_context {
+	uint32_t ebx;
+	uint32_t ecx;
+	uint32_t edx;
+	uint32_t esi;
+	uint32_t edi;
+	uint32_t ebp;
+	uint32_t eax;
+	uint32_t ds;
+	uint32_t es;
+	uint32_t fs;
+	uint32_t eip;
+	uint32_t cs;
+	uint32_t eflags;
+	uint32_t esp;
+	uint32_t ss;
+} __attribute__((packed));
+
+typedef struct process_context process_context;
 
 // The order of the items in this struct are NOT to be changed
-struct process_context {
+struct scheduler_context {
 	uint32_t esp;
 	uint32_t ebp;
 	uint32_t eip; // Should be inside the kernel code
 } __attribute__((packed));
 
-typedef struct process_context process_context;
+typedef struct scheduler_context scheduler_context;
+
+struct blocking_call_t {
+	// The type of blocking call that the process is currently in
+	uint32_t type;
+	// Any data returned by the blocking call (may be interpreted as a pointer to some struct
+	//  or a 4 byte value or nothing at all, depending on the type of the blocking call)
+	uint32_t data;
+} __attribute__((packed));
+
+typedef struct blocking_call_t blocking_call_t;
+
+// Values that can be placed in the type field of a blocking_call_t struct
+#define BLOCKING_CALL_NONE          0
+#define BLOCKING_CALL_RTC           1
+#define BLOCKING_CALL_PROCESS_EXEC  2
+#define BLOCKING_CALL_TERMINAL_READ 3
 
 typedef struct pcb_t {
 	// A dynamic array of the files that are being used by the process
@@ -105,11 +146,22 @@ typedef struct pcb_t {
 	int8_t args[TERMINAL_SIZE];
 	// The virtual address of paged in video memory
 	void *vid_mem;
-	// The state of the process (either LIVE or SLEEP)
+	// The state of the process (either PROCESS_RUNNING, PROCESS_SLEEPING, or PROCESS_STOPPING)
 	uint8_t state;
-	// The context of the process before the scheduler switched to another process
-	process_context context;
+	// If the state is PROCESS_SLEEPING (due to a blocking call), data associated with the blocking call
+	blocking_call_t blocking_call;
+	// The values of ESP, EIP, and EBP before the scheduler switched to another process
+	// All other registers are stored on the stack by the timer linkage
+	scheduler_context context;
+	// The signal handlers for the process
+	signal_handler signal_handlers[NUM_SIGNALS];
+	// The status of each signal (options can be found in signals.h)
+	int32_t signal_status[NUM_SIGNALS];
+	// The data associated with any pending signal
+	uint32_t signal_data[NUM_SIGNALS];
 } pcb_t;
+
+typedef DYNAMIC_ARRAY(pcb_t, pcb_dyn_arr) pcb_dyn_arr;
 
 // Initializes any supporting data structures for managing user level processes
 int init_processes();
@@ -133,6 +185,8 @@ int8_t is_userspace_string_valid(void *ptr, int32_t pid);
 int32_t get_pid();
 // Gets the current pcb from the stack
 pcb_t* get_pcb();
+// Gets a pointer to the current userspace program's registers stored on the kernel stack
+process_context *get_user_context();
 // Gets the pointer to the start of video memory for the given TTY
 void *get_vid_mem(uint8_t tty);
 // Switches from the current TTY to the provided TTY
@@ -142,6 +196,8 @@ void scheduler_interrupt_handler();
 
 // The currently active TTY
 extern uint8_t active_tty;
+// A dynamic array of the PCBs, where each index corresponds to a PID
+extern pcb_dyn_arr pcbs;
 
 // A spinlock that should be acquired whenever anything that changes based on the TTY is used
 //  such as the return value of get_vid_mem, for example

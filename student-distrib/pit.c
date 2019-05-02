@@ -134,6 +134,9 @@ void unregister_periodic_callback(uint32_t id) {
  * Handler for the timer interrupt
  */
 void timer_handler() {
+	// Set that we are not in userspace
+	in_userspace = 0;
+
 	send_eoi(TIMER_IRQ);
 
 	sys_time += interval;
@@ -154,4 +157,7 @@ void timer_handler() {
 	// Finally, run the scheduler
 	if (scheduling_enabled)
 		scheduler_interrupt_handler();
+
+	// Set that we are going back to userspace
+	in_userspace = 1;
 }
