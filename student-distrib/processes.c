@@ -9,6 +9,7 @@
 #include "graphics/graphics.h"
 #include "graphics/VMwareSVGA.h"
 #include "window_manager/window_manager.h"
+#include "mouse.h"
 
 // A dynamic array indicating which PIDs are currently in use by running programs
 // Each index corresponds to a PID and contains a pointer to that process' PCB
@@ -23,6 +24,9 @@ static struct fops_t stdin_table  = {.open = NULL, .close = NULL,
 static struct fops_t stdout_table = {.open = NULL, .close = NULL,
 	                                 .read = NULL,
 	                                 .write = (int32_t (*)(int32_t, const void*, int32_t))&terminal_write};
+static struct fops_t mouse_table =  {.open = NULL, .close = NULL,
+	                                 .read = mouse_driver_read,
+	                                 .write = NULL};
 
 // Pointers to the video memory back buffers for each of the TTYs, which programs will draw to
 //  when their TTY is not active
@@ -534,11 +538,13 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 	}
 
 	// Create file_t objects for stdin and stdout
-	file_t stdin_file, stdout_file;
+	file_t stdin_file, stdout_file, mouse_file;
 	stdin_file.in_use = 1;
 	stdin_file.fd_table = &stdin_table;
 	stdout_file.in_use = 1;
 	stdout_file.fd_table = &stdout_table;
+	mouse_file.in_use = 1;
+	mouse_file.fd_table = &mouse_table;
 
 	// Then, initialize the files dynamic array and add the two elements, checking all allocations on the way
 	DYN_ARR_INIT(file_t, pcb->files);
@@ -547,7 +553,10 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 		goto process_execute_fail;
 	}
 	// Adds the two elements, relying on short circuit evaluation to break if pushing fails
-	if (DYN_ARR_PUSH(file_t, pcb->files, stdin_file) < 0 || DYN_ARR_PUSH(file_t, pcb->files, stdout_file) < 0) {
+	if (DYN_ARR_PUSH(file_t, pcb->files, stdin_file) < 0 || 
+		DYN_ARR_PUSH(file_t, pcb->files, stdout_file) < 0 ||
+		DYN_ARR_PUSH(file_t, pcb->files, mouse_file) < 0) {
+
 		kfree(kernel_stack_base - KERNEL_STACK_SIZE);
 		DYN_ARR_DELETE(pcb->files);
 		goto process_execute_fail;

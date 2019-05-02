@@ -235,6 +235,9 @@ void init_desktop() {
     }
 }
 
+int prev_left_click = 0;
+int prev_right_click = 0;
+
 void mouse_event(uint32_t x, uint32_t y) {
     // Sets mouse to not currently holding window when left button not pressed
     spin_lock_irqsave(window_lock);
@@ -252,16 +255,25 @@ void mouse_event(uint32_t x, uint32_t y) {
             compositor();
             return;
         }
+        
         // Used to focus the window clicked on
-        if (mouse.left_click && !mouse.holding_window) {
+        if ((mouse.left_click != prev_left_click || mouse.right_click != prev_right_click) && !mouse.holding_window) {
             while (temp != NULL) {
                 if (window_contains_mouse(temp, x, y)) {
-                    move_window_to_front(temp->id);
-                    break;  
+                    if (mouse.left_click)
+                        move_window_to_front(temp->id);
+                    // Store the mouse event info 
+                    temp->mouse_event[0] = x - temp->x;
+                    temp->mouse_event[1] = y - temp->y;
+                    temp->mouse_event[2] = mouse.left_click;
+                    temp->mouse_event[3] = mouse.right_click;
+                    break;
                 }
                 temp = temp->next;
             }
         }
+        prev_left_click = mouse.left_click;
+        prev_right_click = mouse.right_click;
 
         // Rely on shortcutting to insure mouse clips on to window even when out of window bounds when moving
         if (mouse.holding_window || (mouse.left_click && window_bar_contains_mouse(head, x, y))) {

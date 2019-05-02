@@ -1,3 +1,3 @@
 #!/bin/bash
 
-gdb -ex 'add-symbol-file ../syscalls/sigtest.exe 0x8048094' -ex c bootimg
+gdb -ex 'add-symbol-file ../syscalls/window.exe 0x8048094' -ex c bootimg

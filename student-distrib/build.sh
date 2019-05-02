@@ -1,8 +1,8 @@
 #!/bin/bash
 
 cd ../syscalls
-make shell.exe
-make shell
+make window.exe
+make window
 cd ..
-cp -f syscalls/to_fsdir/shell fsdir/
+cp -f syscalls/to_fsdir/window fsdir/
 ./createfs -i fsdir -o student-distrib/filesys_img

@@ -42,6 +42,7 @@
 // The static file descriptors assigned to stdin and stdout for all programs
 #define STDIN  0
 #define STDOUT 1
+#define MOUSE_FD 2
 
 extern void *vid_mem_buffers[NUM_TTYS];
 

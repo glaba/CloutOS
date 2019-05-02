@@ -18,6 +18,9 @@ typedef struct mouse_info {
 
 extern mouse_info mouse;
 
+// Reads the 5 bytes of mouse data (window ID, relative X, relative Y, left button, right button)
+int32_t mouse_driver_read(int32_t fd, char *buf, int32_t bytes);
+
 // Initializes the mouse to use interrupts and enables the mouse interrupt
 void init_mouse();
 

@@ -14,6 +14,60 @@ uint32_t *canvas_buffer;
 uint32_t alloc_buffer[BUFSIZE];
 int8_t font_data[FONT_SIZE];
 
+uint32_t strlen(const int8_t* s) {
+    register uint32_t len = 0;
+    while (s[len] != '\0')
+        len++;
+    return len;
+}
+
+int8_t* strrev(int8_t* s) {
+    register int8_t tmp;
+    register int32_t beg = 0;
+    register int32_t end = strlen(s) - 1;
+
+    while (beg < end) {
+        tmp = s[end];
+        s[end] = s[beg];
+        s[beg] = tmp;
+        beg++;
+        end--;
+    }
+    return s;
+}
+
+int8_t* itoa(uint32_t value, int8_t* buf, int32_t radix) {
+    static int8_t lookup[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    int8_t *newbuf = buf;
+    int32_t i;
+    uint32_t newval = value;
+
+    /* Special case for zero */
+    if (value == 0) {
+        buf[0] = '0';
+        buf[1] = '\0';
+        return buf;
+    }
+
+    /* Go through the number one place value at a time, and add the
+     * correct digit to "newbuf".  We actually add characters to the
+     * ASCII string from lowest place value to highest, which is the
+     * opposite of how the number should be printed.  We'll reverse the
+     * characters later. */
+    while (newval > 0) {
+        i = newval % radix;
+        *newbuf = lookup[i];
+        newbuf++;
+        newval /= radix;
+    }
+
+    /* Add a terminating NULL */
+    *newbuf = '\0';
+
+    /* Reverse the string and return */
+    return strrev(buf);
+}
+
 void put_char(uint32_t *screen_base, uint32_t screenWidth, unsigned char c, uint32_t x, uint32_t y, uint32_t foreground_color);
 
 
@@ -100,7 +154,22 @@ int main () {
     ece391_update_window(window_id);
     ece391_fdputs (1, (uint8_t*)"Ran the window program\n");
 
-    while (1);
+    while (1) {
+        uint8_t mouse_buffer[5];
+        char out_buf[10];
+
+        int num_read = ece391_read(2, mouse_buffer, 5);
+
+        if (num_read > 0) {
+            // itoa(num_read, out_buf, 10);
+            // ece391_fdputs(1, out_buf);
+            // ece391_fdputs(1, "\n0x");
+            // itoa((uint32_t)&mouse_buffer, out_buf, 16);
+            // ece391_fdputs(1, out_buf);            
+            // ece391_fdputs(1, "\n");
+            draw_pixel(canvas_buffer, alloc_buffer[2], mouse_buffer[1], mouse_buffer[2], 0xFFFFFFFF);
+        }
+    }
 
     return 0;
 }

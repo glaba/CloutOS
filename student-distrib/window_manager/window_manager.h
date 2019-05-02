@@ -24,6 +24,10 @@ typedef struct window {
     int page_index;
     int need_update;
 
+    // The information related to the last mouse event:
+    // relative X, relative Y, left button, right button
+    int mouse_event[4];
+
     struct window *next;
     struct window *prev;
 } window;

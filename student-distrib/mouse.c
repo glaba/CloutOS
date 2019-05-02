@@ -23,6 +23,39 @@
 
 mouse_info mouse;
 
+/*
+ * Reads the 5 bytes of mouse data (window ID, relative X, relative Y, left button, right button)
+ */
+int32_t mouse_driver_read(int32_t fd, char *buf, int32_t bytes) {
+	uint8_t *buffer = (uint8_t*)buf;
+
+	spin_lock_irqsave(pcb_spin_lock);
+
+	// Check if there's a window for this process
+	window *cur;
+	for (cur = head; cur != NULL; cur = cur->next) {
+		if (cur->pid == get_pid()) {
+			// Check if there is a mouse event to report
+			if (cur->mouse_event[0] >= 0) {
+				int i = 0;
+				if (bytes > 0)
+					buffer[i++] = cur->id;
+
+				for (; i < 5 && i < bytes; i++) {
+					buffer[i] = cur->mouse_event[i - 1];
+				}
+				
+				// Set the x coordinate to -1 as a flag that there is no event pending
+				cur->mouse_event[0] = -1;
+				spin_unlock_irqsave(pcb_spin_lock);
+				return i;
+			}
+		}
+	}
+
+	spin_unlock_irqsave(pcb_spin_lock);
+	return 0;
+}
 
 void mouse_wait(uint8_t a_type) {
 	uint32_t timeout = 100000;
