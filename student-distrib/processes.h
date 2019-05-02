@@ -43,9 +43,9 @@
 #define STDIN  0
 #define STDOUT 1
 #define MOUSE_FD 2
+#define UDP_FD 3
 
 extern void *vid_mem_buffers[NUM_TTYS];
-
 
 typedef struct fops_t {
 	int32_t (*open )(const uint8_t*);
@@ -134,6 +134,7 @@ typedef struct blocking_call_t blocking_call_t;
 #define BLOCKING_CALL_RTC           1
 #define BLOCKING_CALL_PROCESS_EXEC  2
 #define BLOCKING_CALL_TERMINAL_READ 3
+#define BLOCKING_CALL_UDP_READ      4
 
 typedef struct pcb_t {
 	// A dynamic array of the files that are being used by the process

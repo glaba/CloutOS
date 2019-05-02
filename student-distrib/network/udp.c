@@ -5,6 +5,8 @@
 #include "dhcp.h"
 #include "../endian.h"
 #include "../kheap.h"
+#include "../list.h"
+#include "../processes.h"
 
 // The size of a UDP/IP header, assuming there are no IP options
 #define IP_HEADER_SIZE 20
@@ -129,6 +131,29 @@ int fill_ip_header(uint16_t data_length, uint16_t fragment_id, uint16_t fragment
 }
 
 /*
+ * Writes data over UDP
+ *
+ * INPUTS: buf: a buffer of the following format (bytewise): IP address (4 bytes), Src Port (2 bytes)
+ *              Dest port (2 bytes), data (rest)
+ *         bytes: total size of the buffer
+ */
+int32_t udp_write(int32_t fd, const void *buf, int32_t bytes) {
+	if (bytes < 8)
+		return -1;
+
+	uint8_t dest_ip[IPV4_ADDR_SIZE];
+	uint16_t src_port, dest_port;
+
+	int i;
+	for (i = 0; i < 4; i++)
+		dest_ip[i] = *(uint8_t*)(buf + i);
+	src_port = *(uint16_t*)(buf + 4);
+	dest_port = *(uint16_t*)(buf + 6);
+
+	return send_udp_packet(buf + 8, bytes - 8, src_port, dest_ip, dest_port, 1);
+}
+
+/*
  * Sends the UDP packet using the given ports and the specified Ethernet interface
  *
  * INPUTS: data: a pointer to the start of the data
@@ -170,20 +195,38 @@ int send_udp_packet(void *data, uint16_t length, uint16_t src_port, uint8_t dest
 	// The destination MAC address this packet will be addressed to
 	uint8_t dest_mac_addr[MAC_ADDR_SIZE];
 
-	// If there is no ARP entry, send an ARP request
-	if (get_arp_entry(dest_ip, dest_mac_addr, id) == ARP_TABLE_ENTRY_EMPTY)
-		send_arp_request(dest_ip, id);
+	// First, check the IP address with the subnet mask
+	// If it is equal to our own IP address under the subnet mask, we have to send an ARP request
+	eth_device *device = get_eth_device(id);
+	int outsider = 0;
+	for (i = 0; i < IPV4_ADDR_SIZE; i++) {
+		if ((device->ip_addr[i] & device->subnet_mask[i]) != (dest_ip[i] & device->subnet_mask[i])) {
+			outsider = 1;
+			break;
+		}
+	}
 
-	// Loop while we are waiting
-	while (get_arp_entry(dest_ip, dest_mac_addr, id) == ARP_TABLE_ENTRY_WAITING);
+	if (!outsider) {
+		// If there is no ARP entry, send an ARP request
+		if (get_arp_entry(dest_ip, dest_mac_addr, id) == ARP_TABLE_ENTRY_EMPTY)
+			send_arp_request(dest_ip, id);
 
-	// Check that the ARP entry is present -- if it is not, this means that we did not get an ARP response
-	//  so we should fail
-	if (get_arp_entry(dest_ip, dest_mac_addr, id) != ARP_TABLE_ENTRY_PRESENT) {
-		printf("Did not receive ARP response, UDP packet cannot be sent\n");
+		// Loop while we are waiting
+		while (get_arp_entry(dest_ip, dest_mac_addr, id) == ARP_TABLE_ENTRY_WAITING);
 
-		kfree(packet);
-		return -1;
+		// Check that the ARP entry is present -- if it is not, this means that we did not get an ARP response
+		//  so we should fail
+		if (get_arp_entry(dest_ip, dest_mac_addr, id) != ARP_TABLE_ENTRY_PRESENT) {
+			printf("Did not receive ARP response, UDP packet cannot be sent\n");
+
+			kfree(packet);
+			return -1;
+		}
+	} else {
+		// Copy in the router's MAC address
+		for (i = 0; i < MAC_ADDR_SIZE; i++) {
+			dest_mac_addr[i] = device->router_mac_addr[i];
+		}
 	}
 
 	// Transmit the packet and store whether or not it succeeded
@@ -194,15 +237,50 @@ int send_udp_packet(void *data, uint16_t length, uint16_t src_port, uint8_t dest
 	return retval;
 }
 
+typedef struct received_udp_packet {
+	int length;
+	char buffer[3000];
+} received_udp_packet;
+
+int32_t udp_read(int32_t fd, void *buf, int32_t bytes) {
+	spin_lock_irqsave(pcb_spin_lock);
+
+	pcb_t *pcb = get_pcb();
+	int32_t pid = pcb->pid;
+
+	// Set aside a buffer and store it in the PCB
+	pcb->blocking_call.type = BLOCKING_CALL_UDP_READ;
+	pcb->blocking_call.data = (uint32_t)kmalloc(sizeof(received_udp_packet));
+
+	// Put the process to sleep while we wait for a response
+	process_sleep(pid);
+
+	spin_lock_irqsave(pcb_spin_lock);
+
+	// Now that the process has woken up, copy the data into the buffer
+	int i;
+	received_udp_packet *packet = (received_udp_packet*)get_pcb()->blocking_call.data;
+	for (i = 0; i < packet->length && i < bytes; i++) {
+		*(uint8_t*)(buf + i) = packet->buffer[i];
+	}
+
+	// Free the memory allocated
+	kfree(pcb->blocking_call.data);
+
+	spin_unlock_irqsave(pcb_spin_lock);
+	return i;
+}
+
 /*
  * Receives a UDP packet and forwards it to the appropriate location
  * INPUTS: buffer: a buffer containing the packet data
+ *         src_mac_addr: the source mac address
  *         length: the length of the data (just for validation)
  *         vlan: the VLAN number if this was received from a VLAN packet, or -1 otherwise
  *         id: the ID of the Ethernet device this packet originated from
  * OUTPUTS: -1 if the packet was malformed / could not be understood and 0 otherwise
  */
-int receive_udp_packet(uint8_t *buffer, uint32_t length, int32_t vlan, uint32_t id) {
+int receive_udp_packet(uint8_t *buffer, uint8_t src_mac_addr[MAC_ADDR_SIZE], uint32_t length, int32_t vlan, uint32_t id) {
 	// Extract the fields we care about from the IP header
 	// Make sure that the protocol is UDP
 	if (buffer[PROTOCOL_OFFSET] != IP_HEADER_UDP_PROTOCOL)
@@ -239,8 +317,26 @@ int receive_udp_packet(uint8_t *buffer, uint32_t length, int32_t vlan, uint32_t 
 	switch (dest_port) {
 		case DHCP_CLIENT_UDP_PORT:
 			// Forward the packet to DHCP processing code
-			return receive_dhcp_packet(buffer + IP_HEADER_SIZE + UDP_HEADER_SIZE, udp_data_length, id);
+			return receive_dhcp_packet(buffer + IP_HEADER_SIZE + UDP_HEADER_SIZE, src_mac_addr, udp_data_length, id);
 		default:
+			// Go through all the PCBs looking for something that is waiting on a UDP read
+			for (i = 0; i < pcbs.length; i++) {
+				if (pcbs.data[i].pid >= 0 && pcbs.data[i].state == PROCESS_SLEEPING &&
+					pcbs.data[i].blocking_call.type == BLOCKING_CALL_UDP_READ) {
+
+					// Copy the data into the buffer and wake up the process
+					received_udp_packet *packet = (received_udp_packet*)pcbs.data[i].blocking_call.data;
+					packet->length = udp_data_length;
+
+					uint8_t *syscall_buffer = (uint8_t*)packet->buffer;
+					int j;
+					for (j = 0; j < udp_data_length; j++) {
+						syscall_buffer[j] = buffer[IP_HEADER_SIZE + UDP_HEADER_SIZE + j];
+					}
+					process_wake(i);
+				}
+			}
+
 			// We have nothing to do with this packet
 			// Let's just print it
 			UDP_DEBUG("Received on UDP port %d from %d.%d.%d.%d: ", dest_port,

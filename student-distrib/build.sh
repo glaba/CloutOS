@@ -1,8 +1,8 @@
 #!/bin/bash
 
 cd ../syscalls
-make window.exe
-make window
+make chat.exe
+make chat
 cd ..
-cp -f syscalls/to_fsdir/window fsdir/
+cp -f syscalls/to_fsdir/chat fsdir/
 ./createfs -i fsdir -o student-distrib/filesys_img

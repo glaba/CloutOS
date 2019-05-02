@@ -121,11 +121,12 @@ int send_dhcp_discover_packet(uint32_t id) {
  * Takes a DHCP packet and a list of options for a DHCPACK packet and performs the appropriate actions
  *
  * INPUTS: packet: a struct containing the DHCP packet data
+ *         src_mac_addr: the source MAC address of the packet
  *         head: a linked list of options that were attached to the DHCP packet
  *         id: the ID of the Ethernet interface that this came on
  * OUTPUTS: -1 on failure and 0 on success
  */
-int receive_dhcp_ack(dhcp_packet *packet, dhcp_option_list_item *head, uint32_t id) {
+int receive_dhcp_ack(dhcp_packet *packet, uint8_t src_mac_addr[MAC_ADDR_SIZE], dhcp_option_list_item *head, uint32_t id) {
 	// Get the eth_device for this ID
 	eth_device *device = get_eth_device(id);
 
@@ -162,6 +163,11 @@ int receive_dhcp_ack(dhcp_packet *packet, dhcp_option_list_item *head, uint32_t 
 			}
 			router_set = 1;
 		}
+	}
+
+	// Copy in the router MAC address
+	for (i = 0; i < MAC_ADDR_SIZE; i++) {
+		device->router_mac_addr[i] = src_mac_addr[i];
 	}
 
 	// If we didn't get one of the two, there is something wrong with the DHCP server and we give up
@@ -258,12 +264,13 @@ int receive_dhcp_offer(dhcp_packet *packet, dhcp_option_list_item *head, uint32_
  * Receives a DHCP packet and performs appropriate actions (depends on the current state of the interaction)
  *
  * INPUTS: buffer: the buffer containing the contents of the purported DHCP packet
+ *         src_mac_addr: source MAC address
  *         length: the length of the DHCP packet
  *         id: the ID of the Ethernet device this came from
  * OUTPUTS: -1 if the packet was malformed / unexpected OR if memory allocation failed and 0 otherwise
  * SIDE EFFECTS: may reset back to uninitialized state if processing the packet failed due to bad malloc
  */
-int receive_dhcp_packet(uint8_t *buffer, uint32_t length, uint32_t id) {
+int receive_dhcp_packet(uint8_t *buffer, uint8_t src_mac_addr[MAC_ADDR_SIZE], uint32_t length, uint32_t id) {
 	// Get the eth_device for this ID
 	eth_device *device = get_eth_device(id);
 
@@ -362,7 +369,7 @@ int receive_dhcp_packet(uint8_t *buffer, uint32_t length, uint32_t id) {
 		retval = receive_dhcp_offer(packet, head, id);
 
 	if (message_type == DHCP_ACK)
-		retval = receive_dhcp_ack(packet, head, id);
+		retval = receive_dhcp_ack(packet, src_mac_addr, head, id);
 
 	// In this case, we must restart the entire process since the server didn't accept for some reason
 	if (message_type == DHCP_NAK) {

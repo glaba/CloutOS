@@ -88,7 +88,8 @@ processes.o: processes.c processes.h types.h system_calls.h lib.h rtc.h \
   graphics/graphics.h graphics/../mouse.h graphics/VMwareSVGA.h \
   window_manager/window_manager.h window_manager/../types.h \
   window_manager/../graphics/graphics.h window_manager/../paging.h \
-  window_manager/../processes.h window_manager/../spinlock.h
+  window_manager/../processes.h window_manager/../spinlock.h \
+  network/udp.h network/network_misc.h network/../types.h
 rtc.o: rtc.c rtc.h types.h irq_defs.h lib.h processes.h system_calls.h \
   file_system.h keyboard.h system_call_linkage.h dynamic_array.h list.h \
   spinlock.h signals.h i8259.h kheap.h paging.h
@@ -220,7 +221,8 @@ udp.o: network/udp.c network/udp.h network/network_misc.h \
   network/../system_call_linkage.h network/../dynamic_array.h \
   network/../list.h network/../spinlock.h network/../signals.h \
   network/eth_device.h network/arp.h network/dhcp.h network/../list.h \
-  network/../endian.h network/../kheap.h network/../paging.h
+  network/../endian.h network/../kheap.h network/../paging.h \
+  network/../processes.h
 window_manager.o: window_manager/window_manager.c \
   window_manager/window_manager.h window_manager/../types.h \
   window_manager/../graphics/graphics.h \
