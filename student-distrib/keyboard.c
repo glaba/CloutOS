@@ -8,8 +8,9 @@
 // The keyboard shortcuts we have so far are
 //  - Ctrl+L to clear the screen (1)
 //  - Ctrl+C to send the SIGNAL_INTERRUPT signal (1)
+//  - Alt+4 to switch to graphics tty (1)
 //  - Alt+1,2,3 to switch TTYs (NUM_TEXT_TTYS)
-#define NUM_KEYBOARD_SHORTCUTS (1 + 1 + NUM_TEXT_TTYS)
+#define NUM_KEYBOARD_SHORTCUTS (1 + 1 + 1 + NUM_TEXT_TTYS)
 
 // Sets a bit in bitfield based on set (sets the bit if set is truthy)
 // The input flag should be a binary number containing only one 1
@@ -142,7 +143,8 @@ static keyboard_shortcut keyboard_shortcuts[NUM_KEYBOARD_SHORTCUTS] = {
 	{.req_keyboard_status = CTRL, .character = 'c', .fn_key = 0, .callback = ctrl_C_handler},
 	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 1, .callback = tty_switch_handler},
 	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 2, .callback = tty_switch_handler},
-	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 3, .callback = tty_switch_handler}
+	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 3, .callback = tty_switch_handler},
+	{.req_keyboard_status = ALT,  .character = 0,   .fn_key = 4, .callback = tty_switch_handler}
 };
 
 struct spinlock_t terminal_lock = SPIN_LOCK_UNLOCKED;
@@ -278,7 +280,7 @@ void ctrl_C_handler(char character, char fn_key) {
  */
 void tty_switch_handler(char character, char fn_key) {
 	// Validate that the fn_key is a number in range
-	if (fn_key < 1 || fn_key > NUM_TEXT_TTYS)
+	if (fn_key < 1 || fn_key > NUM_TEXT_TTYS + 1)
 		return;
 
 	// Switch to that TTY

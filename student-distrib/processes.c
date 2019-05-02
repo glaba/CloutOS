@@ -8,6 +8,7 @@
 #include "interrupt_service_routines.h"
 #include "graphics/graphics.h"
 #include "graphics/VMwareSVGA.h"
+#include "window_manager/window_manager.h"
 
 // A dynamic array indicating which PIDs are currently in use by running programs
 // Each index corresponds to a PID and contains a pointer to that process' PCB
@@ -25,7 +26,7 @@ static struct fops_t stdout_table = {.open = NULL, .close = NULL,
 
 // Pointers to the video memory back buffers for each of the TTYs, which programs will draw to
 //  when their TTY is not active
-static void *vid_mem_buffers[NUM_TTYS];
+void *vid_mem_buffers[NUM_TTYS];
 
 // A spinlock that prevents the TTY from changing while it is owned
 struct spinlock_t tty_spin_lock = SPIN_LOCK_UNLOCKED;
@@ -731,24 +732,45 @@ int32_t process_wake(int32_t pid) {
  * OUTPUTS: -1 if the tty was invalid / we couldn't switch for some reason, and 0 on success
  */
 int32_t tty_switch(uint8_t tty) {
-	if (tty == 0 || tty > NUM_TEXT_TTYS)
+	if (tty == 0 || tty > NUM_TEXT_TTYS + 1)
 		return -1;
 
 	spin_lock_irqsave(tty_spin_lock);
+	if (tty == 4) {
+		GUI_enabled = 1;
+		// init_desktop();
+		int32_t old_tty = active_tty;
+		uint32_t *vid_mem = (uint32_t*)svga.frame_buffer;
+		uint32_t *old_tty_buffer = (uint32_t*)vid_mem_buffers[old_tty - 1];
+		uint32_t *new_tty_buffer = (uint32_t*)vid_mem_buffers[tty - 1];	
+		memcpy(old_tty_buffer, vid_mem, svga.width * svga.height * 4);
+		memcpy(vid_mem, new_tty_buffer, svga.width * svga.height * 4);	
 
+
+		active_tty = tty;
+		compositor();
+		spin_unlock_irqsave(tty_spin_lock);
+		sti();
+		return 0;
+	}
+	GUI_enabled = 0;
 	int32_t old_tty = active_tty;
 
 	uint32_t *vid_mem = (uint32_t*)svga.frame_buffer;
 	uint32_t *old_tty_buffer = (uint32_t*)vid_mem_buffers[old_tty - 1];
 	uint32_t *new_tty_buffer = (uint32_t*)vid_mem_buffers[tty - 1];
 
+
+	// BELOW METHOD WORKED FINE FOR TEXT MODE TTY, MEMCPY IS FASTER FOR GRAPHICS
 	// Copy video memory into the buffer for active_tty (the old TTY)
 	//  and copy the buffer for tty into video memory
-	int i;
-	for (i = 0; i < svga.width * svga.height * 4; i++) {
-		old_tty_buffer[i] = vid_mem[i];
-		vid_mem[i] = new_tty_buffer[i];
-	}
+	// int i;
+	// for (i = 0; i < svga.width * svga.height * 4; i++) {
+	// 	old_tty_buffer[i] = vid_mem[i];
+	// 	vid_mem[i] = new_tty_buffer[i];
+	// }
+	memcpy(old_tty_buffer, vid_mem, svga.width * svga.height * 4);
+	memcpy(vid_mem, new_tty_buffer, svga.width * svga.height * 4);
 
 	spin_lock_irqsave(pcb_spin_lock);
 

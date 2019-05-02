@@ -445,7 +445,7 @@ void putc_tty(uint8_t c, uint8_t tty) {
     uint32_t *video_mem = (uint32_t*)get_vid_mem(tty);
 
     // If it is a newline character, move the cursor down one and reset x
-    if (c == '\n' || c == '\r') {
+    if (c == '\n' || c == '\r' ) {
         screen_y[tty - 1] += vert_inc;
         screen_x[tty - 1] = 0;
     } else {

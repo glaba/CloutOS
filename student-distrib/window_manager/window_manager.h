@@ -4,6 +4,8 @@
 #include "../types.h"
 #include "../graphics/graphics.h"
 #include "../paging.h"
+#include "../processes.h"
+#include "../spinlock.h"
 
 #define WINDOW_BORDER_WIDTH                             15
 #define WINDOW_BORDER_COLOR                             0xFF98989D
@@ -28,7 +30,10 @@ typedef struct window {
 
 window *head;
 window *tail;
+uint32_t *back_buffer;
 extern int GUI_enabled;
+
+int init_window_manager();
 
 int mouse_clicked_close(window *app, uint32_t mouse_x, uint32_t  mouse_y);
 
@@ -40,7 +45,7 @@ int window_contains_mouse(window *app, uint32_t mouse_x, uint32_t mouse_y);
 
 void draw_client_buffer(window *app);
 
-uint32_t* alloc_window(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t* id);
+uint32_t* alloc_window(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t* id, uint32_t pid);
 
 int32_t resize_window(uint32_t width, uint32_t height);
 

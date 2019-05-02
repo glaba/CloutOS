@@ -13,9 +13,10 @@
 
 
 int32_t window_id = 0;
-uint32_t *back_buffer;
+
 
 int GUI_enabled = 0;
+struct spinlock_t window_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * This will allocate a window of width and height at the x, y coordinates relative to the screen
@@ -27,7 +28,8 @@ int GUI_enabled = 0;
  *         id: Used to tell user program of window id
  * OUTPUTS: pointer to buffer user program can use to construct GUI
  */
-uint32_t* alloc_window(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t* id) {
+uint32_t* alloc_window(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t* id, uint32_t pid) {
+    spin_lock_irqsave(window_lock);
     int page_index = get_open_page();
     if (map_containing_region((void *) (page_index * LARGE_PAGE_SIZE), (void*) (page_index * LARGE_PAGE_SIZE), 1, 
         PAGE_SIZE_IS_4M | PAGE_USER_LEVEL | PAGE_READ_WRITE | PAGE_PRESENT) == -1) {
@@ -42,12 +44,13 @@ uint32_t* alloc_window(uint32_t x, uint32_t y, uint32_t width, uint32_t height, 
     printf("Width: %d\n", head->width = width);
     printf("Height: %d\n", head->height = height);
     printf("Buffer location: %x\n", head->buffer = (uint32_t*) (page_index * LARGE_PAGE_SIZE));
+    printf("Process PID: %d\n", head->pid = pid);
     head->page_index = page_index;
     head->need_update = 0;
     insert(head);
     // Init the window by drawing border on top
     init_window(head);
-    
+    spin_unlock_irqsave(window_lock);
     return head->buffer;
 }
 
@@ -68,7 +71,9 @@ void draw_client_buffer(window *app) {
 }
 
 int32_t destroy_window(int pid) {
+    spin_lock_irqsave(window_lock);
     if (head == NULL) {
+        spin_unlock_irqsave(window_lock);
         return -1;
     }
     if (head == tail) {
@@ -76,6 +81,7 @@ int32_t destroy_window(int pid) {
         head = NULL;
         tail = NULL;
         kfree(temp);
+        spin_unlock_irqsave(window_lock);
         return 0;
     }
     if (head->pid == pid) {
@@ -83,6 +89,7 @@ int32_t destroy_window(int pid) {
         head = head->next;
         head->prev = NULL;
         kfree(temp);
+        spin_unlock_irqsave(window_lock);
         return 0;
     }
     if (tail->pid == pid) {
@@ -90,6 +97,7 @@ int32_t destroy_window(int pid) {
         tail = tail->prev;
         tail->next = NULL;
         kfree(temp);
+        spin_unlock_irqsave(window_lock);
         return 0;
     }
     window *temp = head;
@@ -102,6 +110,7 @@ int32_t destroy_window(int pid) {
         temp = temp->next;
     }
     kfree(temp);
+    spin_unlock_irqsave(window_lock);
     return 0;
 }
 
@@ -146,15 +155,29 @@ window* find(uint32_t id) {
  * OUTPUTS: None
  */
 int32_t redraw_window(uint32_t id) {
+    spin_lock_irqsave(window_lock);
     window *app;
     if ((app = find(id)) == NULL) {
+        spin_unlock_irqsave(window_lock);
         return -1;
     }
     app->need_update = 1;
-    printf("redraw window\n");
+    // printf("redraw window\n");
     compositor();
+    spin_unlock_irqsave(window_lock);
     return 0;
 } 
+
+int init_window_manager() {
+    // Copying desktop to back_buffer for double buffering system
+    // back_buffer = kmalloc(svga.width * svga.height * 4);
+    // memcpy(back_buffer, desktop, svga.width * svga.height * 4);
+    back_buffer = vid_mem_buffers[3];
+    head = NULL;
+    tail = NULL;
+    memcpy((uint32_t*) back_buffer, desktop, svga.width * svga.height * 4);
+    return 1;
+}
 
 /*
  * Copies the desktop background to backbuffer and displays on screen
@@ -163,9 +186,6 @@ int32_t redraw_window(uint32_t id) {
  * OUTPUTS: None
  */
 void init_desktop() {
-    // Copying desktop to back_buffer for double buffering system
-    back_buffer = kmalloc(svga.width * svga.height * 4);
-    memcpy(back_buffer, desktop, svga.width * svga.height * 4);
     if (GUI_enabled) {
         // Copy the desktop image to actual screen    
         memcpy(svga.frame_buffer, back_buffer, svga.width * svga.height * 4);   
@@ -175,36 +195,44 @@ void init_desktop() {
 
 void mouse_event(uint32_t x, uint32_t y) {
     // Sets mouse to not currently holding window when left button not pressed
-    if (!mouse->left_click && mouse->holding_window)
-        mouse->holding_window = 0;
-    
-    window *temp = head;
-    if (mouse->left_click && mouse_clicked_close(temp, x, y)) {
-        destroy_window(temp->pid);
-        compositor();
+    spin_lock_irqsave(window_lock);
+    if (head == NULL) {
+        spin_unlock_irqsave(window_lock);
         return;
     }
-    // Used to focus the window clicked on
-    if (mouse->left_click && !mouse->holding_window) {
-        while (temp != NULL) {
-            if (window_contains_mouse(temp, x, y)) {
-                move_window_to_front(temp->id);
-                break;  
-            }
-            temp = temp->next;
+    if (GUI_enabled && head != NULL) {
+        if (!mouse.left_click && mouse.holding_window)
+            mouse.holding_window = 0;
+        
+        window *temp = head;
+        if (mouse.left_click && mouse_clicked_close(temp, x, y)) {
+            destroy_window(temp->pid);
+            compositor();
+            return;
         }
-    }
+        // Used to focus the window clicked on
+        if (mouse.left_click && !mouse.holding_window) {
+            while (temp != NULL) {
+                if (window_contains_mouse(temp, x, y)) {
+                    move_window_to_front(temp->id);
+                    break;  
+                }
+                temp = temp->next;
+            }
+        }
 
-    // Rely on shortcutting to insure mouse clips on to window even when out of window bounds when moving
-    if (mouse->holding_window || (mouse->left_click && window_bar_contains_mouse(head, x, y))) {
-        mouse->holding_window = 1;
-        head->x += mouse->x - mouse->old_x;
-        head->y += mouse->y - mouse->old_y;
-        if (head->x > svga.width)    head->x = 0;
-        if (head->y > svga.height)   head->y = 0;
+        // Rely on shortcutting to insure mouse clips on to window even when out of window bounds when moving
+        if (mouse.holding_window || (mouse.left_click && window_bar_contains_mouse(head, x, y))) {
+            mouse.holding_window = 1;
+            temp->x += mouse.x - mouse.old_x;
+            temp->y += mouse.y - mouse.old_y;
+            if (temp->x > svga.width)    temp->x = 0;
+            if (temp->y > svga.height)   temp->y = 0;
+        }
+        // Calls compositor which puts everything together
+        compositor();
     }
-    // Calls compositor which puts everything together
-    compositor();
+    spin_unlock_irqsave(window_lock);
 }
 
 void move_window_to_front(int id) {

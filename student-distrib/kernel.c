@@ -204,6 +204,9 @@ void entry(unsigned long magic, unsigned long addr) {
 	/* Initialize signals */
 	init_signals();
 
+	/* Init the window manager */
+	os_ready &= init_window_manager();
+
 	if (os_ready) {
 		init_graphics();
 		// GUI_enabled = 1;

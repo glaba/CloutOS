@@ -82,7 +82,7 @@ void put_char(uint32_t *screen_base, uint32_t screenWidth, unsigned char c, uint
                 break;
             }
             if (row_mapping & (int8_t)0x80)
-                draw_pixel(screen_base, screenWidth, x + col_count, y, foreground_color);
+                draw_pixel_fast(screen_base, x + col_count, y, foreground_color);
             
             col_count++;
             row_mapping = (int8_t)row_mapping << 1;

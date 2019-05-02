@@ -43,6 +43,9 @@
 #define STDIN  0
 #define STDOUT 1
 
+extern void *vid_mem_buffers[NUM_TTYS];
+
+
 typedef struct fops_t {
 	int32_t (*open )(const uint8_t*);
 	int32_t (*close)(int32_t);
