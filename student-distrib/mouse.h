@@ -6,9 +6,14 @@
 typedef struct mouse_info {
     uint32_t x;
     uint32_t y;
+    uint32_t old_x;
+    uint32_t old_y;
     uint32_t scroll;
     int right_click;
     int left_click;
+
+    int holding_window;
+
 } mouse_info;
 
 extern mouse_info *mouse;

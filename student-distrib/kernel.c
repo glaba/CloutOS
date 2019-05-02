@@ -208,6 +208,7 @@ void entry(unsigned long magic, unsigned long addr) {
 		// launch_tests();
 #endif
 		vga_text_enabled = 0;
+		// GUI_enabled = 1;
 		init_graphics();
 		
 		

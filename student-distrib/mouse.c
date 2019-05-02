@@ -91,6 +91,7 @@ void init_mouse() {
 	mouse->x = SYSTEM_RESOLUTION_WIDTH / 2;
 	mouse->y = SYSTEM_RESOLUTION_HEIGHT / 2;
 	mouse->scroll = 0;
+	mouse->holding_window = 0;
 
     enable_irq(MOUSE_IRQ);
 }
@@ -159,15 +160,20 @@ void mouse_handler() {
 	bound_mouse_coordinates();
 	if (state & RIGHT_MOUSE_CLICK) {
 		mouse->right_click = 1;
-		mouse_event(mouse->x, mouse->y);
+		// mouse_event(mouse->x, mouse->y);
 	}
 	if (state & LEFT_MOUSE_CLICK) {
 		mouse->left_click = 1;
-		mouse_event(mouse->x, mouse->y);
+		// mouse_event(mouse->x, mouse->y);
 	}
+
+	mouse_event(mouse->x, mouse->y);
+
 	// printf("Mouse Data: x: %d   y: %d   scroll: %d   left: %d   right: %d\n", mouse->x, mouse->y, mouse->scroll, mouse->left_click, mouse->right_click);
 	draw_pixel(svga.frame_buffer, svga.width, mouse->x, mouse->y, 0xFFFFFFFF);
 	svga_update(0, 0, svga.width, svga.height);
+	mouse->old_x = mouse->x;
+	mouse->old_y = mouse->y;
 }
 
 void bound_mouse_coordinates() {

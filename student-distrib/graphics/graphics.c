@@ -91,10 +91,15 @@ void put_char(uint32_t *screen_base, uint32_t screenWidth, unsigned char c, uint
 }
 
 void draw_pixel(uint32_t *screenBase, uint32_t screenWidth, uint32_t x, uint32_t y, uint32_t color) {
+    if (x >= svga.width || y >= svga.height)
+        return;
     screenBase[screenWidth * y + x] = color;
 }
 
 void draw_pixel_fast(uint32_t *screenBase, uint32_t x, uint32_t y, uint32_t color) {
+    if (x >= svga.width || y >= svga.height)
+        return;
+    
     // REMEMBER THE LEFT SHIFT 10 IS SPECIFICALLY FOR 1024 width    
     screenBase[(y << 10) + x] = color;
 }

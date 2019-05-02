@@ -5,7 +5,7 @@
 #include "kheap.h"
 
 // Uncomment PCI_DEBUG_ENABLE to enable debugging
-// #define PCI_DEBUG_ENABLE
+#define PCI_DEBUG_ENABLE
 #ifdef PCI_DEBUG_ENABLE
 	#define PCI_DEBUG(f, ...) printf(f, ##__VA_ARGS__)
 #else

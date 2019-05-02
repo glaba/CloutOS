@@ -302,10 +302,10 @@ int32_t vidmap(uint8_t **screen_start) {
  */
 int32_t allocate_window(int32_t fd, uint32_t *buf) {
 	printf("ALLOCATE WINDOW\n");
-	int32_t* buffer;
+	uint32_t* buffer;
 	if ((buffer = alloc_window(buf[0], buf[1], buf[2], buf[3], &buf[4])) == NULL)	
 		return FAIL;
-	buf[5] = buffer;
+	buf[5] = (uint32_t)buffer;
 	return PASS;
 }
 

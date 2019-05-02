@@ -26,12 +26,27 @@ int main () {
     buf1[3] = 350;   //height
     buf1[4] = 0;     //id
     buf1[5] = 0;     //canvas buffer pointer
+
+    uint32_t buf2[BUFSIZE];		
+    buf2[0] = 300;   //x
+    buf2[1] = 300;   //y
+    buf2[2] = 250;   //width
+    buf2[3] = 250;   //height
+    buf2[4] = 0;     //id
+    buf2[5] = 0;     //canvas buffer pointer
+
+
     ece391_allocate_window(0, buf);
     int window_id = buf[4];
     ece391_allocate_window(0, buf1);
     int window_id1 = buf1[4];
+    ece391_allocate_window(0, buf2);
+    int window_id2 = buf2[4];
+
 
     uint32_t *buffer = (uint32_t*) buf1[5];
+	uint32_t *buffer1 = (uint32_t*) buf2[5];
+
 
     int i, j;
     for (i = 0; i < buf1[2]; i++) {
@@ -39,10 +54,15 @@ int main () {
             draw_pixel(buffer, buf1[2], i, j, 0xFF0000FF);
         }
     }
-
+    for (i = 0; i < buf2[2]; i++) {
+        for (j = 15; j < buf2[3]; j++) {
+            draw_pixel(buffer1, buf2[2], i, j, 0xFFFF0000);
+        }
+    }
 
     ece391_update_window(window_id);
     ece391_update_window(window_id1);
+    ece391_update_window(window_id2);
 
 
     ece391_fdputs (1, (uint8_t*)"Ran the window program strxxx 69\n");
