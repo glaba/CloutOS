@@ -361,7 +361,11 @@ void keyboard_handler() {
 			keyboard_shortcuts[i].callback(character, fn_key);
 			goto keyboard_handler_end;
 		}
+
 	}
+
+	if (active_tty > NUM_TEXT_TTYS)
+		goto keyboard_handler_end;
 
 	// If either the character is a newline, or if the buffer is full, we have the same behavior
 	//  of flushing the line buffer and printing a newline
