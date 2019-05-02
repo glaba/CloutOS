@@ -16,7 +16,7 @@ typedef struct mouse_info {
 
 } mouse_info;
 
-extern mouse_info *mouse;
+extern mouse_info mouse;
 
 // Initializes the mouse to use interrupts and enables the mouse interrupt
 void init_mouse();

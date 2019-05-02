@@ -18,10 +18,10 @@
 
 #define RIGHT_MOUSE_CLICK		0x2	
 #define LEFT_MOUSE_CLICK		0x1
-
-mouse_info *mouse;
-
 #define abs(n) ((n < 0) ? (-n) : (n))
+
+
+mouse_info mouse;
 
 
 void mouse_wait(uint8_t a_type) {
@@ -88,10 +88,10 @@ void init_mouse() {
     printf("Mouse ID: %x\n", inb(MOUSE_PORT));
 
 	// Just init both to middle of screen
-	mouse->x = SYSTEM_RESOLUTION_WIDTH / 2;
-	mouse->y = SYSTEM_RESOLUTION_HEIGHT / 2;
-	mouse->scroll = 0;
-	mouse->holding_window = 0;
+	mouse.x = SYSTEM_RESOLUTION_WIDTH / 2;
+	mouse.y = SYSTEM_RESOLUTION_HEIGHT / 2;
+	mouse.scroll = 0;
+	mouse.holding_window = 0;
 
     enable_irq(MOUSE_IRQ);
 }
@@ -150,41 +150,41 @@ void mouse_handler() {
 	x = x + mouse_x;
     y = y - mouse_y;
 	
-	mouse->x = x;
-	mouse->y = y;
+	mouse.x = x;
+	mouse.y = y;
 
 
-	mouse->scroll += scroll_wheel;
-	mouse->right_click = 0;
-	mouse->left_click = 0;
+	mouse.scroll += scroll_wheel;
+	mouse.right_click = 0;
+	mouse.left_click = 0;
 	bound_mouse_coordinates();
 	if (state & RIGHT_MOUSE_CLICK) {
-		mouse->right_click = 1;
-		// mouse_event(mouse->x, mouse->y);
+		mouse.right_click = 1;
+		// mouse_event(mouse.x, mouse.y);
 	}
 	if (state & LEFT_MOUSE_CLICK) {
-		mouse->left_click = 1;
-		// mouse_event(mouse->x, mouse->y);
+		mouse.left_click = 1;
+		// mouse_event(mouse.x, mouse.y);
 	}
 
-	mouse_event(mouse->x, mouse->y);
+	mouse_event(mouse.x, mouse.y);
 
-	// printf("Mouse Data: x: %d   y: %d   scroll: %d   left: %d   right: %d\n", mouse->x, mouse->y, mouse->scroll, mouse->left_click, mouse->right_click);
-	// draw_pixel(svga.frame_buffer, svga.width, mouse->x, mouse->y, 0xFFFFFFFF);
+	// printf("Mouse.ata: x: %d   y: %d   scroll: %d   left: %d   right: %d\n", mouse.x, mouse.y, mouse.scroll, mouse.left_click, mouse.right_click);
+	draw_pixel(svga.frame_buffer, svga.width, mouse.x, mouse.y, 0xFFFFFFFF);
 	// svga_update(0, 0, svga.width, svga.height);
-	mouse->old_x = mouse->x;
-	mouse->old_y = mouse->y;
+	mouse.old_x = mouse.x;
+	mouse.old_y = mouse.y;
 }
 
 void bound_mouse_coordinates() {
-	if (mouse->x <= 0)
-		mouse->x = 0;
-	if (mouse->y <= 0)
-		mouse->y = 0;
-	if (mouse->x >= SYSTEM_RESOLUTION_WIDTH)
-		mouse->x = SYSTEM_RESOLUTION_WIDTH;
-	if (mouse->y >= SYSTEM_RESOLUTION_HEIGHT)
-		mouse->y = SYSTEM_RESOLUTION_HEIGHT;		
+	if (mouse.x <= 0)
+		mouse.x = 0;
+	if (mouse.y <= 0)
+		mouse.y = 0;
+	if (mouse.x >= SYSTEM_RESOLUTION_WIDTH)
+		mouse.x = SYSTEM_RESOLUTION_WIDTH;
+	if (mouse.y >= SYSTEM_RESOLUTION_HEIGHT)
+		mouse.y = SYSTEM_RESOLUTION_HEIGHT;		
 }
 
 

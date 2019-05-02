@@ -8,6 +8,7 @@
 #include "interrupt_service_routines.h"
 #include "graphics/graphics.h"
 #include "graphics/VMwareSVGA.h"
+#include "window_manager/window_manager.h"
 
 // A dynamic array indicating which PIDs are currently in use by running programs
 // Each index corresponds to a PID and contains a pointer to that process' PCB
@@ -25,7 +26,7 @@ static struct fops_t stdout_table = {.open = NULL, .close = NULL,
 
 // Pointers to the video memory back buffers for each of the TTYs, which programs will draw to
 //  when their TTY is not active
-static void *vid_mem_buffers[NUM_TTYS];
+void *vid_mem_buffers[NUM_TTYS];
 
 // A spinlock that prevents the TTY from changing while it is owned
 struct spinlock_t tty_spin_lock = SPIN_LOCK_UNLOCKED;
@@ -222,16 +223,16 @@ int8_t is_userspace_region_valid(void *ptr, uint32_t size, int32_t pid) {
 		uint32_t start_addr = pcb->large_page_mappings.data[i].virt_index * LARGE_PAGE_SIZE;
 
 		// Check if it is within the virtual address given by this page
-		if (((uint32_t)ptr < start_addr) || 
-		    ((uint32_t)ptr + size >= start_addr + LARGE_PAGE_SIZE)) {
+		if (((uint32_t)ptr >= start_addr) && 
+		    ((uint32_t)ptr + size < start_addr + LARGE_PAGE_SIZE)) {
 
 			spin_unlock_irqsave(pcb_spin_lock);
-			return -1;
+			return 0;
 		}
 	}
 
 	spin_unlock_irqsave(pcb_spin_lock);
-	return 0;
+	return -1;
 }
 
 /*
@@ -275,16 +276,6 @@ int32_t map_process(int32_t pid) {
 			1, PAGE_READ_WRITE | PAGE_USER_LEVEL);
 	}
 
-	// Map in video memory if it is supposed to be mapped in
-	if (pcb->vid_mem != NULL) {
-		// TODO
-		// Check whether it should write to video memory or a buffer, and get
-		//  the physical address corresponding to the correct option
-		void *phys_addr = get_vid_mem(pcb->tty);
-
-		map_video_mem_user(phys_addr); //TODO
-	}
-
 	spin_unlock_irqsave(pcb_spin_lock);
 	return 0;
 }
@@ -309,11 +300,6 @@ int32_t unmap_process(int32_t pid) {
 	for (i = 0; i < pcb->large_page_mappings.length; i++) {
 		// Unmap the region first, since map_region checks if the region is already paged in
 		unmap_region((void*)(pcb->large_page_mappings.data[i].virt_index * LARGE_PAGE_SIZE), 1);
-	}
-
-	// Unmap video memory if it was mapped in // TODO
-	if (pcb->vid_mem != NULL) {
-		unmap_video_mem_user();
 	}
 
 	spin_unlock_irqsave(pcb_spin_lock);
@@ -359,7 +345,8 @@ int32_t free_pid(int32_t pid) {
 	// Free the kernel stack for this process
 	kfree(kernel_stack_top);
 
-	// TODO maybe add stuff for window memory here
+	// Free all window memory here
+	destroy_windows_by_pid(pcb->pid);
 
 	// Mark the current PID as unused and attempt to remove items from the end of the pcbs array
 	pcb->pid = -1;
@@ -538,7 +525,6 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 	pcb->tty = parent_tty;
 	pcb->state = PROCESS_RUNNING;
 	pcb->parent_pid = parent_pid;
-	pcb->vid_mem = NULL; //TODO
 	pcb->kernel_stack_base = kernel_stack_base;
 
 	// Initialize the signal_handlers to NULL and signal_statuses to SIGNAL_OPEN
@@ -741,42 +727,44 @@ int32_t process_wake(int32_t pid) {
  * OUTPUTS: -1 if the tty was invalid / we couldn't switch for some reason, and 0 on success
  */
 int32_t tty_switch(uint8_t tty) {
-	if (tty == 0 || tty > NUM_TEXT_TTYS)
+	if (tty == 0 || tty > NUM_TEXT_TTYS + 1)
 		return -1;
 
 	spin_lock_irqsave(tty_spin_lock);
+	if (tty == 4) {
+		GUI_enabled = 1;
+		// init_desktop();
+		int32_t old_tty = active_tty;
+		uint32_t *vid_mem = (uint32_t*)svga.frame_buffer;
+		uint32_t *old_tty_buffer = (uint32_t*)vid_mem_buffers[old_tty - 1];
+		uint32_t *new_tty_buffer = (uint32_t*)vid_mem_buffers[tty - 1];	
+		memcpy(old_tty_buffer, vid_mem, svga.width * svga.height * 4);
+		memcpy(vid_mem, new_tty_buffer, svga.width * svga.height * 4);	
 
+
+		active_tty = tty;
+		compositor();
+		spin_unlock_irqsave(tty_spin_lock);
+		sti();
+		return 0;
+	}
+	GUI_enabled = 0;
 	int32_t old_tty = active_tty;
 
 	uint32_t *vid_mem = (uint32_t*)svga.frame_buffer;
 	uint32_t *old_tty_buffer = (uint32_t*)vid_mem_buffers[old_tty - 1];
 	uint32_t *new_tty_buffer = (uint32_t*)vid_mem_buffers[tty - 1];
 
+	// BELOW METHOD WORKED FINE FOR TEXT MODE TTY, MEMCPY IS FASTER FOR GRAPHICS
 	// Copy video memory into the buffer for active_tty (the old TTY)
 	//  and copy the buffer for tty into video memory
-	int i;
-	for (i = 0; i < svga.width * svga.height * 4; i++) {
-		old_tty_buffer[i] = vid_mem[i];
-		vid_mem[i] = new_tty_buffer[i];
-	}
-
-	spin_lock_irqsave(pcb_spin_lock);
-
-	// Remap the video memory for the currently running process if it is in the old TTY
-	//  or if it's in the new TTY
-	pcb_t *pcb = get_pcb();
-	if (pcb->vid_mem != NULL) {
-		unmap_video_mem_user(); // TODO
-		
-		// If its TTY is not the new TTY, have it write to the buffer for that TTY
-		if (pcb->tty != tty)
-			map_video_mem_user(vid_mem_buffers[pcb->tty - 1]);
-		// Otherwise, we are switching to this process' TTY, and it should map directly to video memory
-		else
-			map_video_mem_user(vid_mem);
-	}
-
-	spin_unlock_irqsave(pcb_spin_lock);
+	// int i;
+	// for (i = 0; i < svga.width * svga.height * 4; i++) {
+	// 	old_tty_buffer[i] = vid_mem[i];
+	// 	vid_mem[i] = new_tty_buffer[i];
+	// }
+	memcpy(old_tty_buffer, vid_mem, svga.width * svga.height * 4);
+	memcpy(vid_mem, new_tty_buffer, svga.width * svga.height * 4);
 
 	// Update the active TTY
 	active_tty = tty;

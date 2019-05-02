@@ -43,6 +43,9 @@
 #define STDIN  0
 #define STDOUT 1
 
+extern void *vid_mem_buffers[NUM_TTYS];
+
+
 typedef struct fops_t {
 	int32_t (*open )(const uint8_t*);
 	int32_t (*close)(int32_t);
@@ -146,8 +149,6 @@ typedef struct pcb_t {
 	int32_t parent_pid;
 	// The buffer of arguments
 	int8_t args[TERMINAL_SIZE];
-	// The virtual address of paged in video memory
-	void *vid_mem;
 	// The state of the process (either PROCESS_RUNNING, PROCESS_SLEEPING, or PROCESS_STOPPING)
 	uint8_t state;
 	// If the state is PROCESS_SLEEPING (due to a blocking call), data associated with the blocking call
@@ -177,6 +178,8 @@ int32_t process_vidmap(uint8_t **screen_start);
 // Marks the provided process as asleep and spins until the current quantum is complete,
 //  in the case that the current quantum is the process being put to sleep
 int32_t process_sleep(int32_t pid);
+int32_t unmap_process(int32_t pid);
+int32_t map_process(int32_t pid);
 // Wakes up the process of provided PID
 int32_t process_wake(int32_t pid);
 // Checks if the given region lies within the memory assigned to the process with the given PID
