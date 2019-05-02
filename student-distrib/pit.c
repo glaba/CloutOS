@@ -5,6 +5,7 @@
 #include "list.h"
 #include "kheap.h"
 #include "spinlock.h"
+#include "processes.h"
 
 static struct spinlock_t pit_spin_lock = SPIN_LOCK_UNLOCKED;
 
@@ -22,6 +23,9 @@ callback_list_item *callback_list_head;
 // Precomputed interval to increment by so we don't have to do floating point division
 //  on every timer interrupt
 static double interval;
+
+// Whether or not scheduling is occurring
+static int scheduling_enabled = 0;
 
 // Time elapsed from system startup
 double sys_time = 0.0;
@@ -51,6 +55,13 @@ void init_pit() {
 
 	// Set the interval to be 1/frequency
 	interval = 1.0 / PIT_FREQUENCY;
+}
+
+/*
+ * Begins callbacks to scheduler_interrupt_handler at a rate of 69 Hz
+ */
+void enable_scheduling() {
+	scheduling_enabled = 1;
 }
 
 /*
@@ -123,6 +134,9 @@ void unregister_periodic_callback(uint32_t id) {
  * Handler for the timer interrupt
  */
 void timer_handler() {
+	// Set that we are not in userspace
+	in_userspace = 0;
+
 	send_eoi(TIMER_IRQ);
 
 	sys_time += interval;
@@ -139,4 +153,11 @@ void timer_handler() {
 			cur->data.callback(sys_time);
 		}
 	}
+
+	// Finally, run the scheduler
+	if (scheduling_enabled)
+		scheduler_interrupt_handler();
+
+	// Set that we are going back to userspace
+	in_userspace = 1;
 }

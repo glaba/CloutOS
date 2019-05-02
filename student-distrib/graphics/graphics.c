@@ -51,12 +51,14 @@ void init_vga() {
 }
 
 void init_graphics() {
-    init_font();
     init_vga();
+    init_font();
+    vga_text_enabled = 0;
+    clear();
 }
 
 void put_string(uint32_t *screen_base, uint32_t screenWidth, unsigned char *c, uint32_t x, uint32_t y, int32_t color) {
-    int8_t *buf = c;
+    int8_t *buf = (int8_t*)c;
     while (*buf != '\0') {
         put_char(screen_base, screenWidth, *buf, x += font->width, y, color);
         buf++;

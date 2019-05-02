@@ -20,4 +20,7 @@ void list_free_blocks();
 // Verifies that none of the blocks in the linked list overlap (primarily for debugging)
 void verify_no_overlaps();
 
+// Lock that can be acquired to prevent any allocations on the heap
+extern struct spinlock_t heap_lock;
+
 #endif

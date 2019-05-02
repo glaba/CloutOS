@@ -38,8 +38,8 @@
 #define HEAP_SIZE (KERNEL_HEAP_END_ADDR - KERNEL_HEAP_START_ADDR)
 // The kernel ends with the kernel heap at 20MB
 #define KERNEL_END_ADDR KERNEL_HEAP_END_ADDR
-// The virtual address that video memory is mapped to for userspace programs (192MB + 0xB8000)
-#define VIDEO_USER_VIRT_ADDR (192 * 1024 * 1024 + 0xB8000)
+// The virtual address that video memory is mapped to for userspace programs (192MB)
+#define VIDEO_USER_VIRT_ADDR (192 * 1024 * 1024)
 
 /////////////////////////////////////////////////
 // Page table / page directory entry constants //
@@ -80,11 +80,12 @@ void unmap_containing_region(void *start_addr, uint32_t size);
 // Identity maps the smallest 4MB aligned region containing the provided region with the given PDE flags
 int32_t identity_map_containing_region(void* start_addr, uint32_t size, unsigned int flags);
 
-// Maps an open virtual region into video memory so that a userspace program can access it
-int32_t map_video_mem_user(void **addr);
+// Maps the virtual region starting at 192MB into the provided physical start address with size VIDEO_SIZE
+//  so that a userspace program can access it
+int32_t map_video_mem_user(void *phys_addr);
 
 // Unmaps the video memory paged in for userspace programs 
-void unmap_video_mem_user(void *addr);
+void unmap_video_mem_user();
 
 // Returns the index of an unused 4MB page in physical memory and marks it used
 int32_t get_open_page();

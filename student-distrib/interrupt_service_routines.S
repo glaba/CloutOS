@@ -4,71 +4,72 @@
 
 .text
 
-.data 
-	SIZE_OF_SYSTEM_CALL_TABLE = 10
-
-.globl keyboard_linkage
-.globl rtc_linkage
-.globl mouse_linkage
-.globl system_call_linkage
-.globl pci_linkage
-.globl timer_linkage
-
 .align 4
 
-# Function: keyboard_linkage
-# Description: linkage between IDT and keyboard_handler
-# Inputs   : none
-# Outputs  : none
-# Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
-keyboard_linkage:
-	pushal                      # Push all general purpose registers in 32 bit form
-	call keyboard_handler
-	popal                       # Pop general purpose registers
+#define common_interrupt_enter \
+	pushw %fs; \
+	pushw $0; \
+	pushw %es; \
+	pushw $0; \
+	pushw %ds; \
+	pushw $0; \
+	pushl %eax; \
+    pushl %ebp; \
+    pushl %edi; \
+    pushl %esi; \
+	pushl %edx; \
+	pushl %ecx; \
+	pushl %ebx; \
+
+#define common_interrupt_exit \
+	popl %ebx; \
+	popl %ecx; \
+	popl %edx; \
+    popl %esi; \
+    popl %edi; \
+    popl %ebp; \
+	popl %eax; \
+	add $2, %esp; \
+	popw %ds; \
+	add $2, %esp; \
+	popw %es; \
+	add $2, %esp; \
+	popw %fs; \
+
+# The stack pointer in the beginning of the timer linkage
+.global timer_linkage_esp;
+timer_linkage_esp:
+	.long 0
+
+/*
+ * Use a macro to generate the all the linkages
+ *
+ * INPUTS: none
+ * OUTPUTS: none
+ * REGISTERS: saves and restores ebp, esp, eax, ebx, ecx, edx, edi, esi
+ */
+#define GEN_LINKAGE(name, handler) \
+.global name; \
+name: \
+	common_interrupt_enter \
+	call handler; \
+	common_interrupt_exit \
 	iret
 
-# Function: rtc_linkage
-# Description: linkage between IDT and rtc_handler
-# Inputs   : none
-# Outputs  : none
-# Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
-rtc_linkage:
-	pushal                      # Push all general purpose registers in 32 bit form
-	call rtc_handler
-	popal                       # Pop general purpose registers
-	iret
+GEN_LINKAGE(keyboard_linkage, keyboard_handler)
+GEN_LINKAGE(rtc_linkage, rtc_handler)
+GEN_LINKAGE(pci_linkage, pci_irq_handler)
+GEN_LINKAGE(mouse_linkage, mouse_handler)
 
-# Function: mouse_linkage
-# Description: linkage between IDT and mouse_handler
-# Inputs   : none
-# Outputs  : none
-# Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
-mouse_linkage:
-	cli
-	pushal                      # Push all general purpose registers in 32 bit form
-	call mouse_handler
-	popal                       # Pop general purpose registers
-	sti
-	iret
-
-# Function: pci_linkage
-# Description: linkage between IDT and pci_irq_handler
-# Inputs   : none
-# Outputs  : none
-# Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
-pci_linkage:
-	pushal                      # Push all general purpose registers in 32 bit form
-	call pci_irq_handler
-	popal                       # Pop general purpose registers
-	iret
-
-# Function: timer_linkage
-# Description: linkage between IDT and timer_handler
-# Inputs   : none
-# Outputs  : none
-# Registers: saves and restores ebp, eax, ebx, ecx, edx, edi, esi, fl
+# The timer has a special linkage
+.global timer_linkage;
 timer_linkage:
-	pushal                      # Push all general purpose registers in 32 bit form
+	# Copy the value of ESP excluding the IRET context into a special location
+	addl $20, %esp
+	movl %esp, timer_linkage_esp
+	addl $-20, %esp
+	# Now, do the regular linkage
+	common_interrupt_enter
 	call timer_handler
-	popal                       # Pop general purpose registers
+	common_interrupt_exit
 	iret

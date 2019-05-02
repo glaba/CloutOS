@@ -2,191 +2,168 @@
  * vim:ts=4 noexpandtab */
 
 #include "lib.h"
+#include "processes.h"
 #include "graphics/graphics.h"
 #include "graphics/VMwareSVGA.h"
-
 
 #define NUM_COLS    80
 #define NUM_ROWS    25
 
-// Position of cursor
-static int screen_x;
-static int screen_y;
+// Position of cursor for each TTY
+static int screen_x[NUM_TEXT_TTYS];
+static int screen_y[NUM_TEXT_TTYS];
 
 // Color of text that is drawn in the future
 static uint8_t attrib = 0x3;
-uint32_t text_color = 0xFFFFFFFF;
-uint32_t background_color = 0x00000000;
 
+static uint8_t *text_vid_mem = (uint8_t*)VIDEO;
 
-// Pointer to video memory
-static char* video_mem = (char *)VIDEO;
+/*
+ * Clears the screen for the given TTY
+ * INPUTS: tty: the TTY for which to clear the screen
+ */
+void clear_tty(uint8_t tty) {
+    if (tty >= NUM_TEXT_TTYS)
+        return;
 
-/* void clear(void);
+    // Acquire the lock to write to video memory
+    spin_lock_irqsave(tty_spin_lock);
 
-    CHANGED FOR VGA
+    uint8_t *video_mem = (uint8_t*)get_vid_mem(tty);
+    if (video_mem == NULL) {
+        spin_unlock_irqsave(tty_spin_lock);
+        return;
+    }
 
- * Inputs: void
- * Return Value: none
- * Function: Clears video memory */
-void clear(void) {
+    // Clear if we are in graphics mode
     if (!vga_text_enabled) {
-        memset(svga.frame_buffer, (int32_t) 0x00000000, svga.width * svga.height * 4);
-        screen_x = 0;
-        screen_y = 0;
+        memset(video_mem, 0, svga.width * svga.height * 4);
+        screen_x[active_tty - 1] = 0;
+        screen_y[active_tty - 1] = 0;
+        spin_unlock_irqsave(tty_spin_lock);
+        return;
     }
-    else {
-        int32_t i;
-        for (i = 0; i < NUM_ROWS * NUM_COLS; i++) {
-            *(uint8_t *)(video_mem + (i << 1)) = ' ';
-            *(uint8_t *)(video_mem + (i << 1) + 1) = attrib;
-        }
-        // Reset the cursor to point to the top left of the screen
-        screen_x = 0;
-        screen_y = 0;
-        update_cursor();
+
+    // We are in text mode
+    int32_t i;
+    for (i = 0; i < NUM_ROWS * NUM_COLS; i++) {
+        text_vid_mem[i << 1] = ' ';
+        text_vid_mem[(i << 1) + 1] = attrib;
     }
+
+    // Reset the cursor to point to the top left of the screen
+    screen_x[tty - 1] = 0;
+    screen_y[tty - 1] = 0;
+    
+    spin_unlock_irqsave(tty_spin_lock);
+    update_cursor();
+}
+
+/*
+ * Clears the screen for the currently active TTY
+ */
+void clear() {
+    clear_tty(active_tty);
 }
 
 /*
  * Sets the color with which subsequent text will be drawn
  *
- * CHANGED FOR VGA
- * 
  * INPUTS: back_color, fore_color: the background and foreground color
  * OUTPUTS: none
  * SIDE EFFECTS: all future text drawn until another invocation of this function will
  *               be drawn with the given color
  */
-void set_color(uint32_t back_color, uint32_t fore_color) {
-    if (!vga_text_enabled) {
-        background_color = back_color;
-        text_color = fore_color;
-    }
-    else
-        attrib = fore_color | (back_color << 4);
+void set_color(uint8_t back_color, uint8_t fore_color) {
+    attrib = fore_color | (back_color << 4);
 }
 
 /*
  * Sets the location of the cursor
  *
- * CHANGED FOR VGA
- * 
  * INPUTS: (x, y): the updated location of the cursor where text will start being drawn
  * OUTPUTS: NONE
  * SIDE EFFECTS: screen_x and screen_y are updated
  */
 void set_cursor_location(int x, int y) {
-    screen_x = x;
-    screen_y = y;
+    spin_lock_irqsave(tty_spin_lock);
+
+    screen_x[active_tty - 1] = x;
+    screen_y[active_tty - 1] = y;
+
+    spin_unlock_irqsave(tty_spin_lock);
 }
 
 /*
- * Decrements the cursor location by 1
+ * Decrements the cursor location by 1 for the given TTY
  *
- * CHANGED FOR VGA
- * 
- * INPUTS: none
- * OUTPUTS: none
- * SIDE EFFECTS: screen_x and screen_y are updated
- *
+ * INPUTS: tty: the TTY to update the cursor location within
+ * SIDE EFFECTS: screen_x and screen_y are updated for the given TTY
  */
-void decrement_location() {
-    if (!vga_text_enabled) {
-        if(screen_x <= 0 && screen_y <= 0)
-            return;
-        screen_x -= font->width;
+void decrement_location(uint8_t tty) {
+    int horz_dec = vga_text_enabled ? 1 : font->width;
+    int vert_dec = vga_text_enabled ? 1 : font->height;
+    int width = vga_text_enabled ? NUM_COLS : svga.width;
 
-        if (screen_x < 0 && screen_y > 0) {
-            screen_y -= font->height;
-            screen_x = svga.width - font->width;
-        }
-    }
-    else {
-        if(screen_x <= 0 && screen_y <= 0)
-            return;
-        screen_x--;
-
-        if (screen_x < 0 && screen_y > 0) {
-            screen_y--;
-            screen_x = NUM_COLS-1;
-        }
-        /*update blinking cursor*/
-        update_cursor();
-    }
-}
-
-
-/*
- * Clears the screen by the specified amount of spaces
- *
- * CHANGED FOR VGA
- * 
- * INPUTS: none
- * OUTPUTS: none
- * SIDE EFFECTS: clears 1 char back in memory,
- *               updates cursor
- */
-void clear_char() {
-    /* clear video mem and move cursor*/
-    if (!vga_text_enabled) {
-        int i, j;
-        int a;
- 
- 
-        for (i = screen_x; i < screen_x + font->width; i++) {
-            for (j = screen_y; j < screen_y + font->height; j++) {
-                draw_pixel(svga.frame_buffer, svga.width, i, j, 0x00000000);
-            }
-        }
-        decrement_location();
-		svga_update(0, 0, 1024, 768);
-    }
-    else {
-        /* clear video mem and move cursor*/
-        int i;
-        if(screen_x <= 0 && screen_y <= 0)
-            return;
-        /*linear location is calculated*/
-        i = NUM_COLS * screen_y + screen_x;
-        /*need to clear byte before*/
-        i--;
-        *(uint8_t *)(video_mem + ((i) << 1)) = ' ';
-        *(uint8_t *)(video_mem + ((i) << 1) + 1) = attrib;
-
-        // Update the screen coordinates
-        decrement_location();
-    }
-}
-
-/*
- * Clears the screen by one line
- *
- * INPUTS: none
- * OUTPUTS: none
- * SIDE EFFECTS: clears 1 char back in memory,
- *               updates cursor
- */
-void clear_line() {
-    /* clear video mem and move cursor*/
-    int x,y,i;
-    x = screen_x;
-    y = screen_y-1;
-    if(screen_x <= 0 && screen_y <= 0)
+    if (screen_x[tty - 1] <= 0 && screen_y[tty - 1] <= 0)
         return;
+    screen_x[tty - 1] -= horz_dec;
 
-    /*linear location is calculated*/
-    for(i = NUM_COLS * screen_y + screen_x-1; i >= NUM_COLS * (screen_y-1) + screen_x; i--) {
-        /*need to clear byte before*/
-        *(uint8_t *)(video_mem + ((i) << 1)) = ' ';
-        *(uint8_t *)(video_mem + ((i) << 1) + 1) = attrib;
+    if (screen_x[tty - 1] < 0 && screen_y[tty - 1] > 0) {
+        screen_y[tty - 1] -= vert_dec;
+        screen_x[tty - 1] = width - horz_dec;
     }
-    putc('e');
-    // Update the screen coordinates
     update_cursor();
 }
 
+/*
+ * Performs a single backspace operation
+ *
+ * INPUTS: tty: the TTY for which to go back one space
+ * OUTPUTS: none
+ * SIDE EFFECTS: clears 1 char back in memory,
+ *               updates cursor
+ */
+void clear_char(uint8_t tty) {
+    if (screen_x[tty - 1] <= 0 && screen_y[tty - 1] <= 0)
+        return;
 
+    spin_lock_irqsave(tty_spin_lock);
+
+    // If we are in graphics mode
+    if (!vga_text_enabled) {
+        uint32_t *video_mem = (uint32_t*)get_vid_mem(tty);
+        if (video_mem == NULL) {
+            spin_unlock_irqsave(tty_spin_lock);
+            return;
+        }
+        
+        // Update the coordinates
+        decrement_location(tty);
+
+        int i, j;
+        for (i = screen_x[tty - 1]; i < screen_x[tty - 1] + font->width; i++) {
+            for (j = screen_y[tty - 1]; j < screen_y[tty - 1] + font->height; j++) {
+                draw_pixel(video_mem, svga.width, i, j, 0x00000000);
+            }
+        }
+        spin_unlock_irqsave(tty_spin_lock);
+        return;
+    }
+
+    // We are in text mode
+    // The linear location within the array of the character to be removed 
+    int i = NUM_COLS * screen_y[tty - 1] + screen_x[tty - 1] - 1;
+
+    // Write a space into this location, clearing it
+    text_vid_mem[i << 1] = ' ';
+    text_vid_mem[(i << 1) + 1] = attrib;
+
+    spin_unlock_irqsave(tty_spin_lock);
+    
+    // Update the screen coordinates
+    decrement_location(tty);
+}
 
 /* Standard printf().
  * Only supports the following format strings:
@@ -204,8 +181,13 @@ void clear_line() {
  *       for the "#" modifier (this implementation doesn't add a "0x" at
  *       the beginning), but I think it's more flexible this way.
  *       Also note: %x is the only conversion specifier that can use
- *       the "#" modifier to alter output. */
-int32_t printf(int8_t *format, ...) {
+ *       the "#" modifier to alter output. 
+ *
+ * INPUTS: tty: the TTY to print this to
+ *         format: format string as described above
+ *         varargs: typical printf format
+ */
+int32_t printf_tty(uint8_t tty, int8_t *format, ...) {
     /* Pointer to the format string */
     int8_t* buf = format;
 
@@ -225,7 +207,7 @@ format_char_switch:
                     switch (*buf) {
                         /* Print a literal '%' character */
                         case '%':
-                            putc('%');
+                            putc_tty('%', tty);
                             break;
 
                         /* Use alternate formatting */
@@ -243,7 +225,7 @@ format_char_switch:
                                 int8_t conv_buf[64];
                                 if (alternate == 0) {
                                     itoa(*((uint32_t *)esp), conv_buf, 16);
-                                    puts(conv_buf);
+                                    puts_tty(conv_buf, tty);
                                 } else {
                                     int32_t starting_index;
                                     int32_t i;
@@ -253,7 +235,7 @@ format_char_switch:
                                         conv_buf[i] = '0';
                                         i++;
                                     }
-                                    puts(&conv_buf[starting_index]);
+                                    puts_tty(&conv_buf[starting_index], tty);
                                 }
                                 esp++;
                             }
@@ -264,7 +246,7 @@ format_char_switch:
                             {
                                 int8_t conv_buf[36];
                                 itoa(*((uint32_t *)esp), conv_buf, 10);
-                                puts(conv_buf);
+                                puts_tty(conv_buf, tty);
                                 esp++;
                             }
                             break;
@@ -280,20 +262,20 @@ format_char_switch:
                                 } else {
                                     itoa(value, conv_buf, 10);
                                 }
-                                puts(conv_buf);
+                                puts_tty(conv_buf, tty);
                                 esp++;
                             }
                             break;
 
                         /* Print a single character */
                         case 'c':
-                            putc((uint8_t) *((int32_t *)esp));
+                            putc_tty((uint8_t) *((int32_t *)esp), tty);
                             esp++;
                             break;
 
                         /* Print a NULL-terminated string */
                         case 's':
-                            puts(*((int8_t **)esp));
+                            puts_tty(*((int8_t **)esp), tty);
                             esp++;
                             break;
 
@@ -305,28 +287,38 @@ format_char_switch:
                 break;
 
             default:
-                putc(*buf);
+                putc_tty(*buf, tty);
                 break;
         }
         buf++;
     }
+
     return (buf - format);
 }
 
-/* int32_t puts(int8_t* s);
-
-    MODIFIED FOR VGA
-
- *   Inputs: int_8* s = pointer to a string of characters
- *   Return Value: Number of bytes written
- *    Function: Output a string to the console */
-int32_t puts(int8_t* s) {
+/* 
+ * Prints a string to the specified TTY
+ *
+ * INPUTS: s: pointer to a null terminated string
+ *         tty: the TTY to output the string to
+ */
+int32_t puts_tty(int8_t* s, uint8_t tty) {
     register int32_t index = 0;
     while (s[index] != '\0') {
-        putc(s[index]);
+        putc_tty(s[index], tty);
         index++;
     }
+
     return index;
+}
+
+/* 
+ * Prints a string to the currently active TTY
+ *
+ * INPUTS: s: pointer to a null terminated string
+ */
+int32_t puts(int8_t* s) {
+    return puts_tty(s, active_tty);
 }
 
 /*
@@ -338,172 +330,177 @@ int32_t puts(int8_t* s) {
  * SIDE EFFECTS: prints an image onto the screen, overwriting what may already be there
  */
 void print_image(const char* s, unsigned int x, unsigned int y) {
-    unsigned int start_x = x;
+    spin_lock_irqsave(tty_spin_lock);
 
-    for (; *s != '\0'; s++) {
-        // Go to next iteration if we are out of bounds
-        if (y >= NUM_ROWS || x >= NUM_COLS)
-            continue;
+    if (vga_text_enabled) {
+        unsigned int start_x = x;
 
-        // If there is a newline character, jump to the next line in the image
-        if (*s == '\n' || *s == '\r') {
-            y++;
-            x = start_x;
-        // Otherwise, draw the image
-        } else {
-            *(uint8_t *)(video_mem + ((NUM_COLS * y + x) << 1))     = *s;
-            *(uint8_t *)(video_mem + ((NUM_COLS * y + x) << 1) + 1) = attrib;
+        for (; *s != '\0'; s++) {
+            // Go to next iteration if we are out of bounds
+            if (y >= NUM_ROWS || x >= NUM_COLS)
+                continue;
 
-            x++;
+            // If there is a newline character, jump to the next line in the image
+            if (*s == '\n' || *s == '\r') {
+                y++;
+                x = start_x;
+            // Otherwise, draw the image
+            } else {
+                *(text_vid_mem + ((NUM_COLS * y + x) << 1))     = *s;
+                *(text_vid_mem + ((NUM_COLS * y + x) << 1) + 1) = attrib;
+
+                x++;
+            }
         }
     }
+
+    spin_unlock_irqsave(tty_spin_lock);
 }
 
 /*
- * Scrolls all the text on the screen up by one line and sets the cursor position on the bottom
+ * Scrolls all the text on the given TTY up by one line and sets the cursor position on the bottom
  *
- *  MODIFIED FOR VGA
- * 
- * INPUTS: none
+ * INPUTS: tty: the TTY to scroll
  * OUTPUTS: none
  * SIDE EFFECTS: scrolls the text in the video memory upwards like a console
  */
-static void scroll_screen() {
+static void scroll_screen_tty(uint8_t tty) {
+    spin_lock_irqsave(tty_spin_lock);
+
     if (!vga_text_enabled) {
-        screen_y = svga.height - font->height;
-        screen_x = 0;
+        uint32_t *video_mem = (uint32_t*)get_vid_mem(tty);
+        screen_y[tty - 1] = svga.height - font->height;
+        screen_x[tty - 1] = 0;
 
-        memmove(svga.frame_buffer, svga.frame_buffer + (font->height * svga.width), svga.width * svga.height * 4);
-
-        svga_update(0, 0, svga.width, svga.height);
-
+        memmove(video_mem, video_mem + font->height * svga.width, svga.width * svga.height * sizeof(uint32_t));
+        spin_unlock_irqsave(tty_spin_lock);
+        return;
     }
-    else {
-        screen_y = NUM_ROWS - 1;
-        screen_x = 0;
-        int x, y;
 
-        // Copy all the lines up one
-        for (x = 0; x < NUM_COLS; x++) {
-            for (y = 1; y < NUM_ROWS; y++) {
-                *(uint8_t *)(video_mem + ((NUM_COLS * (y - 1) + x) << 1)) =
-                    *(uint8_t *)(video_mem + ((NUM_COLS * y + x) << 1));
-                *(uint8_t *)(video_mem + ((NUM_COLS * (y - 1) + x) << 1) + 1) =
-                    *(uint8_t *)(video_mem + ((NUM_COLS * y + x) << 1) + 1);
-            }
-        }
+    // Now, we are in text mode
+    screen_y[tty - 1] = NUM_ROWS - 1;
+    screen_x[tty - 1] = 0;
+    int x, y;
 
-        // Finally, clear the last line
-        for (x = 0; x < NUM_COLS; x++) {
-            *(uint8_t *)(video_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1)) = ' ';
-            *(uint8_t *)(video_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1) + 1) = attrib;
+    // Copy all the lines up one
+    for (x = 0; x < NUM_COLS; x++) {
+        for (y = 1; y < NUM_ROWS; y++) {
+            *(text_vid_mem + ((NUM_COLS * (y - 1) + x) << 1)) = *(text_vid_mem + ((NUM_COLS * y + x) << 1));
+            *(text_vid_mem + ((NUM_COLS * (y - 1) + x) << 1) + 1) = *(text_vid_mem + ((NUM_COLS * y + x) << 1) + 1);
         }
     }
+
+    // Finally, clear the last line
+    for (x = 0; x < NUM_COLS; x++) {
+        *(text_vid_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1)) = ' ';
+        *(text_vid_mem + ((NUM_COLS * (NUM_ROWS - 1) + x) << 1) + 1) = attrib;
+    }
+
+    spin_unlock_irqsave(tty_spin_lock);
 }
 
 /*
- * Increments the cursor location by 1
+ * Increments the cursor location by 1 for the given TTY
  *
- * MODIFIED FOR VGA
- * 
- * INPUTS: none
+ * INPUTS: tty: the TTY for which to move the cursor
  * OUTPUTS: none
  * SIDE EFFECTS: screen_x and screen_y are updated
  */
-void increment_location() {
-    if (!vga_text_enabled) {
-        screen_x = (screen_x + font->width) % svga.width;
+void increment_location(uint8_t tty) {
+    int horz_inc = vga_text_enabled ? 1 : font->width;
+    int vert_inc = vga_text_enabled ? 1 : font->height;
+    int width = vga_text_enabled ? NUM_COLS : svga.width;
+    int height = vga_text_enabled ? NUM_ROWS : svga.height;
 
-        if (screen_x == 0)
-            screen_y += font->height;
-        // Scroll the screen if we have reached the bottom of the page
-        if(screen_y >= (svga.height - font->height)) {
-            scroll_screen();
-        }
-        // update_cursor();
-    }
+    spin_lock_irqsave(tty_spin_lock);
 
-    else {
-        screen_x = (screen_x + 1) % NUM_COLS;
+    screen_x[tty - 1] = (screen_x[tty - 1] + horz_inc) % width;
 
-        if (screen_x == 0)
-        screen_y++;
-        // Scroll the screen if we have reached the bottom of the page
-        if(screen_y == NUM_ROWS) {
-            scroll_screen();
-        }
-        update_cursor();
-    }
+    if (screen_x[tty - 1] == 0)
+        screen_y[tty - 1] += vert_inc;
+
+    // Scroll the screen if we have reached the bottom of the page
+    if (screen_y[tty - 1] > height - vert_inc)
+        scroll_screen_tty(tty);
+
+    spin_unlock_irqsave(tty_spin_lock);
+
+    update_cursor();
 }
 
-/* void putc(uint8_t c);
+/* 
+ * Prints a single character to the given TTY
+ *
+ * INPUTS: c: the character to print
+ *         tty: the TTY to print the character to
+ */
+void putc_tty(uint8_t c, uint8_t tty) {
+    spin_lock_irqsave(tty_spin_lock);
 
-    MODIFIED FOR VGA
+    int horz_inc = vga_text_enabled ? 1 : font->width;
+    int vert_inc = vga_text_enabled ? 1 : font->height;
+    int width = vga_text_enabled ? NUM_COLS : svga.width;
+    int scroll_threshold = vga_text_enabled ? NUM_ROWS : (svga.height - font->height); 
 
- * Inputs: uint_8* c = character to print
- * Return Value: void
- *  Function: Output a character to the console */
-void putc(uint8_t c) {
+    uint32_t *video_mem = (uint32_t*)get_vid_mem(tty);
+
     // If it is a newline character, move the cursor down one and reset x
-    if (!vga_text_enabled) {
-        if(c == '\n' || c == '\r') {
-            screen_y += font->height;
-            screen_x = 0;
-        } else {
+    if (c == '\n' || c == '\r') {
+        screen_y[tty - 1] += vert_inc;
+        screen_x[tty - 1] = 0;
+    } else {
+        if (vga_text_enabled) {
             // Otherwise, set the desired text at the cursor position
-            screen_x = (screen_x + font->width) % svga.width;
-            if (screen_x == 0)
-                screen_y += font->height;
-            put_char(svga.frame_buffer, svga.width, c, screen_x, screen_y, 0xFFFFFFFF);
-
-        }
-
-        // Scroll the screen if we have reached the bottom of the page
-        if (screen_y >= svga.height) {
-            scroll_screen();
-        }
-        svga_update(0, 0, svga.width, svga.height);
-    }
-    else {
-        if(c == '\n' || c == '\r') {
-            screen_y++;
-            screen_x = 0;
+            text_vid_mem[(NUM_COLS * screen_y[tty - 1] + screen_x[tty - 1]) << 1] = c;
+            text_vid_mem[((NUM_COLS * screen_y[tty - 1] + screen_x[tty - 1]) << 1) + 1] = attrib;
         } else {
-            // Otherwise, set the desired text at the cursor position
-            *(uint8_t *)(video_mem + ((NUM_COLS * screen_y + screen_x) << 1)) = c;
-            *(uint8_t *)(video_mem + ((NUM_COLS * screen_y + screen_x) << 1) + 1) = attrib;
-
-            // Update the screen coordinates
-            screen_x = (screen_x + 1) % NUM_COLS;
-
-            if (screen_x == 0)
-                screen_y++;
+            put_char(video_mem, width, c, screen_x[tty - 1], screen_y[tty - 1], 0xFFFFFFFF);
         }
 
-        // Scroll the screen if we have reached the bottom of the page
-        if (screen_y == NUM_ROWS) {
-            scroll_screen();
-        }
-        update_cursor();
+        // Update the screen coordinates
+        screen_x[tty - 1] = (screen_x[tty - 1] + horz_inc) % width;
+        
+        if (screen_x[tty - 1] == 0)
+            screen_y[tty - 1] += vert_inc;
     }
-    
+
+    // Scroll the screen if we have reached the bottom of the page
+    if (screen_y[tty - 1] > scroll_threshold) {
+        scroll_screen_tty(tty);
+    }
+
+    spin_unlock_irqsave(tty_spin_lock);
+    update_cursor();
 }
 
+/* 
+ * Prints a single character to the screen
+ *
+ * INPUTS: c: the character to print
+ */
+void putc(uint8_t c) {
+    putc_tty(c, active_tty);
+}
 
 /* void update_cursor(void);
  * Inputs: N/A
  * Return Value: n/a
- * Function: Updates where blinking cursor is
+ * Function: Updates where blinking cursor is for the active TTY
  * Source: https://wiki.osdev.org/Text_Mode_Cursor
  */
-void update_cursor()
-{
-	uint16_t post = screen_y * NUM_COLS + screen_x;
+void update_cursor() {
+    spin_lock_irqsave(tty_spin_lock);
 
-	outb(0x0F, 0x3D4);
-	outb(post, 0x3D5);
-	outb(0x0E, 0x3D4);
-	outb((post >> 8),0x3D5);
+    if (vga_text_enabled) {
+        uint16_t post = screen_y[active_tty - 1] * NUM_COLS + screen_x[active_tty - 1];
+
+        outb(0x0F, 0x3D4);
+        outb(post & 0xFF, 0x3D5);
+        outb(0x0E, 0x3D4);
+        outb((post >> 8) & 0xFF, 0x3D5);
+    }
+
+    spin_unlock_irqsave(tty_spin_lock);
 }
 
 
@@ -571,6 +568,19 @@ int8_t* strrev(int8_t* s) {
 uint32_t strlen(const int8_t* s) {
     register uint32_t len = 0;
     while (s[len] != '\0')
+        len++;
+    return len;
+}
+
+
+/* strlen_avoid_overflow(const int8_t* s, uint32_t max);
+ * Inputs: const int8_t* s = string to take length of
+ *         uint32_t max    = max posible len of string
+ * Return Value: length of string s
+ * Function: return length of string s */
+uint32_t strnlen(const int8_t* s, uint32_t max) {
+    register uint32_t len = 0;
+    while (len < max && s[len] != '\0')
         len++;
     return len;
 }
@@ -789,15 +799,4 @@ int8_t* strncpy(int8_t* dest, const int8_t* src, uint32_t n) {
         i++;
     }
     return dest;
-}
-
-/* void test_interrupts(void)
- * Inputs: void
- * Return Value: void
- * Function: increments video memory. To be used to test rtc */
-void test_interrupts(void) {
-    int32_t i;
-    for (i = 0; i < NUM_ROWS * NUM_COLS; i++) {
-        video_mem[i << 1]++;
-    }
 }

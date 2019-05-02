@@ -65,28 +65,29 @@ static inline void enable_page_size_extension() {
 }
 
 /*
- * If there is no mapping already existing, maps a region of specified size starting from the
+ * Unconditionally maps a region of specified size starting from the
  *  given virtual address to the region of the same size starting from the given physical address
  *
  * INPUTS: start_phys_addr: the start of the region in physical memory
  *         start_virt_addr: the start of the region in virtual memory
  *         num_pdes: the size of the region in multiples of 4MB
  *         flags: the flags that should be applied to the PDE (4MB page and present will be included by default)
- * OUTPUTS: 0 on success and -1 if the region was already being used
+ * OUTPUTS: 0 on success
  */
 int32_t map_region(void *start_phys_addr, void *start_virt_addr, uint32_t num_pdes, uint32_t flags) {
 	// Align the two inputs to the nearest 4MB boundary (if they are not already)
 	start_phys_addr = (void*)(((uint32_t)start_phys_addr / LARGE_PAGE_SIZE) * LARGE_PAGE_SIZE);
 	start_virt_addr = (void*)(((uint32_t)start_virt_addr / LARGE_PAGE_SIZE) * LARGE_PAGE_SIZE);
 
-	// Check if the memory is mapped at any of the desired page directory entries, we fail if so
-	unsigned int i, cur_pde_index, cur_pde;
-
 	// Mark all the desired pages as 4M, present pages, as well as the custom flags
+	unsigned int i, cur_pde_index;
 	unsigned int cur_phys_index;
 	for (i = 0; i < num_pdes; i++) {
 		cur_pde_index = (unsigned int)(start_virt_addr) / LARGE_PAGE_SIZE + i;
 		cur_phys_index = (unsigned int)(start_phys_addr) / LARGE_PAGE_SIZE + i;
+
+		if (cur_pde_index >= PAGE_DIRECTORY_SIZE || cur_phys_index >= PAGE_DIRECTORY_SIZE) 
+			break;
 
 		page_directory[cur_pde_index] = (cur_phys_index * PAGE_TABLE_SIZE * PAGE_ALIGNMENT) |
 			flags | PAGE_SIZE_IS_4M | PAGE_PRESENT;
@@ -115,6 +116,9 @@ void unmap_region(void *start_addr, uint32_t num_pdes) {
 	for (i = 0; i < num_pdes; i++) {
 		cur_pde_index = (unsigned int)(start_addr_aligned) / LARGE_PAGE_SIZE + i;
 
+		if (cur_pde_index >= PAGE_DIRECTORY_SIZE)
+			break;
+
 		page_directory[cur_pde_index] = 0;
 	}
 
@@ -123,14 +127,14 @@ void unmap_region(void *start_addr, uint32_t num_pdes) {
 }
 
 /*
- * If there is no mapping already existing, maps in a 4MB-aligned region made up of large 4MB pages that fully contains
+ * Unconditionally maps in a 4MB-aligned region made up of large 4MB pages that fully contains
  *  the desired region. Both start_phys_addr and start_virt_addr are assumed to have the same offset mod 4MB
  *
  * INPUTS: start_phys_addr: the start of the region in physical memory
  *         start_virt_addr: the start of the region in virtual memory
  *         size: the size of the region in bytes
  *         flags: the flags that should be applied to the PDE (4MB page and present will be included by default)
- * OUTPUTS: 0 on success and -1 if the region was already being used or if the pointers are not correctly aligned
+ * OUTPUTS: 0 on success and -1 if the pointers are not correctly aligned
  */
 int32_t map_containing_region(void *start_phys_addr, void *start_virt_addr, uint32_t size, uint32_t flags) {
 	// Check if physical address and virtual address are offset by the same amount from a multiple of 4MB
@@ -177,18 +181,28 @@ int32_t identity_map_containing_region(void *start_addr, uint32_t size, unsigned
 }
 
 /*
- * Maps an open virtual region into video memory so that a userspace program can access it
+ * Maps the virtual region starting at 192MB into video memory / video memory buffer so that
+ *  a userspace program can access it
  *
- * OUTPUTS: addr: the virtual address that video memory is mapped to
+ * INPUTS: phys_addr: a 4KB aligned address that will serve as a video memory buffer
  * RETURNS: 0 on success and -1 otherwise
- */
-int32_t map_video_mem_user(void **addr) {
-	// We will just put this in the 4MB region from 192MB - 196MB for now
-	page_directory[VIDEO_USER_VIRT_ADDR >> 22] = (unsigned long)(&user_video_page_table) |
-		PAGE_READ_WRITE | PAGE_USER_LEVEL | PAGE_PRESENT;
+ */ //TODO
+int32_t map_video_mem_user(void *phys_addr) {
+	// First, check that phys_addr is 4KB aligned
+	if ((uint32_t)phys_addr % NORMAL_PAGE_SIZE != 0)
+		return -1;
 
-	// Return the address that it was mapped to
-	*addr = (void*)VIDEO_USER_VIRT_ADDR;
+	// Then, fill in the user_video_page_table to point to the desired physical address
+	int i;
+	for (i = 0; i < VIDEO_SIZE / NORMAL_PAGE_SIZE; i++) {
+		// The page is present, and points to an offset from phys_addr
+		user_video_page_table[i] = ((uint32_t)phys_addr + i * NORMAL_PAGE_SIZE) |
+			PAGE_READ_WRITE | PAGE_USER_LEVEL | PAGE_PRESENT;
+	}
+
+	// Set the page directory entry
+	page_directory[VIDEO_USER_VIRT_ADDR >> 22] = (uint32_t)(&user_video_page_table) |
+		PAGE_READ_WRITE | PAGE_USER_LEVEL | PAGE_PRESENT;
 
 	// Reload the page directory
 	write_cr3(&page_directory);
@@ -198,12 +212,10 @@ int32_t map_video_mem_user(void **addr) {
 }
 
 /*
- * Unmaps the video memory paged in for userspace programs 
- *
- * INPUTS: addr: the virtual address that the video memory was paged into
- */
-void unmap_video_mem_user(void *addr) {
-	page_directory[(uint32_t)addr >> 22] = 0;
+ * Unmaps the video memory paged in for userspace programs
+ */ //TODO
+void unmap_video_mem_user() {
+	page_directory[VIDEO_USER_VIRT_ADDR >> 22] = 0;
 
 	// Reload the page directory
 	write_cr3(&page_directory);
@@ -259,17 +271,15 @@ void free_page(int32_t index) {
 void init_paging() {
 	int i;
 
-	// Set the entries in video_page_table as well as user_video_page_table
+	// Set the entries in video_page_table
 	for (i = 0; i < PAGE_TABLE_SIZE; i++) {
 		// If the current entry does not correspond to the region in video memory
 		if (i < VIDEO / NORMAL_PAGE_SIZE || i >= (VIDEO + VIDEO_SIZE) / NORMAL_PAGE_SIZE) {
 			// The page is not present
 			video_page_table[i] = ~PAGE_PRESENT;
-			user_video_page_table[i] = ~PAGE_PRESENT;
 		} else {
 			// The page is present
 			video_page_table[i] = (i * NORMAL_PAGE_SIZE) | PAGE_READ_WRITE | PAGE_PRESENT;
-			user_video_page_table[i] = (i * NORMAL_PAGE_SIZE) | PAGE_USER_LEVEL | PAGE_READ_WRITE | PAGE_PRESENT;
 		}
 	}
 

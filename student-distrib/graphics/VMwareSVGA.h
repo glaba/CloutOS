@@ -100,7 +100,6 @@ enum {
 //       the use of the current SVGA driver. */
 };
 
-
 typedef struct SVGADevice {
     uint32_t *fifo_buffer;
     uint32_t *frame_buffer;
@@ -127,7 +126,6 @@ typedef struct SVGADevice {
         uint32_t  reserved_size;
         uint32_t  next_fence;
     } fifo;
-
 } SVGADevice;
 
 extern SVGADevice svga;

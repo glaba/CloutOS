@@ -6,6 +6,7 @@
 #define _LIB_H
 
 #include "types.h"
+#include "processes.h"
 
 // Start address of video memory and size of video memory in bytes
 #define VIDEO      0xB8000
@@ -32,35 +33,37 @@
 // A useful constant...
 #define NULL 0
 
-extern int vga_text_enabled;
-
+// Use a #define for printf to automatically transfer the variable arguments
+#define printf(f, ...) (printf_tty(active_tty, f, ##__VA_ARGS__))
 
 // Sets the color with which subsequent text will be drawn
-void set_color(uint32_t back_color, uint32_t fore_color);
+void set_color(uint8_t back_color, uint8_t fore_color);
 
 // Sets the location of the cursor
 void set_cursor_location(int x, int y);
+// Updates the text cursor location
+void update_cursor();
 
 // Prints an ASCII image with top right corner at (x, y)
 void print_image(const char* s, unsigned int x, unsigned int y);
 
-int32_t printf(int8_t *format, ...);
+int32_t printf_tty(uint8_t tty, int8_t *format, ...);
 void putc(uint8_t c);
+void putc_tty(uint8_t c, uint8_t tty);
 int32_t puts(int8_t *s);
+int32_t puts_tty(int8_t *s, uint8_t tty);
 int8_t *itoa(uint32_t value, int8_t* buf, int32_t radix);
 int8_t *strrev(int8_t* s);
 uint32_t strlen(const int8_t* s);
-void clear(void);
+uint32_t strnlen(const int8_t* s, uint32_t max);
+void clear_tty(uint8_t tty);
+void clear();
 
-//USER defined functions
-void clear_char();
+void clear_char(uint8_t tty);
 
-//Updates cursor
-void update_cursor();
-
-//decrement/increment the location by 1
-void decrement_location();
-void increment_location();
+// decrement/increment the location by 1
+void decrement_location(uint8_t tty);
+void increment_location(uint8_t tty);
 
 void* memset(void* s, int32_t c, uint32_t n);
 void* memset_word(void* s, int32_t c, uint32_t n);
@@ -75,8 +78,8 @@ int8_t* strncpy(int8_t* dest, const int8_t*src, uint32_t n);
 int32_t bad_userspace_addr(const void* addr, int32_t len);
 int32_t safe_strncpy(int8_t* dest, const int8_t* src, int32_t n);
 
-/* Test to see that RTC interrupts are working */
-void test_interrupts(void);
+// Whether or not we are using VGA text mode (as opposed to VGA graphics mode)
+extern int vga_text_enabled;
 
 /* Port read functions */
 /* Inb reads a byte and returns its value as a zero-extended 32-bit

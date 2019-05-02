@@ -94,7 +94,7 @@ int32_t destroy_window(int pid) {
     }
     window *temp = head;
     while (temp != NULL) {
-        if (temp->pid = pid) {
+        if (temp->pid == pid) {
             temp->prev->next = temp->next;
             temp->next->prev = temp->prev;
             break;

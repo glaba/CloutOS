@@ -1,7 +1,7 @@
-#ifndef RTC_H
-#define RTC_H
-#include "types.h"
+#ifndef _RTC_H
+#define _RTC_H
 
+#include "types.h"
 #include "irq_defs.h"
 
 /* Address port allows you to specify index/register number */
@@ -30,6 +30,11 @@
 #define _256HZ_ 0x08
 #define _512HZ_ 0x07
 #define _1024HZ_ 0x06
+
+// The base frequency that the RTC runs at
+#define BASE_FREQ 1024
+// The default frequency when the RTC is opened
+#define DEFAULT_FREQ 2
 
 /*basic rtc init and handler*/
 void init_rtc();

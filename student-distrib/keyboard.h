@@ -3,7 +3,6 @@
 
 #include "types.h"
 #include "irq_defs.h"
-#include "graphics/VMwareSVGA.h"
 
 /* Port numbers for keyboard controller status and data ports */
 #define KEYBOARD_CONTROLLER_STATUS_PORT 0x64
@@ -26,8 +25,9 @@
 #define LEFT_ALT_CODE    0x38
 #define BACKSPACE_CODE   0x0E
 #define TAB_CODE         0x0F
-#define UP_CDOE          0x48
-#define DOWN_CODE        0x50
+#define FN1_TO_10_START  59
+#define FN11             125
+#define FN12             126
 
 /* Keyboard key status flags */
 #define SHIFT     0x1
@@ -35,12 +35,13 @@
 #define CTRL      0x4
 #define ALT       0x8
 
-/*Important masks*/
+/* Important bitmasks */
 #define KEY_DOWN_MASK 0x80
 #define SCAN_CODE_MASK 0x7F
 #define TERMINAL_SIZE 128
 
-void clear_linebuffer();
+/* The number of spaces printed for a tab character */
+#define NUM_SPACES_PER_TAB 4
 
 // Initializes the keyboard to use interrupts and enables the keyboard interrupt
 void init_keyboard();
@@ -48,13 +49,13 @@ void init_keyboard();
 // Interrupt handler for IRQ1 (keyboard interrupt)
 void keyboard_handler();
 
-//open
-extern int32_t terminal_open(void);
-//close
-extern int32_t terminal_close(void);
-//read
+// Initializes the terminal to be written or read from
+extern int32_t terminal_open(const uint8_t *filname);
+// Uninitializes the terminal from being written or read
+extern int32_t terminal_close(int32_t fd);
+// Blocking call that returns the string typed after 127 characters or the enter key is pressed
 extern int32_t terminal_read(int32_t fd, char* buf, int32_t bytes);
-//write
+// Writes the provided string to the screen
 extern int32_t terminal_write(int32_t fd, const char* buf, int32_t bytes);
 
 #endif

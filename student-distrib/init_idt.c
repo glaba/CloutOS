@@ -14,46 +14,40 @@
 #define MOUSE_INTERRUPT (0x20 + MOUSE_IRQ)
 #define TIMER_INTERRUPT (0x20 + TIMER_IRQ)
 
-/*   initialize_idt();
- *   DESCRIPTION: Fills the IDT with entries and sets settings
- *           such as privilege level, and gate type
- *   INPUTS: NONE
- *   RETURN VALUE: NONE
- *   SIDE EFFECTS: Fills the IDT */ 
 void initialize_idt() {
 	int idt_idx;
 
 	/* For the first 32 entries in IDT which are exceptions */
 	for (idt_idx = 0; idt_idx < END_OF_EXCEPTIONS; idt_idx++) {
 		/* The following reserved bit settings set first 32 entries as TRAP gates */
-		idt[idt_idx].reserved0 = 0x0;
-		idt[idt_idx].reserved1 = 0x1;
-		idt[idt_idx].reserved2 = 0x1;
-		idt[idt_idx].reserved3 = 0x0;
-		idt[idt_idx].reserved4 = 0x0;
-		idt[idt_idx].seg_selector = KERNEL_CS;
-		idt[idt_idx].size = 0x1;
 		idt[idt_idx].present = 0x1;
 		idt[idt_idx].dpl = 0x0;
-	}
-
-	/* For the other entries up to 255 for interrupts */
-	for (idt_idx = END_OF_EXCEPTIONS; idt_idx < NUM_VEC; idt_idx++) {
-		/* The following reserved bit settings set entries 32 to 255 as interrupt gates */
 		idt[idt_idx].reserved0 = 0x0;
+		idt[idt_idx].size = 0x1;
 		idt[idt_idx].reserved1 = 0x1;
 		idt[idt_idx].reserved2 = 0x1;
 		idt[idt_idx].reserved3 = 0x1;
 		idt[idt_idx].reserved4 = 0x0;
 		idt[idt_idx].seg_selector = KERNEL_CS;
-		idt[idt_idx].size = 0x1;
+	}
+
+	/* For the other entries up to 255 for interrupts */
+	for (idt_idx = END_OF_EXCEPTIONS; idt_idx < NUM_VEC; idt_idx++) {
+		/* The following reserved bit settings set entries 32 to 255 as interrupt gates */
 		idt[idt_idx].present = 0x1;
 		idt[idt_idx].dpl = 0x0;
+		idt[idt_idx].reserved0 = 0x0;
+		idt[idt_idx].size = 0x1;
+		idt[idt_idx].reserved1 = 0x1;
+		idt[idt_idx].reserved2 = 0x1;
+		idt[idt_idx].reserved3 = 0x0;
+		idt[idt_idx].reserved4 = 0x0;
+		idt[idt_idx].seg_selector = KERNEL_CS;
 		
 		if (idt_idx == SYSTEM_CALL_VECTOR) {
 			/* The following reserved bit setting sets first 32 entries as TRAP gates 
 			   which means that interrupts will not be disabled */
-			idt[idt_idx].reserved3 = 0x0;
+			idt[idt_idx].reserved3 = 0x1;
 		
 			/* Make sure system call handler is accessible from user space */
 			idt[idt_idx].dpl = 0x3;

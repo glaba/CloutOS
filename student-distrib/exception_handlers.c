@@ -4,6 +4,7 @@
 #include "exception_handlers.h"
 #include "processes.h"
 #include "graphics/VMwareSVGA.h"
+#include "signals.h"
 
 // Uncomment to show the error screen (useful to disable for debugging)
 #define SHOW_ERROR_SCREEN
@@ -17,37 +18,19 @@
  *              they return non-zero if something was printed, and optionally return 0 if nothing was printed
  */
 #define GENERATE_EXCEPTION_HANDLER(handler_name, err, line1_gen, line2_gen) \
-int line1_##handler_name(uint32_t err_code) {line1_gen return 0;}           \
-int line2_##handler_name(uint32_t err_code) {line2_gen return 0;}           \
-void handler_name(args) {                                                   \
-	cli();                                                                  \
-  svga_disable();																													\
-	check_userspace_exception();                                            \
-	print_error(err, line1_##handler_name, line2_##handler_name, 0);        \
-	while (1);                                                              \
-	sti();                                                                  \
+int line1_##handler_name(uint32_t err_code) {line1_gen return 0;} \
+int line2_##handler_name(uint32_t err_code) {line2_gen return 0;} \
+void handler_name(args) { \
+	if (in_userspace && 0) { \
+		send_signal(get_pid(), SIGNAL_SEGFAULT, 0); \
+		handle_signals(); \
+	} else { \
+		cli(); \
+		svga_disable(); \
+		print_error(err, line1_##handler_name, line2_##handler_name, 0); \
+		while (1); \
+	} \
 }
-
-/*
- * This macro generates an exception handler for an exception that has an error code
- *
- * INPUTS: handler_name: the name of the exception handler
- *         err: the string containing the name of the exception which will be printed
- *         line1_gen, line2_gen: function bodies which print out custom error messages (if desired)
- *              they return non-zero if something was printed, and optionally return 0 if nothing was printed
- */
-#define GENERATE_EXCEPTION_HANDLER_ERR(handler_name, err, line1_gen, line2_gen)   \
-int line1_##handler_name(uint32_t err_code) {line1_gen return 0;}                 \
-int line2_##handler_name(uint32_t err_code) {line2_gen return 0;}                 \
-void handler_name(uint32_t err_code) {                                            \
-	cli();                                                                        \
-	svga_disable();																																\
-	check_userspace_exception();                                                  \
-	print_error(err, line1_##handler_name, line2_##handler_name, err_code);       \
-	while (1);                                                                    \
-	sti();                                                                        \
-}
-
 
 /* An ASCII art skeleton that is 25 lines tall */
 const char* skeleton = "\n\n\n\n\n\n\
@@ -130,54 +113,50 @@ void print_error(const char* err, int (*line1)(uint32_t), int (*line2)(uint32_t)
 #endif
 }
 
-GENERATE_EXCEPTION_HANDLER(divide_zero_e, "DIVIDE BY ZERO EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER(debug_e, "DEBUG EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER(nminterrupt_e, "NON MASKABLE INTERRUPT EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER(breakpoint_e, "BREAKPOINT EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER(overflow_e, "OVERFLOW EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER(bound_range_exceeded_e, "BOUND RANGE EXCEEDED EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER(invalid_opcode_e, "INVALID OPCODE EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER(device_na_e, "DEVICE NOT AVAILABLE EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER_ERR(double_fault, "DOUBLE FAULT EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER(coprocessor_segment_overrun_e, "COPROCESSOR SEGMENT EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER_ERR(invalid_tss_e, "INVALID TSS EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER_ERR(segment_np_e, "SEGMENT NOT PRESENT EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER_ERR(stack_segment_fault_e, "STACK SEGMENT FAULT EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER_ERR(general_protection_e, "GENERAL PROTECTION EXCEPTION", {
-	return printf("Segment selector index that triggered fault: 0x%x", err_code);
-}, {})
-GENERATE_EXCEPTION_HANDLER_ERR(page_fault_e, "PAGE FAULT EXCEPTION", {
+GENERATE_EXCEPTION_HANDLER(divide_zero_handler, "DIVIDE BY ZERO EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(debug_handler, "DEBUG EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(nminterrupt_handler, "NON MASKABLE INTERRUPT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(breakpoint_handler, "BREAKPOINT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(overflow_handler, "OVERFLOW EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(bound_range_exceeded_handler, "BOUND RANGE EXCEEDED EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(invalid_opcode_handler, "INVALID OPCODE EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(device_na_handler, "DEVICE NOT AVAILABLE EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(double_fault_handler, "DOUBLE FAULT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(coprocessor_segment_overrun_handler, "COPROCESSOR SEGMENT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(invalid_tss_handler, "INVALID TSS EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(segment_np_handler, "SEGMENT NOT PRESENT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(stack_segment_fault_handler, "STACK SEGMENT FAULT EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(general_protection_handler, "GENERAL PROTECTION EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(page_fault_handler, "PAGE FAULT EXCEPTION", {
 	uint32_t address;
     asm("movl %%cr2, %0": "=r" (address));
     return printf("Invalid memory access attempt at 0x%#x", address);
-}, {
-	return printf("Error code: %x", err_code);
-})
-GENERATE_EXCEPTION_HANDLER(floating_point_error_e, "FLOATING POINT ERROR EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER_ERR(alignment_check_e, "ALIGNMENT CHE EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER(machine_check_e, "MACHINE CHECK EXCEPTION", {}, {})
-GENERATE_EXCEPTION_HANDLER(floating_point_exception_e, "SIMD FLOATING POINT EXCEPTION", {}, {})
+}, {})
+GENERATE_EXCEPTION_HANDLER(floating_point_error_handler, "FLOATING POINT ERROR EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(alignment_check_handler, "ALIGNMENT CHE EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(machine_check_handler, "MACHINE CHECK EXCEPTION", {}, {})
+GENERATE_EXCEPTION_HANDLER(floating_point_exception_handler, "SIMD FLOATING POINT EXCEPTION", {}, {})
 
-/* Fill in exception handlers array with all exception handlers generated by the macro */
+/* Fill in exception handlers array with all assembly linkages for exception handlers */
 uint32_t exception_handlers[NUM_EXCEPTION_HANDLERS] = {
-	(uint32_t)divide_zero_e,
-	(uint32_t)debug_e,
-	(uint32_t)nminterrupt_e,
-	(uint32_t)breakpoint_e,
-	(uint32_t)overflow_e,
-	(uint32_t)bound_range_exceeded_e,
-	(uint32_t)invalid_opcode_e,
-	(uint32_t)device_na_e,
-	(uint32_t)double_fault,
-	(uint32_t)coprocessor_segment_overrun_e,
-	(uint32_t)invalid_tss_e,
-	(uint32_t)segment_np_e,
-	(uint32_t)stack_segment_fault_e,
-	(uint32_t)general_protection_e,
-	(uint32_t)page_fault_e,
+	(uint32_t)divide_zero_linkage,
+	(uint32_t)debug_linkage,
+	(uint32_t)nminterrupt_linkage,
+	(uint32_t)breakpoint_linkage,
+	(uint32_t)overflow_linkage,
+	(uint32_t)bound_range_exceeded_linkage,
+	(uint32_t)invalid_opcode_linkage,
+	(uint32_t)device_na_linkage,
+	(uint32_t)double_fault_linkage,
+	(uint32_t)coprocessor_segment_overrun_linkage,
+	(uint32_t)invalid_tss_linkage,
+	(uint32_t)segment_np_linkage,
+	(uint32_t)stack_segment_fault_linkage,
+	(uint32_t)general_protection_linkage,
+	(uint32_t)page_fault_linkage,
 	(uint32_t)NULL,
-	(uint32_t)floating_point_error_e,
-	(uint32_t)alignment_check_e,
-	(uint32_t)machine_check_e,
-	(uint32_t)floating_point_exception_e
+	(uint32_t)floating_point_error_linkage,
+	(uint32_t)alignment_check_linkage,
+	(uint32_t)machine_check_linkage,
+	(uint32_t)floating_point_exception_linkage
 };

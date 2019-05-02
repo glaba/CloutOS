@@ -7,7 +7,6 @@
 #include "lib.h"
 #include "i8259.h"
 #include "debug.h"
-#include "tests.h"
 #include "keyboard.h"
 #include "paging.h"
 #include "rtc.h"
@@ -23,13 +22,13 @@
 #include "mouse.h"
 #include "graphics/graphics.h"
 #include "window_manager/window_manager.h"
-
-#define RUN_TESTS
+#include "signals.h"
 
 /* Macros. */
 /* Check if the bit BIT in FLAGS is set. */
 #define CHECK_FLAG(flags, bit)   ((flags) & (1 << (bit)))
 
+// Whether or not the VGA text display is enabled
 int vga_text_enabled = 1;
 
 /* Check if MAGIC is valid and print the Multiboot information structure
@@ -202,23 +201,21 @@ void entry(unsigned long magic, unsigned long addr) {
 	/* Initialize user level processes */
 	os_ready &= (init_processes() == 0);
 
+	/* Initialize signals */
+	init_signals();
+
 	if (os_ready) {
-#ifdef RUN_TESTS
-		/* Run tests */
-		// launch_tests();
-#endif
-		vga_text_enabled = 0;
-		// GUI_enabled = 1;
 		init_graphics();
-		
-		
+		// GUI_enabled = 1;
+				
 		clear();
 		// init_desktop();
 
+		enable_scheduling();
 
 		// process_execute("window", 0);
 		/* Execute the first program ("shell") ... */
-		process_execute("shell", 0);
+		process_execute("shell", 0, 1, 0);
 	}
 
 	/* Unregister the E1000 Ethernet device */
