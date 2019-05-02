@@ -21,7 +21,8 @@
 int line1_##handler_name(uint32_t err_code) {line1_gen return 0;} \
 int line2_##handler_name(uint32_t err_code) {line2_gen return 0;} \
 void handler_name(args) { \
-	if (in_userspace && 0) { \
+	sti(); \
+	if (in_userspace) { \
 		send_signal(get_pid(), SIGNAL_SEGFAULT, 0); \
 		handle_signals(); \
 	} else { \

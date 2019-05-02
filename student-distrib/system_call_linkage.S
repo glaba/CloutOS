@@ -63,6 +63,9 @@ system_call_linkage:
 
 	movl $1, in_userspace
 
+	# Check for signals and handle them if necessary
+	call handle_signals
+
 	# Pop all saved registers, which may have been modified
 	common_interrupt_exit
 

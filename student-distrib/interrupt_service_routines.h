@@ -30,8 +30,5 @@ extern void pci_linkage();
 /* Linkage for the timer interrupt */
 extern void timer_linkage();
 
-// The value of ESP at the beginning of the timer linkage
-extern uint32_t timer_linkage_esp;
-
 #endif
 #endif

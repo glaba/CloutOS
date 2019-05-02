@@ -693,6 +693,9 @@ int32_t process_sleep(int32_t pid) {
 
 	spin_unlock_irqsave(pcb_spin_lock);
 
+	// Enable the timer IRQ so that the scheduler can pick is up
+	sti();
+
 	// Spin while the process is in the sleep state 
 	// The scheduler will take us out of this loop
 	int sleeping = 1;
@@ -710,12 +713,19 @@ int32_t process_sleep(int32_t pid) {
  * Wakes up the process of provided PID
  * 
  * INPUTS: pid: the PID of the process to put to sleep
- * OUTPUTS: 0 on success, which is always
+ * OUTPUTS: 0 on success, and -1 on failure
  */
 int32_t process_wake(int32_t pid) {
 	spin_lock_irqsave(pcb_spin_lock);
 
 	pcb_t *pcb = get_pcb_from_pid(pid);
+
+	// Check that the process is sleeping, it should not be woken if stopping
+	if (pcb->state != PROCESS_SLEEPING) {
+		spin_unlock_irqsave(pcb_spin_lock);
+		return -1;
+	}
+
 	pcb->state = PROCESS_RUNNING;
 
 	spin_unlock_irqsave(pcb_spin_lock);
@@ -851,12 +861,6 @@ int32_t context_switch(int32_t pid) {
 	);
 
 context_switch_return:
-	spin_lock_irqsave(pcb_spin_lock);
-	
-	if (timer_linkage_esp == tss.esp0)
-		handle_signals();
-
-	spin_unlock_irqsave(pcb_spin_lock);
 	return 0;
 }
 
@@ -895,9 +899,6 @@ void scheduler_interrupt_handler() {
 
 	// If we found no process to switch to, just keep going with this process
 	if (next_pid == -1) {
-		// Handle signals only if the timer interrupt for scheduling is the only thing on the stack
-		if (timer_linkage_esp == tss.esp0)
-			handle_signals();
 		sti();
 		return;
 	}

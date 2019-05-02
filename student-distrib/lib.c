@@ -448,6 +448,8 @@ void putc_tty(uint8_t c, uint8_t tty) {
     if (c == '\n' || c == '\r') {
         screen_y[tty - 1] += vert_inc;
         screen_x[tty - 1] = 0;
+    } else if (c == ' ') {
+        increment_location(tty);
     } else {
         if (vga_text_enabled) {
             // Otherwise, set the desired text at the cursor position

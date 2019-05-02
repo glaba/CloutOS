@@ -36,11 +36,6 @@
 	add $2, %esp; \
 	popw %fs; \
 
-# The stack pointer in the beginning of the timer linkage
-.global timer_linkage_esp;
-timer_linkage_esp:
-	.long 0
-
 /*
  * Use a macro to generate the all the linkages
  *
@@ -53,6 +48,7 @@ timer_linkage_esp:
 name: \
 	common_interrupt_enter \
 	call handler; \
+	call handle_signals; \
 	common_interrupt_exit \
 	iret
 
@@ -60,16 +56,4 @@ GEN_LINKAGE(keyboard_linkage, keyboard_handler)
 GEN_LINKAGE(rtc_linkage, rtc_handler)
 GEN_LINKAGE(pci_linkage, pci_irq_handler)
 GEN_LINKAGE(mouse_linkage, mouse_handler)
-
-# The timer has a special linkage
-.global timer_linkage;
-timer_linkage:
-	# Copy the value of ESP excluding the IRET context into a special location
-	addl $20, %esp
-	movl %esp, timer_linkage_esp
-	addl $-20, %esp
-	# Now, do the regular linkage
-	common_interrupt_enter
-	call timer_handler
-	common_interrupt_exit
-	iret
+GEN_LINKAGE(timer_linkage, timer_handler)

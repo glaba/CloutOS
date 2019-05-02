@@ -541,7 +541,6 @@ int32_t terminal_read(int32_t fd, char* buf, int32_t bytes) {
 	// Set the blocking call field in the PCB
 	pcb->blocking_call.type = BLOCKING_CALL_TERMINAL_READ;
 
-	sti();
 	// Put the process to sleep
 	process_sleep(pcb->pid);
 

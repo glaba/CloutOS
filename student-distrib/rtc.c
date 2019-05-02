@@ -3,6 +3,7 @@
 #include "i8259.h"
 #include "processes.h"
 #include "kheap.h"
+#include "spinlock.h"
 
 // Each process can have a virtual RTC device associated with it, which is described
 //  by this struct
@@ -27,6 +28,8 @@ static int init = 0;
 
 // The counter that keeps track of the number of ticks at 1024 Hz
 static volatile int counter = 0;
+
+static struct spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * NMI_enable()
@@ -171,7 +174,7 @@ void rtc_handler() {
  *               and sets freq to 2 HZ
  */
 int32_t rtc_open(const uint8_t *filename) {
-	cli();
+	spin_lock_irqsave(rtc_lock);
 
 	/* Call init_rtc if not yet initialized */
 	if (!init)
@@ -183,7 +186,7 @@ int32_t rtc_open(const uint8_t *filename) {
 	for (cur = rtc_client_list_head; cur != NULL; cur = cur->next) {
 		// If the current PID is equal to a PID in the list, we fail
 		if (cur->data.pid == pid) {
-			sti();
+			spin_unlock_irqsave(rtc_lock);
 			return -1;
 		}
 	}
@@ -191,7 +194,7 @@ int32_t rtc_open(const uint8_t *filename) {
 	// Allocate memory for the linked list node
 	rtc_client_list_item *client = kmalloc(sizeof(rtc_client_list_item));
 	if (client == NULL) {
-		sti();
+		spin_unlock_irqsave(rtc_lock);
 		return -1;
 	}
 
@@ -205,7 +208,7 @@ int32_t rtc_open(const uint8_t *filename) {
 	rtc_client_list_head = client;
 	
 	// Re-enable interrupts and return success
-	sti();
+	spin_unlock_irqsave(rtc_lock);
 	return 0;
 }
 
@@ -221,7 +224,7 @@ int32_t rtc_close(int32_t fd) {
 	int32_t pid = get_pid();
 
 	// Block interrupts while we modify the linked list
-	cli();
+	spin_lock_irqsave(rtc_lock);
 
 	// Find the item in the linked list corresponding to the current process
 	rtc_client_list_item *prev, *cur;
@@ -244,7 +247,7 @@ int32_t rtc_close(int32_t fd) {
 	}
 
 	// Re-enable interrupts now that we are done touching the linked list
-	sti();
+	spin_unlock_irqsave(rtc_lock);
 	return 0;
 }
 
@@ -260,7 +263,7 @@ int32_t rtc_close(int32_t fd) {
  */
 int32_t rtc_read(int32_t fd, void *buf, int32_t bytes) {
 	// Block interrupts while we use the linked list
-	cli();
+	spin_lock_irqsave(rtc_lock);
 
 	// Find the item in the RTC linked list corresponding to this PID
 	int32_t pid = get_pid();
@@ -278,8 +281,6 @@ int32_t rtc_read(int32_t fd, void *buf, int32_t bytes) {
 
 	// Set the blocking call field in the PCB
 	get_pcb()->blocking_call.type = BLOCKING_CALL_RTC;
-
-	sti();
 
 	// Put the process to sleep and let the RTC handler take care of waking it up
 	process_sleep(pid);
@@ -312,7 +313,7 @@ int32_t rtc_write(int32_t fd, const void *buf, int32_t bytes) {
 		return -1;
 
 	// Clear interrupts before we modify items in the linked list
-	cli();
+	spin_lock_irqsave(rtc_lock);
 
 	// Find the item in the linked list corresponding to the current PID and set the interval
 	//  field to correspond to the frequency
@@ -325,12 +326,12 @@ int32_t rtc_write(int32_t fd, const void *buf, int32_t bytes) {
 			cur->data.interval = BASE_FREQ / freq;
 
 			// In some sense, we have "written" 4 bytes (the frequency) to the virtual RTC device
-			sti();
+			spin_unlock_irqsave(rtc_lock);
 			return sizeof(int32_t);
 		}
 	}
 
 	// If we got here, the RTC was not opened before being written to, so return -1
-	sti();
+	spin_unlock_irqsave(rtc_lock);
 	return -1;
 }
