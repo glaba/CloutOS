@@ -13,12 +13,12 @@ int main ()
     while (1) {
         ece391_fdputs(1, "Us: ");
         int our_len = ece391_read(0, our_buf, 1024);
-        our_packet[0] = 192;
-        our_packet[1] = 168;
-        our_packet[2] = 10;
-        our_packet[3] = 4;
+        our_packet[0] = 172;
+        our_packet[1] = 16;
+        our_packet[2] = 191;
+        our_packet[3] = 177;
         *(uint16_t*)(our_packet + 4) = 80;
-        *(uint16_t*)(our_packet + 6) = 2280;
+        *(uint16_t*)(our_packet + 6) = 2281;
         // Copy the message into our_packet
         int i;
         for (i = 0; i < our_len; i++) {

@@ -15,7 +15,8 @@ void fill_circle(uint32_t *screenBase, uint32_t screenWidth, uint32_t x0, uint32
 void put_string(uint32_t *screen_base, uint32_t screenWidth, unsigned char *c, uint32_t x, uint32_t y, int32_t color);
 void put_char(uint32_t *screen_base, uint32_t screenWidth, unsigned char c, uint32_t x, uint32_t y, uint32_t foreground_color);
 void draw_to_display(uint32_t *screen_base, uint32_t screenWidth, int ans);
-
+char button_pressed(uint8_t x, uint8_t y);
+int char_to_int(char c);
 
 #define sgn(x) ((x < 0) ? -1 : ((x > 0) ? 1 : 0)) /* macro to return the sign of a number */
 #define abs(n) ((n < 0) ? (-n) : (n))             /* macro ro return the abs value of a number */
@@ -190,7 +191,7 @@ void put_char(uint32_t *screen_base, uint32_t screenWidth, unsigned char c, uint
 }
 
 void draw_to_display(uint32_t *screen_base, uint32_t screenWidth, int ans) {
-    int8_t buffer[10];
+    uint8_t buffer[10];
     ece391_itoa(ans, buffer, 10);
     put_string(screen_base, screenWidth, buffer, 50, 92, 0x00000000);
     ece391_update_window(window_id);
@@ -242,31 +243,252 @@ int main () {
     draw_thick_line_horizontal(canvas_buffer, alloc_buffer[2], 0, 345, alloc_buffer[2], 345, 5, 0x006200ee);
     draw_thick_line_horizontal(canvas_buffer, alloc_buffer[2], 0, 395, alloc_buffer[2], 395, 5, 0x006200ee);
     
-    put_string(canvas_buffer, alloc_buffer[2], "X", 15, 213, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "/", 62, 213, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "+", 112, 213, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "C", 159, 213, 0x00000000);
-    
-    put_string(canvas_buffer, alloc_buffer[2], "1", 15, 260, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "2", 62, 260, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "3", 112, 260, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "-", 159, 260, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"X", 15, 213, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"/", 62, 213, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"+", 112, 213, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"C", 159, 213, 0x00000000);
 
-    put_string(canvas_buffer, alloc_buffer[2], "4", 15, 310, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "5", 62, 310, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "6", 112, 310, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "=", 159, 310, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"1", 15, 260, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"2", 62, 260, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"3", 112, 260, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"-", 159, 260, 0x00000000);
 
-    put_string(canvas_buffer, alloc_buffer[2], "7", 15, 360, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "8", 62, 360, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "9", 112, 360, 0x00000000);
-    put_string(canvas_buffer, alloc_buffer[2], "0", 159, 360, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"4", 15, 310, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"5", 62, 310, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"6", 112, 310, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"=", 159, 310, 0x00000000);
 
-    draw_to_display(canvas_buffer, alloc_buffer[2], 100000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"7", 15, 360, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"8", 62, 360, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"9", 112, 360, 0x00000000);
+    put_string(canvas_buffer, alloc_buffer[2], (unsigned char *)"0", 159, 360, 0x00000000);
+
+    draw_to_display(canvas_buffer, alloc_buffer[2], 0);
 
     ece391_update_window(window_id);
     ece391_fdputs (1, (uint8_t*)"Ran the window program\n");
 
+    // int first_number = 0;
+    // int second_number = 0;
+    // char operation;
+    // int cycle = -1;
+    while (1) {
+        uint8_t mouse_buffer[5];
+        char out_buf[10];
+
+        int num_read = ece391_read(2, mouse_buffer, 5);
+
+        if (num_read > 0) {
+            draw_pixel(canvas_buffer, alloc_buffer[2], mouse_buffer[1], mouse_buffer[2], 0xFFFFFFFF);
+            uint8_t x = mouse_buffer[1];
+            uint8_t y = mouse_buffer[2];
+
+            if (y > 200 && y < 250 && x > 0 && x < 50){
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "X", 50, 92, 0x00000000);
+            }
+            else if (y >= 200 && y <= 250 && x > 50 && x <= 100) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "/", 50, 92, 0x00000000);
+            }
+            else if (y >= 200 && y <= 250 && x > 100 && x <= 150) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "+", 50, 92, 0x00000000);
+            }
+            else if (y >= 200 && y <= 250 && x > 150 && x <= 200) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+            }
+            // Second row
+            else if (y > 250 && y <= 300 && x > 0 && x <= 50) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "1", 50, 92, 0x00000000);
+            }
+            else if (y > 250 && y <= 300 && x > 50 && x <= 100) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "2", 50, 92, 0x00000000);
+            }
+            else if (y > 250 && y <= 300 && x > 100 && x <= 150) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "3", 50, 92, 0x00000000);
+            }
+            else if (y > 250 && y <= 300 && x > 150 && x <= 200) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "i", 50, 92, 0x00000000);
+            }
+            // Third row
+            else if (x > 0 && x <= 50 && y > 300 && y <= 350) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "4", 50, 92, 0x00000000);
+            }
+            else if (x > 50 && x <= 100 && y > 300 && y <= 350) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "5", 50, 92, 0x00000000);
+            }
+            else if (x > 100 && x <= 150 && y > 300 && y <= 350) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "6", 50, 92, 0x00000000);
+            }
+            else if (x > 150 && x <= 200 && y > 300 && y <= 350) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "=", 50, 92, 0x00000000);
+            }
+            // Fourth row
+            else if (x > 0 && x <= 50 && y > 350 && y <= 400) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "7", 50, 92, 0x00000000);
+            }
+            else if (x > 50 && x <= 100 && y > 350 && y <= 400) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "8", 50, 92, 0x00000000);
+            }
+            else if (x > 100 && x <= 150 && y > 350 && y <= 400) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "9", 50, 92, 0x00000000);
+            }
+            else if (x > 150 && x <= 200 && y > 350 && y <= 400) {
+                fill_rect(canvas_buffer, alloc_buffer[2], 0, 15, 200, 160, 0xFFFFFFFF);
+                put_string(canvas_buffer, alloc_buffer[2], "0", 50, 92, 0x00000000);
+            }
+            ece391_update_window(window_id);
+        }
+        // uint8_t mouse_buffer[5];  // 0 - window id, 1 - relative x, 2 - relative y, 3 - left click, 4 - right click
+        // int num_read;
+        // else if (ece391_read(2, mouse_buffer, 5) > 0) {
+        //     draw_pixel(canvas_buffer, alloc_buffer[2], mouse_buffer[1], mouse_buffer[2], 0x00000000);
+        //     // first_number = char_to_int(button_pressed(mouse_buffer));
+        //     put_string(canvas_buffer, alloc_buffer[2], button_pressed(mouse_buffer[1], mouse_buffer[2]), 50, 92, 0x00000000);
+        //     // draw_to_display(canvas_buffer, alloc_buffer[2], first_number);
+        //     ece391_update_window(window_id);
+        //     cycle++;
+        //     // continue;
+        // }
+        // switch (cycle) {
+        //     case 0:
+        //         first_number = char_to_int(button_pressed(mouse_buffer));
+        //         draw_to_display(canvas_buffer, alloc_buffer[2], first_number);
+        // //         cycle++;
+        //         break;
+        //     case 1:
+        //         operation = button_pressed(mouse_buffer);
+        //         put_string(canvas_buffer, alloc_buffer[2], operation, 50, 92, 0x00000000);
+        // //         cycle++;
+        //         break;
+        //     case 2:
+        //         second_number = char_to_int(button_pressed(mouse_buffer));
+        //         draw_to_display(canvas_buffer, alloc_buffer[2], first_number);
+        //         cycle = -1;
+        //         switch (operation)
+        //         {
+        //             case '+':
+        //                 draw_to_display(canvas_buffer, alloc_buffer[2], first_number + second_number);
+        //                 break;
+        //             default:
+        //                 break;
+        //         }
+        //         break;
+        //     default:
+        //         cycle = -1;
+        //         break;
+        // }
+
+    }
+
     return 0;
+}
+
+// char button_pressed(uint8_t x, uint8_t y) {
+//     // int x = buffer[1];
+//     // int y = buffer[2];
+
+//     // First row
+//     if (x >= 0 && x <= 50 && y >= 200 && y <= 250) {
+//         return "X";
+//     }
+//     if (x > 50 && x <= 100 && y >= 200 && y <= 250) {
+//         return "/";
+//     }
+//     if (x > 100 && x <= 150 && y >= 200 && y <= 250) {
+//         return "+";
+//     }
+//     if (x > 150 && x <= 200 && y >= 200 && y <= 250) {
+//         return "C";
+//     }
+//     // Second row
+//     if (x >= 0 && x <= 50 && y > 250 && y <= 300) {
+//         return "1";
+//     }
+//     if (x > 50 && x <= 100 && y > 250 && y <= 300) {
+//         return "2";
+//     }
+//     if (x > 100 && x <= 150 && y > 250 && y <= 300) {
+//         return "3";
+//     }
+//     if (x > 150 && x <= 200 && y > 250 && y <= 300) {
+//         return "-";
+//     }
+//     // Third row
+//     if (x >= 0 && x <= 50 && y > 300 && y <= 350) {
+//         return "4";
+//     }
+//     if (x > 50 && x <= 100 && y > 300 && y <= 350) {
+//         return "5";
+//     }
+//     if (x > 100 && x <= 150 && y > 300 && y <= 350) {
+//         return "6";
+//     }
+//     if (x > 150 && x <= 200 && y > 300 && y <= 350) {
+//         return "=";
+//     }
+//     // Fourth row
+//     if (x >= 0 && x <= 50 && y > 350 && y <= 400) {
+//         return "7";
+//     }
+//     if (x > 50 && x <= 100 && y > 350 && y <= 400) {
+//         return "8";
+//     }
+//     if (x > 100 && x <= 150 && y > 350 && y <= 400) {
+//         return "9";
+//     }
+//     if (x > 150 && x <= 200 && y > 350 && y <= 400) {
+//         return "0";
+//     }
+//     return "";
+// }
+
+int char_to_int(char c) {
+    switch (c) {
+        case '1':
+            return 1;
+            break;
+        case '2':
+            return 2;
+            break;
+        case '3':
+            return 3;
+            break;
+        case '4':
+            return 4;
+            break;
+        case '5':
+            return 5;
+            break;
+        case '6':
+            return 6;
+            break;
+        case '7':
+            return 7;
+            break;
+        case '8':
+            return 8;
+            break;
+        case '9':
+            return 9;
+            break;
+        case '0':
+            return 0;
+            break;
+        default:
+            return -1;
+    }
 }
 

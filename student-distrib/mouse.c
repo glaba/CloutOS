@@ -203,7 +203,8 @@ void mouse_handler() {
 	mouse_event(mouse.x, mouse.y);
 
 	// printf("Mouse.ata: x: %d   y: %d   scroll: %d   left: %d   right: %d\n", mouse.x, mouse.y, mouse.scroll, mouse.left_click, mouse.right_click);
-	draw_pixel(svga.frame_buffer, svga.width, mouse.x, mouse.y, 0xFFFFFFFF);
+	if (active_tty == 4)
+		draw_pixel(svga.frame_buffer, svga.width, mouse.x, mouse.y, 0xFFFFFFFF);
 	// svga_update(0, 0, svga.width, svga.height);
 	mouse.old_x = mouse.x;
 	mouse.old_y = mouse.y;

@@ -447,7 +447,7 @@ int32_t sigreturn() {
  * SIDE EFFECTS: pages in video memory
  */
 int32_t allocate_window(int32_t fd, uint32_t *buf) {
-	printf("ALLOCATE WINDOW\n");
+	// printf("ALLOCATE WINDOW\n");
 	uint32_t* buffer;
 	if ((buffer = alloc_window(buf[0], buf[1], buf[2], buf[3], &buf[4], get_pid())) == NULL)	
 		return FAIL;
@@ -459,7 +459,7 @@ int32_t allocate_window(int32_t fd, uint32_t *buf) {
  * System call that instructs the OS to redraw the window of given ID
  */
 int32_t update_window(int32_t id) {
-	printf("UPDATE WINDOW ID: %d\n", id);
+	// printf("UPDATE WINDOW ID: %d\n", id);
 	if (redraw_window(id) == -1)
 		return FAIL;
 	return PASS;
