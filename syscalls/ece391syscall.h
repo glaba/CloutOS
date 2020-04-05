@@ -21,6 +21,9 @@ extern int32_t ece391_getargs (uint8_t* buf, int32_t nbytes);
 extern int32_t ece391_vidmap (uint8_t** screen_start);
 extern int32_t ece391_set_handler (int32_t signum, void* handler);
 extern int32_t ece391_sigreturn (void);
+extern int32_t ece391_allocate_window(int32_t fd, void *buf);
+extern int32_t ece391_update_window(int32_t id);
+
 
 enum signums {
 	DIV_ZERO = 0,

@@ -20,6 +20,8 @@
 
 // The number of text-based TTYs (1-based indices)
 #define NUM_TEXT_TTYS 3
+// The total number of TTYs
+#define NUM_TTYS 4
 
 // Magic number that must appear in the first 4 bytes of all executables
 #define ELF_MAGIC 0x464C457F
@@ -40,6 +42,10 @@
 // The static file descriptors assigned to stdin and stdout for all programs
 #define STDIN  0
 #define STDOUT 1
+#define MOUSE_FD 2
+#define UDP_FD 3
+
+extern void *vid_mem_buffers[NUM_TTYS];
 
 typedef struct fops_t {
 	int32_t (*open )(const uint8_t*);
@@ -128,6 +134,7 @@ typedef struct blocking_call_t blocking_call_t;
 #define BLOCKING_CALL_RTC           1
 #define BLOCKING_CALL_PROCESS_EXEC  2
 #define BLOCKING_CALL_TERMINAL_READ 3
+#define BLOCKING_CALL_UDP_READ      4
 
 typedef struct pcb_t {
 	// A dynamic array of the files that are being used by the process
@@ -144,8 +151,6 @@ typedef struct pcb_t {
 	int32_t parent_pid;
 	// The buffer of arguments
 	int8_t args[TERMINAL_SIZE];
-	// The virtual address of paged in video memory
-	void *vid_mem;
 	// The state of the process (either PROCESS_RUNNING, PROCESS_SLEEPING, or PROCESS_STOPPING)
 	uint8_t state;
 	// If the state is PROCESS_SLEEPING (due to a blocking call), data associated with the blocking call
@@ -175,6 +180,8 @@ int32_t process_vidmap(uint8_t **screen_start);
 // Marks the provided process as asleep and spins until the current quantum is complete,
 //  in the case that the current quantum is the process being put to sleep
 int32_t process_sleep(int32_t pid);
+int32_t unmap_process(int32_t pid);
+int32_t map_process(int32_t pid);
 // Wakes up the process of provided PID
 int32_t process_wake(int32_t pid);
 // Checks if the given region lies within the memory assigned to the process with the given PID

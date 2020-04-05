@@ -6,6 +6,11 @@
 #include "kheap.h"
 #include "i8259.h"
 #include "interrupt_service_routines.h"
+#include "graphics/graphics.h"
+#include "graphics/VMwareSVGA.h"
+#include "window_manager/window_manager.h"
+#include "mouse.h"
+#include "network/udp.h"
 
 // A dynamic array indicating which PIDs are currently in use by running programs
 // Each index corresponds to a PID and contains a pointer to that process' PCB
@@ -20,16 +25,21 @@ static struct fops_t stdin_table  = {.open = NULL, .close = NULL,
 static struct fops_t stdout_table = {.open = NULL, .close = NULL,
 	                                 .read = NULL,
 	                                 .write = (int32_t (*)(int32_t, const void*, int32_t))&terminal_write};
+static struct fops_t mouse_table =  {.open = NULL, .close = NULL,
+	                                 .read = mouse_driver_read,
+	                                 .write = NULL};
+static struct fops_t udp_table   =  {.open = NULL, .close = NULL,
+                                     .read = udp_read, .write = udp_write};
 
 // Pointers to the video memory back buffers for each of the TTYs, which programs will draw to
 //  when their TTY is not active
-static void *vid_mem_buffers[NUM_TEXT_TTYS];
+void *vid_mem_buffers[NUM_TTYS];
 
 // A spinlock that prevents the TTY from changing while it is owned
 struct spinlock_t tty_spin_lock = SPIN_LOCK_UNLOCKED;
 
 // Indicates whether or not the shell program has been started for the TTY of each index
-static int tty_inited[NUM_TEXT_TTYS];
+static int shell_started[NUM_TEXT_TTYS];
 
 // The currently active TTY
 uint8_t active_tty = 1;
@@ -46,19 +56,20 @@ int init_processes() {
 		return -1;
 
 	// Create video memory buffers for the 3 text TTYs
-	// We will place all of them within one single 4MB page
-	int32_t vid_mem_buffer_page = get_open_page();
-	if (vid_mem_buffer_page == -1)
-		return -1;
-
-	// Map in the page
-	identity_map_containing_region((void*)(vid_mem_buffer_page * LARGE_PAGE_SIZE), LARGE_PAGE_SIZE,
-		PAGE_GLOBAL | PAGE_READ_WRITE);
-
-	// The buffers will simply be sequential within the 4MB page
+	// We will place each of them within its own page (12 MB total)
 	int i;
-	for (i = 0; i < NUM_TEXT_TTYS; i++)
-		vid_mem_buffers[i] = (void*)(vid_mem_buffer_page * LARGE_PAGE_SIZE + VIDEO_SIZE * i);
+	for (i = 0; i < NUM_TTYS; i++) {
+		int32_t vid_mem_buffer_page = get_open_page();
+		if (vid_mem_buffer_page == -1)
+			return -1;
+		
+		// Map in the page
+		identity_map_containing_region((void*)(vid_mem_buffer_page * LARGE_PAGE_SIZE), LARGE_PAGE_SIZE,
+			PAGE_GLOBAL | PAGE_READ_WRITE);
+		
+		// Store a pointer to the buffer
+		vid_mem_buffers[i] = (void*)(vid_mem_buffer_page * LARGE_PAGE_SIZE);
+	}
 
 	// Clear the TTYs that are not currently active
 	for (i = 0; i < NUM_TEXT_TTYS; i++) {
@@ -67,9 +78,9 @@ int init_processes() {
 	}
 
 	// List TTY2 and TTY3 as uninitialized
-	tty_inited[0] = 1;
+	shell_started[0] = 1;
 	for (i = 1; i < NUM_TEXT_TTYS; i++) {
-		tty_inited[i] = 0;
+		shell_started[i] = 0;
 	}
 
 	return 0;
@@ -188,12 +199,15 @@ process_context *get_user_context() {
  */
 void *get_vid_mem(uint8_t tty) {
 	// Check that TTY is valid
-	if (tty < 1 || tty > NUM_TEXT_TTYS)
+	if (tty < 1 || tty > NUM_TTYS)
 		return NULL;
 
-	if (active_tty == tty)
-		return (void*)VIDEO;
-	else
+	if (active_tty == tty) {
+		if (vga_text_enabled)
+			return (void*)VIDEO;
+		else
+			return (void*)svga.frame_buffer;
+	} else
 		return vid_mem_buffers[tty - 1];
 }
 
@@ -216,16 +230,16 @@ int8_t is_userspace_region_valid(void *ptr, uint32_t size, int32_t pid) {
 		uint32_t start_addr = pcb->large_page_mappings.data[i].virt_index * LARGE_PAGE_SIZE;
 
 		// Check if it is within the virtual address given by this page
-		if (((uint32_t)ptr < start_addr) || 
-		    ((uint32_t)ptr + size >= start_addr + LARGE_PAGE_SIZE)) {
+		if (((uint32_t)ptr >= start_addr) && 
+		    ((uint32_t)ptr + size < start_addr + LARGE_PAGE_SIZE)) {
 
 			spin_unlock_irqsave(pcb_spin_lock);
-			return -1;
+			return 0;
 		}
 	}
 
 	spin_unlock_irqsave(pcb_spin_lock);
-	return 0;
+	return -1;
 }
 
 /*
@@ -269,15 +283,6 @@ int32_t map_process(int32_t pid) {
 			1, PAGE_READ_WRITE | PAGE_USER_LEVEL);
 	}
 
-	// Map in video memory if it is supposed to be mapped in
-	if (pcb->vid_mem != NULL) {
-		// Check whether it should write to video memory or a buffer, and get
-		//  the physical address corresponding to the correct option
-		void *phys_addr = get_vid_mem(pcb->tty);
-
-		map_video_mem_user(phys_addr);
-	}
-
 	spin_unlock_irqsave(pcb_spin_lock);
 	return 0;
 }
@@ -302,11 +307,6 @@ int32_t unmap_process(int32_t pid) {
 	for (i = 0; i < pcb->large_page_mappings.length; i++) {
 		// Unmap the region first, since map_region checks if the region is already paged in
 		unmap_region((void*)(pcb->large_page_mappings.data[i].virt_index * LARGE_PAGE_SIZE), 1);
-	}
-
-	// Unmap video memory if it was mapped in
-	if (pcb->vid_mem != NULL) {
-		unmap_video_mem_user();
 	}
 
 	spin_unlock_irqsave(pcb_spin_lock);
@@ -351,6 +351,9 @@ int32_t free_pid(int32_t pid) {
 
 	// Free the kernel stack for this process
 	kfree(kernel_stack_top);
+
+	// Free all window memory here
+	destroy_windows_by_pid(pcb->pid);
 
 	// Mark the current PID as unused and attempt to remove items from the end of the pcbs array
 	pcb->pid = -1;
@@ -529,7 +532,6 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 	pcb->tty = parent_tty;
 	pcb->state = PROCESS_RUNNING;
 	pcb->parent_pid = parent_pid;
-	pcb->vid_mem = NULL;
 	pcb->kernel_stack_base = kernel_stack_base;
 
 	// Initialize the signal_handlers to NULL and signal_statuses to SIGNAL_OPEN
@@ -539,11 +541,15 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 	}
 
 	// Create file_t objects for stdin and stdout
-	file_t stdin_file, stdout_file;
+	file_t stdin_file, stdout_file, mouse_file, udp_file;
 	stdin_file.in_use = 1;
 	stdin_file.fd_table = &stdin_table;
 	stdout_file.in_use = 1;
 	stdout_file.fd_table = &stdout_table;
+	mouse_file.in_use = 1;
+	mouse_file.fd_table = &mouse_table;
+	udp_file.in_use = 1;
+	udp_file.fd_table = &udp_table;
 
 	// Then, initialize the files dynamic array and add the two elements, checking all allocations on the way
 	DYN_ARR_INIT(file_t, pcb->files);
@@ -552,7 +558,11 @@ int32_t process_execute(const char *command, uint8_t has_parent, uint8_t tty, ui
 		goto process_execute_fail;
 	}
 	// Adds the two elements, relying on short circuit evaluation to break if pushing fails
-	if (DYN_ARR_PUSH(file_t, pcb->files, stdin_file) < 0 || DYN_ARR_PUSH(file_t, pcb->files, stdout_file) < 0) {
+	if (DYN_ARR_PUSH(file_t, pcb->files, stdin_file) < 0 || 
+		DYN_ARR_PUSH(file_t, pcb->files, stdout_file) < 0 ||
+		DYN_ARR_PUSH(file_t, pcb->files, mouse_file) < 0 ||
+		DYN_ARR_PUSH(file_t, pcb->files, udp_file) < 0) {
+
 		kfree(kernel_stack_base - KERNEL_STACK_SIZE);
 		DYN_ARR_DELETE(pcb->files);
 		goto process_execute_fail;
@@ -670,50 +680,6 @@ process_execute_fail:
 }
 
 /*
- * Maps video memory for the current userspace program to either video memory or a buffer depending
- *  on whether or not the current program is in the active TTY
- * Must be called from the kernel stack of a userspace program
- *
- * OUTPUTS: screen_start: a pointer to pointer that contains the virtual address of video memory
- *                        after it is paged in
- * SIDE EFFECTS: may modify the page directory
- */
-int32_t process_vidmap(uint8_t **screen_start) {
-	spin_lock_irqsave(pcb_spin_lock);
-
-	pcb_t *pcb = get_pcb();
-
-	// Check if video is already mapped in
-	if (pcb->vid_mem != NULL) {
-		spin_unlock_irqsave(pcb_spin_lock);
-		return -1;
-	}
-
-	// Check that the provided pointer is valid
-	if (is_userspace_region_valid((void*)screen_start, 1, pcb->pid) == -1) {
-		spin_unlock_irqsave(pcb_spin_lock);
-		return -1;
-	}
-
-	// Check whether or not the process should be writing directly to video memory
-	//  or if it should be writing to a buffer (based on whether or not it is in the active TTY)
-	void *phys_addr = get_vid_mem(pcb->tty);
-
-	if (map_video_mem_user(phys_addr) == -1) {
-		spin_unlock_irqsave(pcb_spin_lock);
-		return -1;
-	}
-
-	// Copy the value into the PCB and the return value
-	*screen_start = (uint8_t*)VIDEO_USER_VIRT_ADDR;
-	get_pcb()->vid_mem = (void*)VIDEO_USER_VIRT_ADDR;
-
-	// Return success
-	spin_unlock_irqsave(pcb_spin_lock);
-	return 0;
-}
-
-/*
  * Marks the provided process as asleep and spins until the current quantum is complete,
  *  in the case that the current quantum is the process being put to sleep
  *
@@ -727,6 +693,9 @@ int32_t process_sleep(int32_t pid) {
 	pcb->state = PROCESS_SLEEPING;
 
 	spin_unlock_irqsave(pcb_spin_lock);
+
+	// Enable the timer IRQ so that the scheduler can pick is up
+	sti();
 
 	// Spin while the process is in the sleep state 
 	// The scheduler will take us out of this loop
@@ -745,12 +714,19 @@ int32_t process_sleep(int32_t pid) {
  * Wakes up the process of provided PID
  * 
  * INPUTS: pid: the PID of the process to put to sleep
- * OUTPUTS: 0 on success, which is always
+ * OUTPUTS: 0 on success, and -1 on failure
  */
 int32_t process_wake(int32_t pid) {
 	spin_lock_irqsave(pcb_spin_lock);
 
 	pcb_t *pcb = get_pcb_from_pid(pid);
+
+	// Check that the process is sleeping, it should not be woken if stopping
+	if (pcb->state != PROCESS_SLEEPING) {
+		spin_unlock_irqsave(pcb_spin_lock);
+		return -1;
+	}
+
 	pcb->state = PROCESS_RUNNING;
 
 	spin_unlock_irqsave(pcb_spin_lock);
@@ -766,42 +742,44 @@ int32_t process_wake(int32_t pid) {
  * OUTPUTS: -1 if the tty was invalid / we couldn't switch for some reason, and 0 on success
  */
 int32_t tty_switch(uint8_t tty) {
-	if (tty == 0 || tty > NUM_TEXT_TTYS)
+	if (tty == 0 || tty > NUM_TEXT_TTYS + 1)
 		return -1;
 
 	spin_lock_irqsave(tty_spin_lock);
+	if (tty == 4) {
+		GUI_enabled = 1;
+		// init_desktop();
+		int32_t old_tty = active_tty;
+		uint32_t *vid_mem = (uint32_t*)svga.frame_buffer;
+		uint32_t *old_tty_buffer = (uint32_t*)vid_mem_buffers[old_tty - 1];
+		uint32_t *new_tty_buffer = (uint32_t*)vid_mem_buffers[tty - 1];	
+		memcpy(old_tty_buffer, vid_mem, svga.width * svga.height * 4);
+		memcpy(vid_mem, new_tty_buffer, svga.width * svga.height * 4);	
 
+
+		active_tty = tty;
+		compositor();
+		spin_unlock_irqsave(tty_spin_lock);
+		sti();
+		return 0;
+	}
+	GUI_enabled = 0;
 	int32_t old_tty = active_tty;
 
-	uint8_t *vid_mem = (uint8_t*)VIDEO;
-	uint8_t *old_tty_buffer = (uint8_t*)vid_mem_buffers[old_tty - 1];
-	uint8_t *new_tty_buffer = (uint8_t*)vid_mem_buffers[tty - 1];
+	uint32_t *vid_mem = (uint32_t*)svga.frame_buffer;
+	uint32_t *old_tty_buffer = (uint32_t*)vid_mem_buffers[old_tty - 1];
+	uint32_t *new_tty_buffer = (uint32_t*)vid_mem_buffers[tty - 1];
 
+	// BELOW METHOD WORKED FINE FOR TEXT MODE TTY, MEMCPY IS FASTER FOR GRAPHICS
 	// Copy video memory into the buffer for active_tty (the old TTY)
 	//  and copy the buffer for tty into video memory
-	int i;
-	for (i = 0; i < VIDEO_SIZE; i++) {
-		old_tty_buffer[i] = vid_mem[i];
-		vid_mem[i] = new_tty_buffer[i];
-	}
-
-	spin_lock_irqsave(pcb_spin_lock);
-
-	// Remap the video memory for the currently running process if it is in the old TTY
-	//  or if it's in the new TTY
-	pcb_t *pcb = get_pcb();
-	if (pcb->vid_mem != NULL) {
-		unmap_video_mem_user();
-		
-		// If its TTY is not the new TTY, have it write to the buffer for that TTY
-		if (pcb->tty != tty)
-			map_video_mem_user(vid_mem_buffers[pcb->tty - 1]);
-		// Otherwise, we are switching to this process' TTY, and it should map directly to video memory
-		else
-			map_video_mem_user(vid_mem);
-	}
-
-	spin_unlock_irqsave(pcb_spin_lock);
+	// int i;
+	// for (i = 0; i < svga.width * svga.height * 4; i++) {
+	// 	old_tty_buffer[i] = vid_mem[i];
+	// 	vid_mem[i] = new_tty_buffer[i];
+	// }
+	memcpy(old_tty_buffer, vid_mem, svga.width * svga.height * 4);
+	memcpy(vid_mem, new_tty_buffer, svga.width * svga.height * 4);
 
 	// Update the active TTY
 	active_tty = tty;
@@ -814,8 +792,8 @@ int32_t tty_switch(uint8_t tty) {
 
 	// If there is no shell running in this TTY, start one, saving the context so that we can correctly
 	//  return back to here
-	if (!tty_inited[tty - 1]) {
-		tty_inited[tty - 1] = 1;
+	if (tty <= NUM_TEXT_TTYS && !shell_started[tty - 1]) {
+		shell_started[tty - 1] = 1;
 		// Start the new shell
 		process_execute("shell", 0, tty, 1);
 	}
@@ -886,12 +864,6 @@ int32_t context_switch(int32_t pid) {
 	);
 
 context_switch_return:
-	spin_lock_irqsave(pcb_spin_lock);
-	
-	if (timer_linkage_esp == tss.esp0)
-		handle_signals();
-
-	spin_unlock_irqsave(pcb_spin_lock);
 	return 0;
 }
 
@@ -930,9 +902,6 @@ void scheduler_interrupt_handler() {
 
 	// If we found no process to switch to, just keep going with this process
 	if (next_pid == -1) {
-		// Handle signals only if the timer interrupt for scheduling is the only thing on the stack
-		if (timer_linkage_esp == tss.esp0)
-			handle_signals();
 		sti();
 		return;
 	}

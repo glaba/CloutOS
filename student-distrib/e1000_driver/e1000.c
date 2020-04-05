@@ -121,8 +121,10 @@ inline int e1000_irq_handler(pci_function *func) {
 	uint32_t interrupt_cause = GET_32(eth_mmio_base, ETH_INT_CAUSE_REGISTER);
 
 	// The interrupt could be for both rx and tx, so OR the result of the two
-	return e1000_rx_irq_handler(eth_mmio_base, interrupt_cause, &e1000_eth_device) ||
-	       e1000_tx_irq_handler(eth_mmio_base, interrupt_cause);
+	int retval = e1000_rx_irq_handler(eth_mmio_base, interrupt_cause, &e1000_eth_device) &&
+	             e1000_tx_irq_handler(eth_mmio_base, interrupt_cause);
+
+	return retval;
 }
 
 /*

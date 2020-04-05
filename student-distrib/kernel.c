@@ -7,7 +7,6 @@
 #include "lib.h"
 #include "i8259.h"
 #include "debug.h"
-#include "tests.h"
 #include "keyboard.h"
 #include "paging.h"
 #include "rtc.h"
@@ -19,17 +18,23 @@
 #include "pit.h"
 #include "network/arp.h"
 #include "network/eth_device.h"
+#include "graphics/VMwareSVGA.h"
+#include "mouse.h"
+#include "graphics/graphics.h"
+#include "window_manager/window_manager.h"
 #include "signals.h"
-
-#define RUN_TESTS
 
 /* Macros. */
 /* Check if the bit BIT in FLAGS is set. */
 #define CHECK_FLAG(flags, bit)   ((flags) & (1 << (bit)))
 
+// Whether or not the VGA text display is enabled
+int vga_text_enabled = 1;
+
 /* Check if MAGIC is valid and print the Multiboot information structure
    pointed by ADDR. */
 void entry(unsigned long magic, unsigned long addr) {
+
 
 	multiboot_info_t *mbi;
 
@@ -163,7 +168,9 @@ void entry(unsigned long magic, unsigned long addr) {
 
 	/* Initialize keyboard */
 	init_keyboard();
-	/* Initialize RTC */
+	/* Initialize mouse */
+	init_mouse();
+	/* Initialize RTC (will run test_interrupts() only for Checkpoint 1) */
 	init_rtc();
 
 	/* Enable interrupts */
@@ -185,6 +192,7 @@ void entry(unsigned long magic, unsigned long addr) {
 	init_arp();
 
 	/* Initialize E1000 PCI driver and Ethernet device in the correct order */
+	os_ready &= (register_pci_driver(svga_driver) == 0);
 	os_ready &= (register_pci_driver(e1000_driver) == 0);
 	enumerate_pci_devices();
 	uint32_t e1000_eth_dev_id = (uint32_t)register_eth_dev(&e1000_eth_device);
@@ -196,13 +204,19 @@ void entry(unsigned long magic, unsigned long addr) {
 	/* Initialize signals */
 	init_signals();
 
+	/* Init the window manager */
+	os_ready &= init_window_manager();
+
 	if (os_ready) {
-#ifdef RUN_TESTS
-		/* Run tests */
-		launch_tests();
-#endif
+		init_graphics();
+		// GUI_enabled = 1;
+				
+		clear();
+		// init_desktop();
+
 		enable_scheduling();
 
+		// process_execute("window", 0);
 		/* Execute the first program ("shell") ... */
 		process_execute("shell", 0, 1, 0);
 	}

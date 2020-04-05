@@ -3,6 +3,8 @@
 #include "keyboard.h"
 #include "paging.h"
 #include "kheap.h"
+#include "window_manager/window_manager.h"
+
 
 // Instead of return -1 or 0, used labels/macros
 #define PASS 0
@@ -50,14 +52,22 @@ void sys_call(uint32_t syscall_number, uint32_t param1, uint32_t param2, uint32_
 			syscall_set_retval(getargs((uint8_t*)param1, (int32_t)param2)); 
 			break;
 		case 8: 
-			syscall_set_retval(vidmap((uint8_t**)param1)); 
+			syscall_set_retval(FAIL);
 			break;
 		case 9: 
 			syscall_set_retval(set_handler((int32_t)param1, (void*)param2)); 
 			break;
-		case 10: syscall_set_retval(sigreturn()); break;
+		case 10: 
+			syscall_set_retval(sigreturn()); 
+			break;
+		case 11:
+			syscall_set_retval(allocate_window((int32_t)param1, (uint32_t*)param2));
+			break;
+		case 12: 
+			syscall_set_retval(update_window((int32_t)param1));
+			break;
 		default: 
-			syscall_set_retval(-1);
+			syscall_set_retval(FAIL);
 			break;
 	}
 }
@@ -382,20 +392,7 @@ int32_t getargs(uint8_t* buf, int32_t nbytes) {
 }
 
 /*
- * System call that maps video memory for user-level programs
- *
- * OUTPUTS: screen_start: stores the virtual memory address that video memory is paged into
- * RETURNS: -1 on failure and 0 on success
- * SIDE EFFECTS: pages in video memory
- */
-int32_t vidmap(uint8_t **screen_start) {
-	SYSCALL_DEBUG("Begin vidmap system call\n");
-
-	return process_vidmap(screen_start);
-}
-
-/*
- * Currently unimplemented
+ * Sets the signal handler for the provided signal number
  */
 int32_t set_handler(int32_t signum, void *handler_address) {
 	SYSCALL_DEBUG("Begin set_handler system call\n");
@@ -429,7 +426,7 @@ int32_t set_handler(int32_t signum, void *handler_address) {
 }
 
 /*
- * Currently unimplemented
+ * Cleans up the userspace stack after a signal handler was called
  */
 int32_t sigreturn() {
 	SYSCALL_DEBUG("Begin sigreturn system call\n");
@@ -440,4 +437,30 @@ int32_t sigreturn() {
 
 	// Set the current value of EAX as the return value, since we don't want to overwrite it
 	return get_user_context()->eax;
+}
+
+/*
+ * System call that maps video memory for user-level programs
+ *
+ * OUTPUTS: screen_start: stores the virtual memory address that video memory is paged into
+ * RETURNS: -1 on failure and 0 on success
+ * SIDE EFFECTS: pages in video memory
+ */
+int32_t allocate_window(int32_t fd, uint32_t *buf) {
+	// printf("ALLOCATE WINDOW\n");
+	uint32_t* buffer;
+	if ((buffer = alloc_window(buf[0], buf[1], buf[2], buf[3], &buf[4], get_pid())) == NULL)	
+		return FAIL;
+	buf[5] = (uint32_t)buffer;
+	return PASS;
+}
+
+/*
+ * System call that instructs the OS to redraw the window of given ID
+ */
+int32_t update_window(int32_t id) {
+	// printf("UPDATE WINDOW ID: %d\n", id);
+	if (redraw_window(id) == -1)
+		return FAIL;
+	return PASS;
 }

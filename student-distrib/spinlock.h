@@ -41,4 +41,4 @@ inline void spin_lock(struct spinlock_t* lock);
 // Unlocks the provided spinlock (does not consider interrupts)
 inline void spin_unlock(struct spinlock_t* lock);
 
-#endif 
+#endif

@@ -2,7 +2,6 @@
 
 static unsigned int page_directory[PAGE_DIRECTORY_SIZE];
 static unsigned int video_page_table[PAGE_TABLE_SIZE] __attribute__((aligned (PAGE_ALIGNMENT)));
-static unsigned int user_video_page_table[PAGE_TABLE_SIZE] __attribute__((aligned (PAGE_ALIGNMENT)));
 
 // A struct which represents a large 4MB page in physical memory, and keeps track of other pages near it
 typedef struct large_page {
@@ -178,47 +177,6 @@ void unmap_containing_region(void *start_addr, uint32_t size) {
  */
 int32_t identity_map_containing_region(void *start_addr, uint32_t size, unsigned int flags) {
 	return map_containing_region(start_addr, start_addr, size, flags);
-}
-
-/*
- * Maps the virtual region starting at 192MB into video memory / video memory buffer so that
- *  a userspace program can access it
- *
- * INPUTS: phys_addr: a 4KB aligned address that will serve as a video memory buffer
- * RETURNS: 0 on success and -1 otherwise
- */
-int32_t map_video_mem_user(void *phys_addr) {
-	// First, check that phys_addr is 4KB aligned
-	if ((uint32_t)phys_addr % NORMAL_PAGE_SIZE != 0)
-		return -1;
-
-	// Then, fill in the user_video_page_table to point to the desired physical address
-	int i;
-	for (i = 0; i < VIDEO_SIZE / NORMAL_PAGE_SIZE; i++) {
-		// The page is present, and points to an offset from phys_addr
-		user_video_page_table[i] = ((uint32_t)phys_addr + i * NORMAL_PAGE_SIZE) |
-			PAGE_READ_WRITE | PAGE_USER_LEVEL | PAGE_PRESENT;
-	}
-
-	// Set the page directory entry
-	page_directory[VIDEO_USER_VIRT_ADDR >> 22] = (uint32_t)(&user_video_page_table) |
-		PAGE_READ_WRITE | PAGE_USER_LEVEL | PAGE_PRESENT;
-
-	// Reload the page directory
-	write_cr3(&page_directory);
-
-	// We always succeed, for now
-	return 0;
-}
-
-/*
- * Unmaps the video memory paged in for userspace programs
- */
-void unmap_video_mem_user() {
-	page_directory[VIDEO_USER_VIRT_ADDR >> 22] = 0;
-
-	// Reload the page directory
-	write_cr3(&page_directory);
 }
 
 /*

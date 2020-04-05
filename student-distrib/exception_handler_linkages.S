@@ -34,63 +34,63 @@
 	add $2, %esp; \
 	popw %fs; \
 
-.globl divide_zero_linkage
+.global divide_zero_linkage;
 divide_zero_linkage: 
 	common_interrupt_enter
 	call divide_zero_handler
 	common_interrupt_exit
 	iret
 
-.globl debug_linkage
+.global debug_linkage;
 debug_linkage: 
 	common_interrupt_enter
 	call debug_handler
 	common_interrupt_exit
 	iret
 
-.globl nminterrupt_linkage
+.global nminterrupt_linkage;
 nminterrupt_linkage: 
 	common_interrupt_enter
 	call nminterrupt_handler
 	common_interrupt_exit
 	iret
 
-.globl breakpoint_linkage
+.global breakpoint_linkage;
 breakpoint_linkage: 
 	common_interrupt_enter
 	call breakpoint_handler
 	common_interrupt_exit
 	iret
 
-.globl overflow_linkage
+.global overflow_linkage;
 overflow_linkage: 
 	common_interrupt_enter
 	call overflow_handler
 	common_interrupt_exit
 	iret
 
-.globl bound_range_exceeded_linkage
+.global bound_range_exceeded_linkage;
 bound_range_exceeded_linkage: 
 	common_interrupt_enter
 	call bound_range_exceeded_handler
 	common_interrupt_exit
 	iret
 
-.globl invalid_opcode_linkage
+.global invalid_opcode_linkage;
 invalid_opcode_linkage: 
 	common_interrupt_enter
 	call invalid_opcode_handler
 	common_interrupt_exit
 	iret
 
-.globl device_na_linkage
+.global device_na_linkage;
 device_na_linkage: 
 	common_interrupt_enter
 	call device_na_handler
 	common_interrupt_exit
 	iret
 
-.globl double_fault_linkage
+.global double_fault_linkage;
 double_fault_linkage:
 	add $4, %esp # Throw away the error code 
 	common_interrupt_enter
@@ -98,14 +98,14 @@ double_fault_linkage:
 	common_interrupt_exit
 	iret
 
-.globl coprocessor_segment_overrun_linkage
+.global coprocessor_segment_overrun_linkage;
 coprocessor_segment_overrun_linkage: 
 	common_interrupt_enter
 	call coprocessor_segment_overrun_handler
 	common_interrupt_exit
 	iret
 
-.globl invalid_tss_linkage
+.global invalid_tss_linkage;
 invalid_tss_linkage: 
 	add $4, %esp # Throw away the error code 
 	common_interrupt_enter
@@ -113,7 +113,7 @@ invalid_tss_linkage:
 	common_interrupt_exit
 	iret
 
-.globl segment_np_linkage
+.global segment_np_linkage;
 segment_np_linkage: 
 	add $4, %esp # Throw away the error code 
 	common_interrupt_enter
@@ -121,7 +121,7 @@ segment_np_linkage:
 	common_interrupt_exit
 	iret
 
-.globl stack_segment_fault_linkage
+.global stack_segment_fault_linkage;
 stack_segment_fault_linkage: 
 	add $4, %esp # Throw away the error code 
 	common_interrupt_enter
@@ -129,7 +129,7 @@ stack_segment_fault_linkage:
 	common_interrupt_exit
 	iret
 
-.globl general_protection_linkage
+.global general_protection_linkage;
 general_protection_linkage: 
 	add $4, %esp # Throw away the error code 
 	common_interrupt_enter
@@ -137,7 +137,7 @@ general_protection_linkage:
 	common_interrupt_exit
 	iret
 
-.globl page_fault_linkage
+.global page_fault_linkage;
 page_fault_linkage: 
 	add $4, %esp # Throw away the error code 
 	common_interrupt_enter
@@ -145,14 +145,14 @@ page_fault_linkage:
 	common_interrupt_exit
 	iret
 
-.globl floating_point_error_linkage
+.global floating_point_error_linkage;
 floating_point_error_linkage: 
 	common_interrupt_enter
 	call floating_point_error_handler
 	common_interrupt_exit
 	iret
 
-.globl alignment_check_linkage
+.global alignment_check_linkage;
 alignment_check_linkage: 
 	add $4, %esp # Throw away the error code 
 	common_interrupt_enter
@@ -160,17 +160,16 @@ alignment_check_linkage:
 	common_interrupt_exit
 	iret
 
-.globl machine_check_linkage
+.global machine_check_linkage;
 machine_check_linkage: 
 	common_interrupt_enter
 	call machine_check_handler
 	common_interrupt_exit
 	iret
 
-.globl floating_point_exception_linkage
+.global floating_point_exception_linkage;
 floating_point_exception_linkage: 
 	common_interrupt_enter
 	call floating_point_exception_handler
 	common_interrupt_exit
 	iret
-

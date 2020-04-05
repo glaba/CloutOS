@@ -17,7 +17,7 @@
 #define PCI_CONFIG_DATA    0xCFC
 
 // Addresses of PCI configuration space registers / related information
-#define PCI_VENDOR_ID_REGISTER      0x0
+#define PCI_VENDOR_ID_REGISTER      0x0 
 #define PCI_DEVICE_ID_REGISTER      0x2
 #define PCI_COMMAND_REGISTER        0x4
 #define PCI_INTERRUPT_LINE_REGISTER 0x3C
@@ -44,7 +44,7 @@
 #define PCI_ENABLE_IO_SPACE_ACCESS     0x1
 #define PCI_DISABLE_INTERRUPTS         0x200
 
-// Maximum number of buses, slots, and functions
+// Maximum number of buses, slots, and functions 
 #define NUM_BUSES     256
 #define NUM_SLOTS     256
 #define NUM_FUNCTIONS 8
@@ -76,7 +76,7 @@ void pci_irq_handler() {
 
 	PCI_DEBUG("Received PCI interrupt\n");
 
-	// Iterate through all the drivers' interrupt handlers and return
+	// Iterate through all the drivers' interrupt handlers and return 
 	//  if one of them realizes that this interrupt was theirs
 	pci_driver_list_item *cur_driver;
 	pci_function_list_item *cur_function;
@@ -85,18 +85,22 @@ void pci_irq_handler() {
 	     cur_driver != NULL && cur_function != NULL;
 	     cur_driver = cur_driver->next, cur_function = cur_function->next) {
 
-		if (cur_function->data.inited && cur_driver->data.irq_handler(&cur_function->data) == 0) {
+		if (cur_driver->data.irq_handler != NULL && cur_function->data.inited && cur_driver->data.irq_handler(&cur_function->data) == 0) {
 			PCI_DEBUG("PCI interrupt successfully handled by %s driver\n", cur_driver->data.name);
+			
+			// Unlock the lock
+			spin_unlock(&pci_spin_lock);
 
-			goto pci_irq_handler_end;
+			// Send EOI to the PIC
+			send_eoi(PCI_IRQ);
+			return;
 		}
 	}
 
 	// If we got here, then no driver returned success and the interrupt was not handled
 	PCI_DEBUG("No driver found to handle interrupt!\n");
 
-pci_irq_handler_end:
-	// Unlock the lock
+	// Unlock the lock 
 	spin_unlock(&pci_spin_lock);
 
 	// Mark that we are going back to userspace
@@ -117,7 +121,7 @@ int register_pci_driver(pci_driver driver) {
 
 	// Lock before we use pci_drivers, pci_functions and num_loaded_drivers
 	spin_lock(&pci_spin_lock);
-
+	
 	// Allocate memory for the new driver and function
 	pci_driver_list_item *driver_list_item = kmalloc(sizeof(pci_driver_list_item));
 	if (driver_list_item == NULL)
@@ -147,7 +151,7 @@ int register_pci_driver(pci_driver driver) {
 
 	spin_unlock(&pci_spin_lock);
 
-	PCI_DEBUG("Registered driver for VendorID 0x%x, DeviceID 0x%x and Function %d\n",
+	PCI_DEBUG("Registered driver for VendorID 0x%x, DeviceID 0x%x and Function %d\n", 
 		driver.vendor, driver.device, driver.function);
 
 	// Return success since we were able to add the driver
@@ -155,7 +159,7 @@ int register_pci_driver(pci_driver driver) {
 }
 
 /*
- * Undoes any initialization performed by initialize_pci_function
+ * Undoes any initialization performed by initialize_pci_function 
  *
  * INPUTS: func: the PCI function for which to undo initialization steps
  */
@@ -202,7 +206,7 @@ int initialize_pci_function(pci_driver *driver, pci_function *func, uint8_t bus,
 
 	// Write correct configuration to the command register
 	// This also implicitly enables interrupts
-	pci_config_write(func, PCI_COMMAND_REGISTER, 2,
+	pci_config_write(func, PCI_COMMAND_REGISTER, 2, 
 		PCI_ALLOW_BUS_MASTER | PCI_ENABLE_IO_SPACE_ACCESS | PCI_ENABLE_MEMORY_SPACE_ACCESS);
 
 	PCI_DEBUG("   Wrote values into command register\n");
@@ -244,10 +248,10 @@ int initialize_pci_function(pci_driver *driver, pci_function *func, uint8_t bus,
 
 			// Take negative of masked value to get size (essentially a magic procedure specified in the documentation)
 			uint32_t size = -(pci_config_read(func, PCI_BAR_BASE + 4 * bar, 4) & PCI_BAR_MEMORY_SPACE_BASE_ADDR_MASK);
-
+		
 			// Write the original value back to the BAR register
 			pci_config_write(func, PCI_BAR_BASE + 4 * bar, 4, original_value);
-
+		
 			// If for some reason the base pointer is null but the size is non-zero
 			//  there was a misconfiguration at some point and we have failed
 			if (base_addr == 0 && size != 0) {
@@ -258,9 +262,9 @@ int initialize_pci_function(pci_driver *driver, pci_function *func, uint8_t bus,
 			// If there should be a MMIO region
 			if (base_addr != 0) {
 				// Page the MMIO region into the kernel page directory
-				if (identity_map_containing_region((void*)base_addr, size,
+				if (identity_map_containing_region((void*)base_addr, size, 
 						PAGE_DISABLE_CACHE | PAGE_READ_WRITE | PAGE_WRITE_THROUGH_CACHE) != 0) {
-
+					
 					// If this fails, quit device initialization
 					PCI_DEBUG("   Adding MMIO to kernel page directory failed, failing\n");
 					goto pci_init_failed;
@@ -280,7 +284,7 @@ int initialize_pci_function(pci_driver *driver, pci_function *func, uint8_t bus,
 	func->irq = PCI_IRQ;
 	PCI_DEBUG("   Set device to use IRQ%d\n", PCI_IRQ);
 
-	// Device has been inited
+	// Device has been inited	
 	func->inited = 1;
 	PCI_DEBUG("   Successfully inited device\n");
 	return 0;
@@ -288,7 +292,7 @@ int initialize_pci_function(pci_driver *driver, pci_function *func, uint8_t bus,
 	// Exception handling is a standard use for goto labels in C
 pci_init_failed:
 	PCI_DEBUG("   Initialization failed\n");
-
+	
 	// Undo any initialization steps taken
 	uninitialize_pci_function(func);
 
@@ -329,16 +333,16 @@ void enumerate_pci_devices() {
 						 cur_driver != NULL && cur_function != NULL;
 						 cur_driver = cur_driver->next, cur_function = cur_function->next) {
 
-						if (cur_driver->data.vendor == vendor &&
-							cur_driver->data.device == device &&
+						if (cur_driver->data.vendor == vendor && 
+							cur_driver->data.device == device && 
 							cur_driver->data.function == function) {
 
 							// Initialize the function's memory mapped I/O and interrupts
-							if (initialize_pci_function(&cur_driver->data,
+							if (initialize_pci_function(&cur_driver->data, 
 									&cur_function->data, bus, slot, function) == 0) {
 
 								// Use the driver to initialize the device if regular init succeeded
-								PCI_DEBUG("Begin driver initialization - VendorID 0x%x, DeviceID 0x%x\n",
+								PCI_DEBUG("Begin driver initialization - VendorID 0x%x, DeviceID 0x%x\n", 
 									cur_driver->data.vendor, cur_driver->data.device);
 
 								if (cur_driver->data.init_device(&cur_function->data) != 0) {
@@ -358,7 +362,7 @@ void enumerate_pci_devices() {
 }
 
 /*
- * Gets the configuration space address for the given device (bus, slot, func)
+ * Gets the configuration space address for the given device (bus, slot, func) 
  *  and the given offset into that device's configuration space
  * INPUTS: bus, slot, func: three values which specify the position of the device in the PCI bus
  *         offset: the offset into the device's configuration space
@@ -369,15 +373,15 @@ uint32_t pci_config_get_addr(int8_t bus, uint8_t slot, uint8_t func, uint8_t off
 	uint32_t lbus  = (uint32_t)bus;
 	uint32_t lslot = (uint32_t)slot;
 	uint32_t lfunc = (uint32_t)func;
-
-	// Creates a configuration space address of the correct format
+ 
+	// Creates a configuration space address of the correct format 
 	address = (uint32_t)((lbus << 16) | (lslot << 11) |
 			  (lfunc << 8) | (offset & 0xFC) | ((uint32_t)0x80000000));
 
 	return address;
 }
 
-/*
+/* 
  * Reads a 32-bit value from the PCI Configuration Space
  *
  * INPUTS: bus, slot: the number of the PCI bus and the slot of the device in that bus
@@ -385,8 +389,8 @@ uint32_t pci_config_get_addr(int8_t bus, uint8_t slot, uint8_t func, uint8_t off
  *         offset: the offset into the 256-byte configuration space
  *         size: the number of bytes to read (must range from 1-4, and cannot straddle a 4-byte boundary)
  *               this is in the little endian direction
- * OUTPUTS: the 32-bit value at the specified location in the configuration space
- *          for the specified device
+ * OUTPUTS: the 32-bit value at the specified location in the configuration space 
+ *          for the specified device 
  */
 uint32_t _pci_config_read(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint8_t size) {
 	uint32_t data, i;
@@ -407,12 +411,12 @@ uint32_t _pci_config_read(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offse
 		mask = mask << 8;
 	mask -= 1;
 	// Mask out the bits of data that we don't want
-	data = data & mask;
+	data = data & mask; 
 
 	return data;
 }
 
-/*
+/* 
  * Writes a 32-bit value to the PCI Configuration Space
  *
  * INPUTS: bus, slot: the number of the PCI bus and the slot of the device in that bus
@@ -448,14 +452,14 @@ void _pci_config_write(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, 
 	outl(cur_data, PCI_CONFIG_DATA);
 }
 
-/*
+/* 
  * Calls the other pci_config_read with bus, slot, func values from pci_function struct
  */
 uint32_t pci_config_read(pci_function *func, uint8_t offset, uint8_t size) {
 	return _pci_config_read(func->bus, func->slot, func->function, offset, size);
 }
 
-/*
+/* 
  * Calls the other pci_config_write with bus, slot, func values from pci_function struct
  */
 void pci_config_write(pci_function *func, uint8_t offset, uint8_t size, uint32_t data) {

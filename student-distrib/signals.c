@@ -14,6 +14,8 @@ static uint32_t gadget[GADGET_SIZE] = {
 	0xB8, 0x0A, 0x00, 0x00, 0x00, 0xCD, 0x80
 };
 
+static int signals_inited = 0;
+
 /*
  * Called by the PIT every ten seconds so that programs can get the alarm signal
  */
@@ -41,6 +43,7 @@ int32_t init_signals() {
 	if (register_periodic_callback(PIT_FREQUENCY / SIGNAL_ALARM_FREQ, alarm_callback) == 0)
 		return -1;
 
+	signals_inited = 1;
 	return 0;
 }
 
@@ -91,6 +94,12 @@ int32_t send_signal(int32_t pid, int32_t signum, uint32_t data) {
  */
 void handle_signals() {
 	spin_lock_irqsave(pcb_spin_lock);
+
+	// Check to see if we can start signal handling
+	if (!signals_inited || pcbs.length == 0) {
+		spin_unlock_irqsave(pcb_spin_lock);
+		return;
+	}
 
 	pcb_t *cur_pcb = get_pcb();
 

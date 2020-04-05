@@ -100,6 +100,6 @@ typedef LIST_ITEM(dhcp_option, dhcp_option_list_item) dhcp_option_list_item;
 // Sends out a DHCP discover packet over the specified Ethernet interface
 int send_dhcp_discover_packet(uint32_t id);
 // Receives a DHCP packet and performs appropriate actions (depends on the current state of the interaction)
-int receive_dhcp_packet(uint8_t *buffer, uint32_t length, uint32_t id);
+int receive_dhcp_packet(uint8_t *buffer, uint8_t src_mac_addr[MAC_ADDR_SIZE], uint32_t length, uint32_t id);
 
 #endif

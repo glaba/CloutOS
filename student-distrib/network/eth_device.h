@@ -21,6 +21,8 @@ typedef struct eth_device {
 	uint8_t subnet_mask[IPV4_ADDR_SIZE];
 	// The IP address of the router
 	uint8_t router_ip_addr[IPV4_ADDR_SIZE];
+	// The MAC address of the router
+	uint8_t router_mac_addr[MAC_ADDR_SIZE];
 	// Function to initialize the interface the driver exposes to the OS,
 	//  including the mac_addr field
 	// Set by the device driver and called by the OS
